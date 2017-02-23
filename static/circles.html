@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+  <head>
+    <title>wifi-py-rpi-car-controller: Circles</title>
+    <link rel="stylesheet" type="text/css" href="circles.css" />
+    <script type="text/javascript" src="circles.js"></script>
+  </head>
+  <body ondragstart="return false;" ondrop="return false;">
+    <table class="coords">
+      <tr><td class="name">X:</td><td class="value" id="value_x">uninitialised</td></tr>
+      <tr><td class="name">Y:</td><td class="value" id="value_y">uninitialised</td></tr>
+    </table>
+    <svg id="stick" width="500" height="500">
+      <rect id="background" x="0" y="0" width="500" height="500" />
+      <!-- Previous line adds a coloured background --->
+
+      <circle id="circle_red" cx="50" cy="50" r="40" />
+      <circle id="circle_blue" cx="50" cy="50" r="40" />
+
+      <!-- Finally: Add a transparent overlay to simplfy event handling --->
+      <rect id="foreground" x="0" y="0" width="500" height="500" />
+    </svg>
+    <p><a href="/">Return to main page.</a></p>
+  </body>
+</html>

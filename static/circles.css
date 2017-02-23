@@ -1,0 +1,33 @@
+table.coords {
+      margin-left: auto;
+      margin-right: auto;
+      width: 300px;
+}
+table.coords td.name {
+      font-weight: bold;
+      width: 25px;
+}
+table.coords td.value {
+      color: blue;
+}
+#stick {
+      margin-left: auto;
+      margin-right: auto;
+      display: block;
+}
+#background {
+      fill: #ccf;
+}
+#foreground {
+      fill-opacity: 0;
+}
+#circle_red {
+      fill: #afa;
+      stroke: red;
+      stroke-width: 4;
+}
+#circle_blue {
+      fill: #aaa;
+      stroke: blue;
+      stroke-width: 4;
+}

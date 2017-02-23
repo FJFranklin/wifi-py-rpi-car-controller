@@ -1,0 +1,64 @@
+<!doctype html>
+<html>
+  <head>
+    <title>wifi-py-rpi-car-controller</title>
+  </head>
+  <body style="background-color:#003;">
+    <div style="width:90%;background-color:white;margin:auto;">
+      <div style="margin:10px;padding-bottom:10px;">
+	<h1>wifi-py-rpi-car-controller</h1>
+
+	<h2>Introduction</h2>
+
+	<p>In this project, the focus is on communication over WiFi, with the aim of being able to control a car
+	  or other vehicle using a web interface. Ultimately I want to get this working with MQTT - essentially
+	  an IoT solution - but initially this will use a web server and HTTP.</p>
+
+	<p>A computer-controlled car - and here I'll assume the computer is a WiFi-enabled Raspberry Pi running
+	  linux - needs to interact with the human (or other remote) controller, and needs to look after itself,
+	  i.e., check the sensors for obstacles, update the current drive settings, adjust the steering, etc. In
+	  other words, it needs to multitask. The best way to do this is via threads. It also makes sense to have
+	  an event loop.</p>
+
+	<p>Given all these requirements, I have created this project that implements the basic logic:</p>
+
+	<ul>
+	  <li>Written in Python and using threading and Queue for event management, and web.py for the web server.</li>
+	  <li>Currently the web interface is written as a non-templated HTML document. A query/command mechanism
+	    is provided for passing instructions to the car controller (via the server) and receiving data from it.</li>
+	</ul>
+
+	<h2>Tests</h2>
+
+	<ul>
+	  <li><a href="/static/circles.html">Circles</a></li>
+	</ul>
+
+	<h2>Finished?</h2>
+
+	<p><a href="/server?name=stop">Click here to stop the web server...</a></p>
+
+	<h2>License</h2>
+
+	<p>Unless otherwise stated, the code and examples here are provided under the MIT License:</p>
+
+	<p style="font-style:italic;font-size:small;">Copyright (c) 2017 Francis James Franklin</p>
+
+	<p style="font-style:italic;font-size:small;">Permission is hereby granted, free of charge, to any person
+	  obtaining a copy of this software and associated documentation files (the "Software"), to deal in the
+	  Software without restriction, including without limitation the rights to use, copy, modify, merge,
+	  publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom
+	  the Software is furnished to do so, subject to the following conditions:</p>
+
+	<p style="font-style:italic;font-size:small;">The above copyright notice and this permission notice shall
+	  be included in all copies or substantial portions of the Software.</p>
+
+	<p style="font-style:italic;font-size:small;">THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
+	  KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+	  PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE
+	  FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+	  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</p>
+      </div>
+    </div>
+  </body>
+</html>
