@@ -1,33 +1,34 @@
 table.coords {
-      margin-left: auto;
-      margin-right: auto;
-      width: 300px;
+    margin-left: auto;
+    margin-right: auto;
+    width: 300px;
 }
 table.coords td.name {
-      font-weight: bold;
-      width: 25px;
+    font-weight: bold;
+    width: 25px;
 }
 table.coords td.value {
-      color: blue;
+    color: blue;
 }
 #stick {
-      margin-left: auto;
-      margin-right: auto;
-      display: block;
+    margin-left: auto;
+    margin-right: auto;
+    display: block;
 }
 #background {
-      fill: #ccf;
+    fill: #ccf;
 }
 #foreground {
-      fill-opacity: 0;
+    fill: black;
+    fill-opacity: 0.01;
 }
 #circle_red {
-      fill: #afa;
-      stroke: red;
-      stroke-width: 4;
+    fill: #afa;
+    stroke: red;
+    stroke-width: 4;
 }
 #circle_blue {
-      fill: #aaa;
-      stroke: blue;
-      stroke-width: 4;
+    fill: #aaa;
+    stroke: blue;
+    stroke-width: 4;
 }
