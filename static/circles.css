@@ -15,15 +15,20 @@ table.coords td.value {
     margin-right: auto;
     display: block;
 }
+body {
+    background-color: black;
+}
 #background {
-    fill: #ccf;
+    fill: black;
+    stroke: yellow;
+    stroke-width: 8;
 }
 #foreground {
     fill: black;
     fill-opacity: 0.01;
 }
 #circle_red {
-    fill: #afa;
+    fill: none;
     stroke: red;
     stroke-width: 4;
 }
@@ -31,4 +36,8 @@ table.coords td.value {
     fill: #aaa;
     stroke: blue;
     stroke-width: 4;
+}
+.decoration {
+    stroke: white;
+    stroke-width: 2;
 }
