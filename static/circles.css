@@ -1,14 +1,12 @@
-table.coords {
-    margin-left: auto;
-    margin-right: auto;
-    width: 300px;
+text {
+    font-size: 35;
 }
-table.coords td.name {
+.name {
     font-weight: bold;
-    width: 25px;
+    fill: blue;
 }
-table.coords td.value {
-    color: blue;
+.value {
+    fill: white;
 }
 #stick {
     margin-left: auto;
@@ -40,4 +38,7 @@ body {
 .decoration {
     stroke: white;
     stroke-width: 2;
+}
+.gauge {
+    fill: #111;
 }

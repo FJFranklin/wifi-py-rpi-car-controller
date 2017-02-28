@@ -92,6 +92,8 @@ function e_t_move (event) {
  */
 var resize_timeout = 0;
 
+function redraw_gauges (width, height) {
+}
 function window_resize () {
     var win = document.defaultView;
 
@@ -99,6 +101,11 @@ function window_resize () {
     var sh = win.innerHeight - 20;
 
     var uw = 0; // width of input box
+
+    var gx = 50; // gauge zone
+    var gy = 50;
+    var gw = 0;
+    var gh = 0;
 
     var bPortrait = true;
     if (sw > sh) {
@@ -113,6 +120,8 @@ function window_resize () {
         } else {
             uw = uh_max;
         }
+	gw = uw_max;
+	gh = sh - 120 - uw;
     } else {
         var uw_max = sw - 200; // allow 200 for other display elements
         var uh_max = sh - 100;
@@ -122,9 +131,42 @@ function window_resize () {
         } else {
             uw = uh_max;
         }
+	gw = sw - 120 - uw;
+	gh = uh_max;
     }
     var ox = sw - 50 - uw / 2; // position of input box
     var oy = sh - 50 - uw / 2;
+
+    var gauge_13_x = gx;
+    var gauge_24_x = 0;
+
+    var gauge_1_y = gy;
+    var gauge_2_y = 0;
+    var gauge_3_y = 0;
+    var gauge_3_y = 0;
+
+    var gauge_width  = 0;
+    var gauge_height = 0;
+
+    if (gw > gh) { // gauge zone is landscape
+	gauge_width  = (gw - 20) / 2;
+	gauge_height = (gh - 20) / 2;
+
+	gauge_24_x = gauge_13_x + 20 + gauge_width;
+
+	gauge_2_y  = gauge_1_y;
+	gauge_3_y  = gauge_1_y  + 20 + gauge_height;
+	gauge_4_y  = gauge_3_y;
+    } else {       // gauge zone is portrait
+	gauge_width  = gw;
+	gauge_height = (gh - 60) / 4;
+
+	gauge_24_x = gauge_13_x;
+
+	gauge_2_y  = gauge_1_y  + 20 + gauge_height;
+	gauge_3_y  = gauge_2_y  + 20 + gauge_height;
+	gauge_4_y  = gauge_3_y  + 20 + gauge_height;
+    }
 
     var stick      = document.getElementById ("stick");
     var control    = document.getElementById ("control");
@@ -132,6 +174,14 @@ function window_resize () {
     var x_axis     = document.getElementById ("x_axis");
     var y_axis     = document.getElementById ("y_axis");
     var foreground = document.getElementById ("foreground");
+    var gauge_1    = document.getElementById ("gauge_1");
+    var gauge_2    = document.getElementById ("gauge_2");
+    var gauge_3    = document.getElementById ("gauge_3");
+    var gauge_4    = document.getElementById ("gauge_4");
+    var gauge_1r   = document.getElementById ("gauge_1r");
+    var gauge_2r   = document.getElementById ("gauge_2r");
+    var gauge_3r   = document.getElementById ("gauge_3r");
+    var gauge_4r   = document.getElementById ("gauge_4r");
 
     stick.setAttribute ("width",  sw.toString ());
     stick.setAttribute ("height", sh.toString ());
@@ -153,6 +203,25 @@ function window_resize () {
     foreground.setAttribute ("y", (-uw/2).toString ());
     foreground.setAttribute ("width",  uw.toString ());
     foreground.setAttribute ("height", uw.toString ());
+
+    gauge_1.setAttribute ("transform", "matrix(1,0,0,1," + gauge_13_x.toString () + "," + gauge_1_y.toString () + ")");
+    gauge_2.setAttribute ("transform", "matrix(1,0,0,1," + gauge_24_x.toString () + "," + gauge_2_y.toString () + ")");
+    gauge_3.setAttribute ("transform", "matrix(1,0,0,1," + gauge_13_x.toString () + "," + gauge_3_y.toString () + ")");
+    gauge_4.setAttribute ("transform", "matrix(1,0,0,1," + gauge_24_x.toString () + "," + gauge_4_y.toString () + ")");
+
+    gauge_1r.setAttribute ("width",  gauge_width.toString ());
+    gauge_1r.setAttribute ("height", gauge_height.toString ());
+
+    gauge_2r.setAttribute ("width",  gauge_width.toString ());
+    gauge_2r.setAttribute ("height", gauge_height.toString ());
+
+    gauge_3r.setAttribute ("width",  gauge_width.toString ());
+    gauge_3r.setAttribute ("height", gauge_height.toString ());
+
+    gauge_4r.setAttribute ("width",  gauge_width.toString ());
+    gauge_4r.setAttribute ("height", gauge_height.toString ());
+
+    redraw_gauges (gauge_width, gauge_height);
 }
 function e_w_resize (event) { // ignore resize events as long as an execution is in the queue
     if (!resize_timeout) {
