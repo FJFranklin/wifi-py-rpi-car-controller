@@ -42,3 +42,7 @@ body {
 .gauge {
     fill: #111;
 }
+.pivot {
+    fill: black;
+    stroke: red;
+}

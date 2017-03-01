@@ -4,6 +4,16 @@ function user_control (x, y) { // -1 <= x,y <= 1
 
     value_x.innerHTML = x.toFixed (3);
     value_y.innerHTML = y.toFixed (3);
+
+    var g3_needle = document.getElementById ("g3_needle");
+    var g3_rotate = -60 * y;
+
+    g3_needle.setAttribute ("transform", "rotate(" + g3_rotate.toFixed (1) + ")");
+
+    var g4_needle = document.getElementById ("g4_needle");
+    var g4_rotate = -60 * x;
+
+    g4_needle.setAttribute ("transform", "rotate(" + g4_rotate.toFixed (1) + ")");
 }
 
 /* Red circle moves in response to button-down events; X & Y values update according to mouse position events
@@ -93,6 +103,40 @@ function e_t_move (event) {
 var resize_timeout = 0;
 
 function redraw_gauges (width, height) {
+    var ox = width / 2;
+    var oy = height - 10;
+    var sx = (width  - 20) / 160;
+    var sy = (20 - height) /  80;
+
+    var g3_dial    = document.getElementById ("g3_dial");
+    var g3_pivot   = document.getElementById ("g3_pivot");
+    var g3_label_L = document.getElementById ("g3_label_L");
+    var g3_label_R = document.getElementById ("g3_label_R");
+
+    g3_dial.setAttribute ("transform", "matrix(" + sx.toFixed (3) + ",0,0," + sy.toFixed (3) + "," +
+			  ox.toString () + "," + oy.toString () + ")");
+
+    g3_pivot.setAttribute ("cx", ox.toString ());
+    g3_pivot.setAttribute ("cy", oy.toString ());
+
+    g3_label_L.setAttribute ("y", (height - 10).toString ());
+    g3_label_R.setAttribute ("y", (height - 10).toString ());
+    g3_label_R.setAttribute ("x", (width  - 10).toString ());
+
+    var g4_dial    = document.getElementById ("g4_dial");
+    var g4_pivot   = document.getElementById ("g4_pivot");
+    var g4_label_L = document.getElementById ("g4_label_L");
+    var g4_label_R = document.getElementById ("g4_label_R");
+
+    g4_dial.setAttribute ("transform", "matrix(" + sx.toFixed (3) + ",0,0," + sy.toFixed (3) + "," +
+			  ox.toString () + "," + oy.toString () + ")");
+
+    g4_pivot.setAttribute ("cx", ox.toString ());
+    g4_pivot.setAttribute ("cy", oy.toString ());
+
+    g4_label_L.setAttribute ("y", (height - 10).toString ());
+    g4_label_R.setAttribute ("y", (height - 10).toString ());
+    g4_label_R.setAttribute ("x", (width  - 10).toString ());
 }
 function window_resize () {
     var win = document.defaultView;
