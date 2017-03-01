@@ -46,3 +46,12 @@ body {
     fill: black;
     stroke: red;
 }
+.nq_good {
+    fill: white;
+}
+.nq_none {
+    fill: #111;
+}
+.nq_bad {
+    fill: red;
+}

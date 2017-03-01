@@ -226,11 +226,14 @@ function window_resize () {
     var gauge_2r   = document.getElementById ("gauge_2r");
     var gauge_3r   = document.getElementById ("gauge_3r");
     var gauge_4r   = document.getElementById ("gauge_4r");
+    var net_qual   = document.getElementById ("net_qual");
 
     stick.setAttribute ("width",  sw.toString ());
     stick.setAttribute ("height", sh.toString ());
 
     control.setAttribute ("transform", "matrix(1,0,0,-1," + ox.toString () + "," + oy.toString () + ")");
+
+    net_qual.setAttribute ("transform", "matrix(0," + (uw / 200).toString () + ",2.5,0," + (uw / 2).toString () + ",0)");
 
     input_zone.setAttribute ("x", (-uw/2).toString ());
     input_zone.setAttribute ("y", (-uw/2).toString ());
@@ -276,6 +279,106 @@ function e_w_resize (event) { // ignore resize events as long as an execution is
     }
 }
 
+function update_net_quality (delta_tick) {
+    var nq0 = document.getElementById ("nq0");
+    var nq1 = document.getElementById ("nq1");
+    var nq2 = document.getElementById ("nq2");
+    var nq3 = document.getElementById ("nq3");
+    var nq4 = document.getElementById ("nq4");
+    var nq5 = document.getElementById ("nq5");
+    var nq6 = document.getElementById ("nq6");
+    var nq7 = document.getElementById ("nq7");
+    var nq8 = document.getElementById ("nq8");
+    var nq9 = document.getElementById ("nq9");
+
+    if (delta_tick <= 1) {
+	nq0.setAttribute ("class", "nq_good");
+    } else {
+	nq0.setAttribute ("class", "nq_none");
+    }
+    if (delta_tick <= 2) {
+	nq1.setAttribute ("class", "nq_good");
+    } else {
+	nq1.setAttribute ("class", "nq_none");
+    }
+    if (delta_tick <= 3) {
+	nq2.setAttribute ("class", "nq_good");
+    } else {
+	nq2.setAttribute ("class", "nq_none");
+    }
+    if (delta_tick <= 4) {
+	nq3.setAttribute ("class", "nq_good");
+    } else {
+	nq3.setAttribute ("class", "nq_none");
+    }
+    if (delta_tick <= 5) {
+	nq4.setAttribute ("class", "nq_good");
+    } else {
+	nq4.setAttribute ("class", "nq_none");
+    }
+    if (delta_tick <= 6) {
+	nq5.setAttribute ("class", "nq_good");
+    } else {
+	nq5.setAttribute ("class", "nq_none");
+    }
+    if (delta_tick <= 7) {
+	nq6.setAttribute ("class", "nq_good");
+    } else {
+	nq6.setAttribute ("class", "nq_none");
+    }
+    if (delta_tick <= 8) {
+	nq7.setAttribute ("class", "nq_good");
+    } else {
+	nq7.setAttribute ("class", "nq_none");
+    }
+    if (delta_tick <= 9) {
+	if (delta_tick <= 8) {
+	    nq8.setAttribute ("class", "nq_good");
+	} else {
+	    nq8.setAttribute ("class", "nq_bad");
+	}
+    } else {
+	nq8.setAttribute ("class", "nq_none");
+    }
+    if (delta_tick <= 10) {
+	if (delta_tick <= 8) {
+	    nq9.setAttribute ("class", "nq_good");
+	} else {
+	    nq9.setAttribute ("class", "nq_bad");
+	}
+    } else {
+	nq9.setAttribute ("class", "nq_none");
+    }
+    if (delta_tick > 10) {
+	if (delta_tick % 20 < 10) {
+	    nq0.setAttribute ("class", "nq_none");
+	    nq1.setAttribute ("class", "nq_none");
+	    nq2.setAttribute ("class", "nq_none");
+	    nq3.setAttribute ("class", "nq_none");
+	    nq4.setAttribute ("class", "nq_none");
+	    nq5.setAttribute ("class", "nq_none");
+	    nq6.setAttribute ("class", "nq_none");
+	    nq7.setAttribute ("class", "nq_none");
+	    nq8.setAttribute ("class", "nq_none");
+	    nq9.setAttribute ("class", "nq_none");
+	} else {
+	    nq0.setAttribute ("class", "nq_bad");
+	    nq1.setAttribute ("class", "nq_bad");
+	    nq2.setAttribute ("class", "nq_bad");
+	    nq3.setAttribute ("class", "nq_bad");
+	    nq4.setAttribute ("class", "nq_bad");
+	    nq5.setAttribute ("class", "nq_bad");
+	    nq6.setAttribute ("class", "nq_bad");
+	    nq7.setAttribute ("class", "nq_bad");
+	    nq8.setAttribute ("class", "nq_bad");
+	    nq9.setAttribute ("class", "nq_bad");
+	}
+    }
+}
+
+var tick_last_response = 0;
+var tick = 0;
+
 /* Asynchronous request from server, sending and receiving text
  * 
  * (Take a look at https://www.html5rocks.com/en/tutorials/file/xhr2/ for getting binary data, e.g., images)
@@ -286,6 +389,7 @@ function send_request_query (str_name_namespace, str_value_query, callback_funct
     query.open ("GET", "/query?name=" + str_name_namespace + "&value=" + str_value_query);
     query.responseType = "text";
     query.onload = function (e) {
+	tick_last_response = tick;
         callback_function (this.response);
     }
     query.send (); // TODO? Implement error checking?
@@ -307,6 +411,9 @@ function periodic_update () {
     /* In this Circles example, only the blue circle's position needs to be updated periodically
      */
     send_request_query ("circles", "blue_xy", blue_circle_update);
+
+    update_net_quality (tick - tick_last_response);
+    tick = tick + 1;
 }
 function get_started () {
     window.setInterval (periodic_update, 100); // interval in milliseconds
