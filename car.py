@@ -1,6 +1,5 @@
 from datetime import datetime
 import threading
-import numpy as np
 
 import server
 import ticktock
@@ -38,11 +37,21 @@ class car_controller (object):
         response = ''
 # This is a request from the human interface
 # IMPORTANT: Do not change any local variables! This is a request for information, not a request for action.
-        if name == 'circle_blue_xy':
-            t = datetime.now().microsecond / 1000000.0
-            cx = (1 + np.cos (t * 2 * np.pi)) * 200 + 50
-            cy = (1 + np.sin (t * 2 * np.pi)) * 200 + 50
-            response = str (cx) + ',' + str (cy)
+        if name == 'circles':
+            if value == 'blue_xy':
+                t_now = datetime.now ()
+                cx = (((t_now.second %  6) + t_now.microsecond / 1000000.0) - 3) / 3
+                cy = (((t_now.second % 10) + t_now.microsecond / 1000000.0) - 5) / 5
+                cx = cx * 200 + 250
+                cy = cy * 200 + 250
+                response = str (cx) + ',' + str (cy)
+        if name == 'clock':
+            if value == 'time':
+                t_now = datetime.now ()
+                c_s = -6 * t_now.second
+                c_m = -6 * t_now.minute - t_now.second / 10
+                c_h = 360 - 30 * t_now.hour - t_now.minute / 2
+                response = str (c_h) + ',' + str (c_m) + ',' + str (c_s)
 # ----
         print ('query: ' + response)
         return response
@@ -50,13 +59,12 @@ class car_controller (object):
 # ======== DO NOT TOUCH ANYTHING BELOW THIS LINE ========
 
     def command (self, name, value):
-        if name == 'stop':
-            self.queue_controller.quit ()
-        else:
-            self.queue_controller.event (name, value)
+        self.queue_controller.event (name, value)
+        return
 
-        response = ''
-        return response
+    def stop (self):
+        self.queue_controller.stop ()
+        return
 
     def run_in_background (self):
         t = threading.Thread (target=run_queue, args=(self.queue_controller,))

@@ -14,7 +14,8 @@ class server (object):
         urls = (
             '/', 'server_index',
             '/query', 'server_query',
-            '/command', 'server_command'
+            '/command', 'server_command',
+            '/server', 'server_special'
         )
         self.app = web.application (urls, global_vars)
         self.app.internalerror = web.debugerror
@@ -30,7 +31,7 @@ class server (object):
         return
 
     def index (self):
-        return open('static/index.html', 'r').read ()
+        return open ('index.html', 'r').read ()
 
     def query (self, name, value):
         if self.handler is None:
@@ -40,15 +41,19 @@ class server (object):
         return response
 
     def command (self, name, value):
-        if self.handler is None:
-            response = ''
-        else:
-            response = self.handler.command (name, value)
+        response = ''
 
+        if self.handler is not None:
+            self.handler.command (name, value)
+
+        return response # There is no response - the command is handled asynchronously
+
+    def special (self, name, value):
         if name == 'stop':
+            self.handler.stop ()
             self.app.stop ()
 
-        return response
+        return 'Stopping server. This may take a few seconds...'
 
 class server_index:
     def GET (self):
@@ -65,6 +70,12 @@ class server_command:
         args = web.input (name='', value='')
         if (args.name != ''):
             return global_server().command (args.name, args.value)
+
+class server_special:
+    def GET (self):
+        args = web.input (name='', value='')
+        if (args.name != ''):
+            return global_server().special (args.name, args.value)
 
 if __name__ == "__main__":
     global_server().run ()

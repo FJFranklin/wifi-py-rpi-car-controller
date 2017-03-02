@@ -24,8 +24,8 @@ class qController (object):
         self.TickTock = PriorityQueue ()
         return
         
-    def quit (self):
-        q = qData ('quit')
+    def stop (self):
+        q = qData ('stop')
         self.TickTock.put ((qPriorityHigh, q))
         return
 
@@ -47,7 +47,7 @@ class qController (object):
         while True:
             p, q = self.TickTock.get ()
 
-            if q.event_type == 'quit':
+            if q.event_type == 'stop':
                 break
 
             event_handler = q.event_handler
