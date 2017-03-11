@@ -1,15 +1,15 @@
 /*
- * File:   newmainXC16.c
- * Author: fjf
+ * File:   main.c
+ * Author: Francis James Franklin <fjf@alinameridon.com>
  *
- * Created on 08 March 2017, 10:18
+ * Created on 8 March 2017
  */
 
-#include <stdint.h>
-#include <stdbool.h>
-
 #include <xc.h>
-#include "simple_uart.h"
+
+#include "car/uart.h"
+#include "car/clock.h"
+#include "car/command.h"
 
 // #include "libpic30.h"
 // #include "uart.h"
@@ -47,135 +47,44 @@
 // FICD
 #pragma config ICS = PGD1        // ICD Communication Channel Select Bits->Communicate on PGEC1 and PGED1
 
-static bool     bTick      = false;
-static bool     bTick_dSec = false;
-static bool     bTimerTick = true;
-static uint16_t timerCount = 0;
-static uint16_t dSec_Count = 0;
-
-uint16_t app_time_s = 0;
-uint16_t app_time_m = 0;
-uint16_t app_time_h = 0;
-
-void __attribute__((__interupt__, no_auto_psv)) _T1Interrupt (void) {
-  IFSO0bits.T1IF = false;
-
-  if (bTimerTick) {      // counted 10 microseconds
-    bTimerTick = false;
-
-    PR1 = 0x7A3E;
-    /* End of 10 microsecond period */
-
-  } else {               // rest of 0.8 ms period
-    bTick      = true;   // interrupt never sets this to false; 0.8 ms
-    bTimerTick = true;   // interrupt internal flag
-
-    PR1 = 0x018B;
-    /* Beginning of 10 microsecond period */
-
-    if (++timerCount == 1250) {
-      timerCount = 0;
-      bTick_dSec = true; // interrupt never sets this to false; 100 ms
-
-      /* The internal clock
-       */
-      if (++dSec_Count == 10) {
-	dSec_Count = 0;
-	if (++app_time_s == 60) {
-	  app_time_s = 0;
-	  if (++app_time_m == 60) {
-	    app_time_m = 0;
-	    ++app_time_f;
-	  }
-	}
-      }
-    }
-  }
-}
-
-struct command_args {
-  uint8_t arg[4];
-};
-static struct command_args cargs_queue[4];
-static uint8_t cargs_count;
-
-static bool com_queue_add (const struct command_args * cargs) {
-  if (cargs_count < 4) {
-    cargs_queue[cargs_count++] = *cargs;
-    return true;
-  }
-  return false;
-}
-
-static bool com_queue_next (struct command_args * cargs) {
-  int i;
-
-  if (cargs_count) {
-    *cargs = cargs_queue[0];
-    --cargs_count;
-
-    for (i = 0; i < cargs_count; i++) {
-      cargs_queue[i] = cargs_queue[i+1];
-    }
-  }
-  return false;
-}
-
 void simple_test () {
   char c;
-  char buf[10];
-  char com[8];
 
-  uint8_t com_count = 0;
+  uint16_t microseconds;
 
-  struct command_args cargs;
-  struct command_args cnext;
+  car_time_t    now;
 
-  uart_t * U1 = uart_create ('1', 85);
+  car_parse_t   parser = car_command_parser (); // command parser
+  car_command_t command;
+  car_uart_t *  U1 = car_uart_create ('1', 85);
+
+  car_clock_init ();
 
   while (true) {
-    if (com_queue_next (&cnext)) {
+    microseconds = car_clock (&now);
+
+    if (microseconds < 10) {
+      // ...
+      continue;
+    }
+    // ...
+
+    if (car_command_next (&command)) {
+      car_uart_write (U1, "A command!\n", 11); // non-blocking write
       // ...
     }
-    if (bTick) {      // every 0.8 ms
-      bTick = false;
+    if (car_clock_flags & CAR_CLOCK_TICK) { // every 0.8 ms
+      car_clock_flags &= ~CAR_CLOCK_TICK;
       // ...
-      while (uart_read_char (U1, &c)) { // could be as many as 12 bytes since last tick
-	if ((c >= '0') && (c <= '9')) {
-	  com[com_count++] = c - '0';
-	} else if ((c >= 'A') && (c <= 'F')) {
-	  com[com_count++] = 10 + (c - 'A');
-	} else if ((c >= 'a') && (c <= 'f')) {
-	  com[com_count++] = 10 + (c - 'a');
-	} else { // discard & start again
-	  com_count = 0;
-	}
-	if (com_count == 8) {
-	  cargs.arg[0] = ((uint8_t) com[0] << 4) | (uint8_t) com[1];
-	  cargs.arg[1] = ((uint8_t) com[2] << 4) | (uint8_t) com[3];
-	  cargs.arg[2] = ((uint8_t) com[4] << 4) | (uint8_t) com[5];
-	  cargs.arg[3] = ((uint8_t) com[6] << 4) | (uint8_t) com[7];
-	  com_queue_add (&cargs);
-	  com_count = 0;
-	}
+      while (car_uart_read_char (U1, &c)) { // could be as many as 12 bytes since last tick
+	car_command_parse (&parser, c);
       }
     }
-    if (bTick_dSec) { // every 100 ms
-      bTick_dSec = false;
+    if (car_clock_flags & CAR_CLOCK_SECOND) { // every second
+      car_clock_flags &= ~CAR_CLOCK_SECOND;
       // ...
-      if (!dSec_Count) { // each new second
-	buf[0] = '0' + (app_time_h % 100) / 10;
-	buf[1] = '0' + (app_time_h %  10);
-	buf[2] = ':';
-	buf[3] = '0' +  app_time_m / 10;
-	buf[4] = '0' + (app_time_m % 10);
-	buf[5] = ':';
-	buf[6] = '0' +  app_time_s / 10;
-	buf[7] = '0' + (app_time_s % 10);
-	buf[8] = '\n';
-	buf[9] = 0;
-	uart_print (U1, buf);
-      }
+      car_uart_print (U1, car_clock_string ());
+      car_uart_print (U1, "\n");
     }
   }
 }
@@ -225,16 +134,6 @@ int main(void) {
     RPOR5bits.RP11R   = 0x0003; // RB11->UART1:U1TX;                                                                             
 
     __builtin_write_OSCCONL(OSCCON | 0x40); //   lock PPS                                                                       
-
-    T1CON = 0x0000; // Timer 1 disabled
-
-    IPC0bits.T1IP = 0x01;  // priority
-    IFS0bits.T1IF = false; // flag
-    IEC0bits.T1IE = true;  // priority
-
-    TMR1  = 0x0000;
-    PR1   = 0x018B; // 31690 -> 0.8ms [31691(-1=0x7BCA) = 396(-1=18B) + 31295 (-1=7A3E)]
-    T1CON = 0x8000; // Timer 1 enabled w/o prescaling, using internal oscillator
 
     simple_test ();
     return 0;
