@@ -47,7 +47,7 @@
 // FICD
 #pragma config ICS = PGD1        // ICD Communication Channel Select Bits->Communicate on PGEC1 and PGED1
 
-void simple_test () {
+void loop () {
   char c;
 
   uint16_t microseconds;
@@ -55,115 +55,111 @@ void simple_test () {
   car_time_t    now;
 
   car_parse_t   parser = car_command_parser (); // command parser
-  car_command_t command;
-  car_uart_t *  U1 = car_uart_create ('1', 85);
+
+  car_uart_t *  U1 = car_uart_create ('1', 85); // 115200 <= Frequency 39613750 Hz / BRG 85
 
   car_clock_init ();
 
   while (true) {
     microseconds = car_clock (&now);
 
-    if (microseconds < 10) {
-      // ...
-      continue;
+    if (car_command_pending ()) {
+      car_command_pending_exec ();
     }
-    // ...
 
-    if (car_command_next (&command)) {
-      car_uart_write (U1, "A command!\n", 11); // non-blocking write
-      // ...
-    }
     if (car_clock_flags & CAR_CLOCK_TICK) { // every 0.8 ms
       car_clock_flags &= ~CAR_CLOCK_TICK;
-      // ...
+
+      // ping request, or perhaps an interrupt notification
+      if (car_command_flags & CAR_COMMAND_PING) {
+	car_uart_write (U1, "*", 1); // ping!
+	car_command_flags &= ~CAR_COMMAND_PING;
+      }
+
+      // a short greeting - split across ticks to avoid buffer overruns, hopefully
+      if ((car_command_flags & CAR_COMMAND_SAY_HELLO_1) && (car_command_flags & CAR_COMMAND_SAY_HELLO_2)) {
+	car_uart_write (U1, "\nstick v.170317", 15);
+	car_command_flags &= ~CAR_COMMAND_SAY_HELLO_1;
+      } else if (car_command_flags & CAR_COMMAND_SAY_HELLO_2) {
+	car_uart_write (U1, "\nLet's play!", 12);
+	car_command_flags &= ~CAR_COMMAND_SAY_HELLO_2;
+	car_command_flags |=  CAR_COMMAND_SAY_HELLO_1;
+      } else if (car_command_flags & CAR_COMMAND_SAY_HELLO_1) {
+	car_uart_write (U1, "\n) ", 3);
+	car_command_flags &= ~CAR_COMMAND_SAY_HELLO_1;
+      }
+
+      // echo incoming characters, if requested; parse into commands and queue for later execution
       while (car_uart_read_char (U1, &c)) { // could be as many as 12 bytes since last tick
+	if (car_command_flags & CAR_COMMAND_ECHO) {
+	  car_uart_write (U1, &c, 1); // non-blocking write to echo character back
+	  if (c == '\n') {
+	    car_uart_write (U1, ") ", 2); // start new line with a prompt of sorts - potentially messy, though
+	  }
+	}
 	car_command_parse (&parser, c);
       }
     }
+
     if (car_clock_flags & CAR_CLOCK_SECOND) { // every second
       car_clock_flags &= ~CAR_CLOCK_SECOND;
       // ...
-      car_uart_print (U1, car_clock_string ());
-      car_uart_print (U1, "\n");
+      if ((car_command_flags & CAR_COMMAND_TIME_ONCE) || (car_command_flags & CAR_COMMAND_TIME_REPEAT)) {
+	car_uart_print (U1, car_clock_string ());
+	car_uart_print (U1, "\n");
+	if (car_command_flags & CAR_COMMAND_TIME_ONCE) {
+	  car_command_flags &= ~CAR_COMMAND_TIME_ONCE;
+	}
+      }
     }
   }
 }
 
-int main(void) {
-    char c;
-    int bFirst = 1;
+int main (void) {
+  // CF no clock failure; NOSC FRCPLL; CLKLOCK unlocked; OSWEN Switch is Complete;
+  __builtin_write_OSCCONL((uint8_t) (0x100 & 0x00FF));
 
-    // CF no clock failure; NOSC FRCPLL; CLKLOCK unlocked; OSWEN Switch is Complete;                                            
-    __builtin_write_OSCCONL((uint8_t) (0x100 & 0x00FF));
-    // FRCDIV FRC/2; PLLPRE 2; DOZE 1:8; PLLPOST 1:2; DOZEN disabled; ROI disabled;                                             
-    CLKDIV = 0x3100;
-    OSCTUN = 0x0;
+  // FRCDIV FRC/2; PLLPRE 2; DOZE 1:8; PLLPOST 1:2; DOZEN disabled; ROI disabled;                                             
+  CLKDIV = 0x3100;
+  OSCTUN = 0x0;
 
-    // ROON disabled; ROSEL disabled; RODIV Base clock value; ROSSLP disabled;                                                  
-    // REFOCON = 0x0;
+  // ROON disabled; ROSEL disabled; RODIV Base clock value; ROSSLP disabled;                                                  
+  // REFOCON = 0x0;
                                                                                                                    
-    PLLFBD = 0x54; // PLLDIV 84;
+  PLLFBD = 0x54; // PLLDIV 84;
 
-    CORCONbits.RND    = 0; // Unbiased convergent rounding
-    CORCONbits.SATB   = 0; // Accumulator B saturation disabled
-    CORCONbits.SATA   = 0; // Accumulator A saturation disabled
-    CORCONbits.ACCSAT = 0; // Accumulator saturation mode normal (1.31))
+  CORCONbits.RND    = 0; // Unbiased convergent rounding
+  CORCONbits.SATB   = 0; // Accumulator B saturation disabled
+  CORCONbits.SATA   = 0; // Accumulator A saturation disabled
+  CORCONbits.ACCSAT = 0; // Accumulator saturation mode normal (1.31)
 
-    RCON = 0x0; // clear brown-out reset bit
+  RCON = 0x0; // clear brown-out reset bit
 
-    /* The Microstick J3 header used for UART has RXD on RB10 and TXD on RB11
-     * a.k.a. RP10 and RP11 (a.k.a. PWM1H/L3)
-     */
-    LATA     = 0x0000; // Output latches
-    LATB     = 0x0800; // RB11 high (TXD); rest low
-    TRISA    = 0x0000; // GPIO directions
-    TRISB    = 0x0400; // Set Pin RB10 as input (1); rest as output (0)
-    CNPU1    = 0x0000; // change notification pull-up
-    CNPU2    = 0x0000;
-    ODCA     = 0x0000; // open-drain control
-    ODCB     = 0x0000;
-    AD1PCFGL = 0x001F; // set all analog-capable pins to be digital
+  /* The Microstick J3 header used for UART has RXD on RB10 and TXD on RB11
+   * a.k.a. RP10 and RP11 (a.k.a. PWM1H/L3)
+   */
+  LATA     = 0x0000; // Output latches
+  LATB     = 0x0800; // RB11 high (TXD); rest low
+  TRISA    = 0x0000; // GPIO directions
+  TRISB    = 0x0480; // Set Pins RB10 and RB7 (INT0) as input (1); rest as output (0)
+  CNPU1    = 0x0000; // change notification pull-up
+  CNPU2    = 0x0000;
+  ODCA     = 0x0000; // open-drain control
+  ODCB     = 0x0000;
+  AD1PCFGL = 0x001F; // set all analog-capable pins to be digital
 
-    /* Need to unlock registers for Peripheral Pin Select
-     */
-    OSCCON = 0x46; 
-    OSCCON = 0x57; 
-    __builtin_write_OSCCONL(OSCCON & 0xbf); // unlock PPS                                                                       
+  /* Need to unlock registers for Peripheral Pin Select
+   */
+  OSCCON = 0x46; 
+  OSCCON = 0x57; 
+  __builtin_write_OSCCONL(OSCCON & 0xbf); // unlock PPS                                                                       
 
-    RPINR18bits.U1RXR = 0x000A; // RB10->UART1:U1RX;                                                                           
-    RPOR5bits.RP11R   = 0x0003; // RB11->UART1:U1TX;                                                                             
+  RPINR18bits.U1RXR = 0x000A; // RB10->UART1:U1RX;                                                                           
+  RPOR5bits.RP11R   = 0x0003; // RB11->UART1:U1TX;                                                                             
 
-    __builtin_write_OSCCONL(OSCCON | 0x40); //   lock PPS                                                                       
+  __builtin_write_OSCCONL(OSCCON | 0x40); //   lock PPS                                                                       
 
-    simple_test ();
-    return 0;
-    /* Having remapped the UART1 pins, set up the UART1 module:
-     */
-    U1MODE = 0x0008;       // clear all; use high precision baud generator
-    U1BRG  = 0x0055;       // 115200 <= Frequency 39613750 Hz / BRG 85
-    U1STA  = 0x0000;       // clear status register                                                                                         
+  loop ();
 
-    // IEC0bits.U1RXIE = 1;   // interrupt enable
-
-    U1MODEbits.UARTEN = 1; // enable the UART
-    U1STAbits.UTXEN = 1;   // UART has control of transmit pin
-
-    IFS0bits.U1RXIF = 0;   // clear the receive flag                                                                              
-
-    while (1) {
-        if (U1STAbits.URXDA) { // there is data to be read
-            c = U1RXREG;
-        } else {
-            continue;
-        }
-        if (bFirst) { // ignore first byte received
-            bFirst = 0;
-            continue;
-        }
-        if (U1STAbits.UTXEN == 0) U1STAbits.UTXEN = 1; // enable UART TX                                                            
-        while (U1STAbits.UTXBF == 1);                  // if buffer is full, wait                                                                  
-        U1TXREG = c + 1;
-    }
-
-    return 0;
+  return 0;
 }

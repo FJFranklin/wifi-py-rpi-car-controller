@@ -27,8 +27,14 @@ struct car_time_data {
 typedef struct car_time_data car_time_t;
 
 extern void         car_clock_init ();
+extern void         car_clock_set_minutes (uint8_t minutes);
+extern void         car_clock_set_seconds (uint8_t seconds);
 extern uint16_t     car_clock (car_time_t * T); // return value is number microseconds into current 0.8 ms (800 microseconds) tick
 extern const char * car_clock_string ();        // returns current clock time in "MM:SS" format
+
+extern void car_clock_ei0_off ();
+extern void car_clock_ei0_count (uint8_t duration_code); // code = 0x01 (1 second), 0x08 (0.8 ms), 0x20 (20 ms)
+extern void car_clock_ei0_notify ();
 
 /* The bits defined below are set by the clock timer, but never cleared.
  * The user may clear these, if wished.

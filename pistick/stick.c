@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/select.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -14,7 +15,18 @@
 #include <fcntl.h>
 #include <termios.h>
 
-int main () {
+#include "stick.h"
+
+void list () {
+  int count = 0;
+
+  while (help[count]) {
+    fprintf (stdout, "  %s\n", help[count]);
+    ++count;
+  }
+}
+
+int main (int argc, char ** argv) {
   char c;
 
   fd_set fdset;
@@ -24,8 +36,42 @@ int main () {
 
   unsigned char buffer[16];
 
+  const char * device = "/dev/serial0";
+
   int count;
-  int fd = open ("/dev/serial0", O_RDWR | O_NOCTTY | O_NDELAY);
+  int fd;
+
+  if (argc > 2) {
+    fprintf (stderr, "stick [--help] [--list] [--usb] [/dev/ID]\n");
+    return -1;
+  } else if (argc > 1) {
+    if (strcmp (argv[1], "--help") == 0) {
+      fprintf (stderr, "\nstick [--help] [--list] [--usb] [/dev/<ID>]\n\n");
+      fprintf (stderr, "  --help     Display this help.\n");
+      fprintf (stderr, "  --list     List available commands.\n");
+      fprintf (stderr, "  --usb      Connect to /dev/ttyUSB0 instead of default /dev/serial0.\n");
+      fprintf (stderr, "  /dev/<ID>  Connect to /dev/<ID> instead of default /dev/serial0.\n\n");
+      return 0;
+    }
+    if (strcmp (argv[1], "--list") == 0) {
+      list ();
+      return 0;
+    }
+    if (strcmp (argv[1], "--usb") == 0) {
+      device = "/dev/ttyUSB0";
+    } else if (strncmp (argv[1], "/dev/", 5) == 0) {
+      device = argv[1];
+    } else {
+      fprintf (stderr, "stick [--help] [--list] [--usb] [/dev/ID]\n");
+      return -1;
+    }
+  }
+
+  fd = open (device, O_RDWR | O_NOCTTY | O_NDELAY);
+  if (fd == -1) {
+    fprintf (stderr, "Failed to open \"%s\" - exiting.\n", device);
+    return -1;
+  }
 
   /* set up serial
    */
@@ -55,11 +101,17 @@ int main () {
 
   tcsetattr (STDIN_FILENO, TCSANOW, &ttystate);
 
+  if (write (fd, (const unsigned char *) "0D\n0F)02)0E)", 12) < 0) {
+    fprintf (stderr, "error: unable to write to serial\n");
+    return -1;
+  }
+
   while (1) {
     count = read (fd, buffer, 10);
     if (count > 0) {
       buffer[count] = 0;
       fprintf (stdout, "%s", (const char *) buffer);
+      fflush (stdout);
     }
 
     tv.tv_sec = 0;
@@ -72,14 +124,27 @@ int main () {
 
     if (FD_ISSET (fileno (stdin), &fdset)) { // character
       c = fgetc (stdin);
-      if (c == 'q') {
-	fprintf (stderr, "quit: 'q' pressed... bye bye!\n");
+      if (c == 4) { // CTRL-D - End of Transmission
+	fprintf (stderr, "\nbye bye!\n");
 	break;
+      }
+      if (c == 27) { // ESC
+	if (write (fd, (const unsigned char *) "0D\n0F)02)0E)", 12) < 0) {
+	  fprintf (stderr, "error: unable to write to serial\n");
+	  break;
+	}
+	continue;
+      }
+      if (c == '?') {
+	fprintf (stderr, "\n");
+	list ();
+	continue;
       }
       if (write (fd, &c, 1) < 0) {
 	fprintf (stderr, "error: unable to write to serial\n");
 	break;
       }
+      usleep (100000);
     }
   }
 
