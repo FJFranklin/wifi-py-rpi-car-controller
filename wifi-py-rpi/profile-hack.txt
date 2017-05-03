@@ -1,0 +1,4 @@
+# if found, execute the car script on login
+if [ -f "$HOME/wifi-py-rpi/car.sh" ]; then
+    (cd "$HOME/wifi-py-rpi" && ./car.sh) &
+fi

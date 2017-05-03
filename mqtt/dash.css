@@ -13,11 +13,11 @@ circle.dial_pivot {
 }
 text.label {
     fill: white;
-    font-size: 35;
+    font-size: 24px;
 }
 
 text {
-    font-size: 35;
+    font-size: 18px;
 }
 .name {
     font-weight: bold;
@@ -33,6 +33,35 @@ text {
 }
 body {
     background-color: black;
+}
+#power_opt_background {
+    fill: black;
+    stroke: red;
+    stroke-width: 4;
+}
+rect.power_opt_button {
+    fill: red;
+    stroke: yellow;
+}
+text.power_opt_button {
+    fill: black;
+    font-size: 30px;
+    font-weight: bold;
+}
+#power_button {
+    fill: black;
+    stroke: red;
+    stroke-width: 4;
+}
+#power_arc {
+    fill: black;
+    stroke: yellow;
+    stroke-width: 4;
+}
+#power_line {
+    fill: yellow;
+    stroke: black;
+    stroke-width: 4;
 }
 #background {
     fill: black;

@@ -1,5 +1,34 @@
 var client;
 
+var power_options_displayed = true;
+var power_options = null;
+
+function power () {
+    if (power_options == null) {
+	power_options = document.getElementById ("power_options");
+    }
+
+    if (power_options_displayed) {
+	power_options.style.display = 'none';
+	power_options_displayed = false;
+    } else {
+	power_options.style.display = 'block';
+	power_options_displayed = true;
+    }
+}
+
+function power_car () {
+    message = new Paho.MQTT.Message ("car");
+    message.destinationName = "/wifi-py-rpi-car-controller/system/exit";
+    client.send (message);
+}
+
+function power_controller () {
+    message = new Paho.MQTT.Message ("controller");
+    message.destinationName = "/wifi-py-rpi-car-controller/system/exit";
+    client.send (message);
+}
+
 function mqtt_send_XY (x, y) {
     message = new Paho.MQTT.Message (x.toFixed (3) + " " + y.toFixed (3));
     message.destinationName = "/wifi-py-rpi-car-controller/dash/XY";
@@ -16,6 +45,8 @@ function mqtt_receive_XY (str) {
 
     var g4_rotate = -60 * x;
     svg_dial_needle ("g4", g4_rotate);
+
+    blue_circle (x, y);
 }
 
 function user_control (x, y) { // -1 <= x,y <= 1
@@ -79,6 +110,22 @@ function red_circle (event, bMouse, type) {
     c_red.setAttribute ("cy", y.toFixed (3));
 
     user_control (2 * x / rect.width, 2 * y / rect.height);
+}
+
+/* Blue circle moves in response to received MQTT data
+ */
+function blue_circle (x, y) {
+    var svg_box = document.getElementById ("foreground");
+
+    var rect = svg_box.getBoundingClientRect ();
+
+    var cx = x * rect.width / 2;
+    var cy = y * rect.height / 2;
+
+    var c_blue = document.getElementById ("circle_blue");
+
+    c_blue.setAttribute ("cx", cx.toFixed (3));
+    c_blue.setAttribute ("cy", cy.toFixed (3));
 }
 
 function e_m_down (event) {
@@ -255,7 +302,7 @@ function onConnect () {
     // Once a connection has been made, make a subscription and send a message.
     mqtt_log_update ("onConnect");
 
-    client.subscribe ("/wifi-py-rpi-car-controller/dash/XY");
+    client.subscribe ("/wifi-py-rpi-car-controller/car/XY");
 }
 
 // called when the client loses its connection
@@ -269,7 +316,7 @@ function onConnectionLost (responseObject) {
 function onMessageArrived (message) {
     mqtt_log_update ("onMessageArrived:" + message.payloadString);
 
-    if (message.destinationName == "/wifi-py-rpi-car-controller/dash/XY") {
+    if (message.destinationName == "/wifi-py-rpi-car-controller/car/XY") {
 	mqtt_receive_XY (message.payloadString);
     }
 }
@@ -319,6 +366,7 @@ function get_started () {
 
     /* finish creating the web interface ...
      */
+    power ();
     window_resize ();
 
     /* ... and handle actual resize events with some intelligence
