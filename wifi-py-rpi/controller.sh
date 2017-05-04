@@ -26,6 +26,13 @@ if [ -z "$res" ]; then
    pid=$!
    echo $pid > $pid_file
    wait $pid
+   exit_value=$?
    rm $pid_file
-   sudo shutdown -h now
+   if [ $exit_value -eq 0 ]; then
+       echo "exit okay: shutting down..."
+       sudo shutdown -h now
+   else
+       echo "exit not okay: exit without shutdown"
+   fi
 fi
+
