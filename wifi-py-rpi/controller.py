@@ -16,7 +16,7 @@ def on_message (client, userdata, msg):
         if msg.payload == "controller":
             sys.exit ()
 
-client = mqtt.Client (client_id='car', clean_session=True, userdata=None, protocol=mqtt.MQTTv31)
+client = mqtt.Client (client_id='controller', clean_session=True, userdata=None, protocol=mqtt.MQTTv31)
 client.on_connect = on_connect
 client.on_message = on_message
 
