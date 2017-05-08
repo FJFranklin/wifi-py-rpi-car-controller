@@ -11,33 +11,31 @@
 	<h2>Introduction</h2>
 
 	<p>In this project, the focus is on communication over WiFi, with the aim of being able to control a car
-	  or other vehicle using a web interface. Ultimately I want to get this working with MQTT - essentially
-	  an IoT solution - but initially this will use a web server and HTTP.</p>
+	  or other vehicle using a web interface. The method requires two Raspberry Pi (or other Linux) computers.</p>
 
-	<p>A computer-controlled car - and here I'll assume the computer is a WiFi-enabled Raspberry Pi running
-	  linux - needs to interact with the human (or other remote) controller, and needs to look after itself,
-	  i.e., check the sensors for obstacles, update the current drive settings, adjust the steering, etc. In
-	  other words, it needs to multitask. The best way to do this is via threads. It also makes sense to have
-	  an event loop.</p>
+	<p>One RPi, the "controller", is set up as a WiFi hub (e.g., with hostapd) and DHCP server (e.g., using dnsmasq).
+	  This creates a private network which anyone may connect to - the security of the network can of course be
+	  configured - over WiFi. The "controller" also runs a web server and MQTT broker with websockets support;
+	  I am using mosquitto which provites a default MQTT broker as well as a web server / websockets interface.
+	  The webserver serves the HTML/Javascript/CSS files that create the web interface.</p>
+
+	<p>The other RPi, the "car", connects via WiFi to the MQTT broker, and the MQTT broker then acts as a middle man,
+	  relaying data between the browser(s) and the "car". The "car", of course, is responsible for the remote device,
+	  i.e., it must check the sensors for obstacles, update the current drive settings, adjust the steering, etc.</p>
 
 	<p>Given all these requirements, I have created this project that implements the basic logic:</p>
 
 	<ul>
-	  <li>Written in Python and using threading and Queue for event management, and web.py for the web server.</li>
-	  <li>Currently the web interface is written as a non-templated HTML document. A query/command mechanism
-	    is provided for passing instructions to the car controller (via the server) and receiving data from it.</li>
+	  <li>Written in Python and using threading and Queue for event management, and Paho.MQTT (Python).</li>
+	  <li>The web interface is written as a client-side scripted interface based on HTML and SVG, and again
+	    Paho.MQTT (Javascript).</li>
 	</ul>
 
 	<h2>Tests</h2>
 
 	<ul>
-	  <li><a href="/static/circles.html">Circles</a></li>
-	  <li><a href="/static/clock.html">Clock</a></li>
+	  <li><a href="mqtt/index.html">MQTT-based tests</a></li>
 	</ul>
-
-	<h2>Finished?</h2>
-
-	<p><a href="/server?name=stop">Click here to stop the web server...</a></p>
 
 	<h2>License</h2>
 
