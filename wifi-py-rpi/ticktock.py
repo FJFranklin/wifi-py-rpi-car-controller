@@ -21,22 +21,27 @@ class qController (object):
         self.handler = event_handler
         self.timer_interval = timer_interval
         self.TickTock = PriorityQueue ()
+        self.lock = threading.Lock ()
+        self.bListening = False
         return
         
     def stop (self):
-        q = qData ('stop')
-        self.TickTock.put ((qPriorityHigh, q))
+        if self.bListening:
+            q = qData ('stop')
+            self.TickTock.put ((qPriorityHigh, q))
         return
 
     def event (self, event_type, data=None):
-        q = qData (event_type, data)
-        self.TickTock.put ((qPriorityNormal, q))
+        if self.bListening:
+            q = qData (event_type, data)
+            self.TickTock.put ((qPriorityNormal, q))
         return
 
     def tick (self):
         time.sleep (self.timer_interval)
-        q = qData ('tick')
-        self.TickTock.put ((qPriorityLow, q))
+        if self.bListening:
+            q = qData ('tick')
+            self.TickTock.put ((qPriorityLow, q))
         return
 
     def tick_start (self):
@@ -45,6 +50,19 @@ class qController (object):
         return
 
     def run (self):
+        if not self.lock.acquire (False):
+            return False
+
+        # clear the queue, just in case of multiple calls to run()
+        while not self.TickTock.empty ():
+            try:
+                self.TickTock.get (False)
+            except Empty:
+                continue
+            self.TickTock.task_done ()
+
+        self.bListening = True
+
         self.tick_start ()
 
         while True:
@@ -62,4 +80,7 @@ class qController (object):
                 break
 
             self.TickTock.task_done ()
-        return
+
+        self.bListening = False
+        self.lock.release ()
+        return True

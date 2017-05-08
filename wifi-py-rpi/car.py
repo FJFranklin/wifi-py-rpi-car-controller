@@ -1,8 +1,5 @@
 import paho.mqtt.client as mqtt
 
-import time
-import threading
-
 import ticktock
 
 # MQTT constants
@@ -17,7 +14,6 @@ addr_car_xy   = "/wifi-py-rpi-car-controller/car/XY"
 addr_dash_xy  = "/wifi-py-rpi-car-controller/dash/XY"
 
 # It is possible to create a separate thread dedicated to checking the sensors, which might send events when necessary.
-# I have no idea how to stream the camera. That will probably need to be handled in server.py, though.
 
 class car_controller (object):
     def __init__ (self):
