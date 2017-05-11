@@ -1,4 +1,7 @@
-wifi-py-rpi-car-controller: Introduction
+wifi-py-rpi-car-controller
+==========================
+
+**Overview**
 
 In this project, the focus is on communication over WiFi,
 with the aim of being able to control a car or other vehicle
@@ -32,7 +35,9 @@ management, and Paho.MQTT (Python).
 interface based on HTML and SVG, and again Paho.MQTT
 (Javascript).
 
-License
+--------
+
+**License**
 
 Unless otherwise stated, the code and examples here are
 provided under the MIT License:
