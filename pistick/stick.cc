@@ -1,8 +1,9 @@
 /*
- * File:   stick.c
+ * File:   stick.cc
  * Author: Francis James Franklin <fjf@alinameridon.com>
  *
- * Created on 16 March 2017
+ * 21.11.2017 Changed to C++ with option added for Arduino communication
+ * 16.03.2017 Created - C program for serial communication with PIC
  */
 
 #include <stdio.h>
@@ -15,13 +16,13 @@
 #include <fcntl.h>
 #include <termios.h>
 
-#include "stick.h"
+#include "stick.hh"
 
-void list () {
+void list_pic_help () {
   int count = 0;
 
-  while (help[count]) {
-    fprintf (stdout, "  %s\n", help[count]);
+  while (s_help[count]) {
+    fprintf (stdout, "  %s\n", s_help[count]);
     ++count;
   }
 }
@@ -41,42 +42,40 @@ int main (int argc, char ** argv) {
   int count;
   int fd;
 
-  if (argc > 2) {
-    fprintf (stderr, "stick [--help] [--list] [--usb] [/dev/ID]\n");
-    return -1;
-  } else if (argc > 1) {
-    if (strcmp (argv[1], "--help") == 0) {
-      fprintf (stderr, "\nstick [--help] [--list] [--usb] [/dev/<ID>]\n\n");
+  bool bArduino = false;
+
+  for (int arg = 1; arg < argc; arg++) {
+    if (strcmp (argv[arg], "--help") == 0) {
+      fprintf (stderr, "\nstick [--help] [--list] [--usb] [--arduino] [/dev/<ID>]\n\n");
       fprintf (stderr, "  --help     Display this help.\n");
-      fprintf (stderr, "  --list     List available commands.\n");
-      fprintf (stderr, "  --usb      Connect to /dev/ttyUSB0 instead of default /dev/serial0.\n");
-      fprintf (stderr, "  /dev/<ID>  Connect to /dev/<ID> instead of default /dev/serial0.\n\n");
+      fprintf (stderr, "  --list     List available PIC commands.\n");
+      fprintf (stderr, "  --usb      Connect to /dev/ttyUSB0 by default.\n");
+      fprintf (stderr, "  --arduino  Connect to /dev/ttyACM0 by default, and omit PIC-specific behaviour.\n");
+      fprintf (stderr, "  /dev/<ID>  Connect to /dev/<ID> instead of default [/dev/serial0].\n\n");
       return 0;
     }
-    if (strcmp (argv[1], "--list") == 0) {
-      list ();
+    if (strcmp (argv[arg], "--list") == 0) {
+      list_pic_help ();
       return 0;
     }
-    if (strcmp (argv[1], "--usb") == 0) {
-      device = "/dev/ttyUSB0";
-    } else if (strncmp (argv[1], "/dev/", 5) == 0) {
-      device = argv[1];
+    if (strcmp (argv[arg], "--usb") == 0) {
+      device = "/dev/ttyUSB0"; // first serial-over-usb on linux
+    } else if (strcmp (argv[arg], "--arduino") == 0) {
+      device = "/dev/ttyACM0"; // first serial-over-usb on pi
+      bArduino = true;
+    } else if (strncmp (argv[arg], "/dev/", 5) == 0) {
+      device = argv[arg];
     } else {
-      fprintf (stderr, "stick [--help] [--list] [--usb] [/dev/ID]\n");
+      fprintf (stderr, "stick [--help] [--list] [--usb] [--arduino] [/dev/ID]\n");
       return -1;
     }
   }
 
+  /* set up serial
+   */
   fd = open (device, O_RDWR | O_NOCTTY | O_NDELAY);
   if (fd == -1) {
     fprintf (stderr, "Failed to open \"%s\" - exiting.\n", device);
-    return -1;
-  }
-
-  /* set up serial
-   */
-  if (fd == -1) {
-    fprintf (stderr, "error: unable to open serial device\n");
     return -1;
   }
 
@@ -101,12 +100,13 @@ int main (int argc, char ** argv) {
 
   tcsetattr (STDIN_FILENO, TCSANOW, &ttystate);
 
-  if (write (fd, (const unsigned char *) "0D\n0F)02)0E)", 12) < 0) {
-    fprintf (stderr, "error: unable to write to serial\n");
-    return -1;
-  }
+  if (!bArduino)
+    if (write (fd, (const unsigned char *) "0D\n0F)02)0E)", 12) < 0) {
+      fprintf (stderr, "error: unable to write to serial\n");
+      return -1;
+    }
 
-  while (1) {
+  while (true) {
     count = read (fd, buffer, 10);
     if (count > 0) {
       buffer[count] = 0;
@@ -129,15 +129,18 @@ int main (int argc, char ** argv) {
 	break;
       }
       if (c == 27) { // ESC
-	if (write (fd, (const unsigned char *) "0D\n0F)02)0E)", 12) < 0) {
-	  fprintf (stderr, "error: unable to write to serial\n");
-	  break;
+	if (!bArduino) {
+	  if (write (fd, (const unsigned char *) "0D\n0F)02)0E)", 12) < 0) {
+	    fprintf (stderr, "error: unable to write to serial\n");
+	    break;
+	  }
+	  continue;
 	}
-	continue;
+	c = 3; // send ^C to the Uno
       }
-      if (c == '?') {
+      if ((c == '?') && !bArduino) {
 	fprintf (stderr, "\n");
-	list ();
+	list_pic_help ();
 	continue;
       }
       if (write (fd, &c, 1) < 0) {

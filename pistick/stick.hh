@@ -1,7 +1,7 @@
-#ifndef __PISTICK_STICK_H__
-#define __PISTICK_STICK_H__
+#ifndef __PISTICK_STICK_HH__
+#define __PISTICK_STICK_HH__
 
-const char * help[] = {
+const char * s_help[] = {
   "00          Null command - do nothing",
   "01          Ping!",
   "02          Say hello",
@@ -42,4 +42,4 @@ const char * help[] = {
 };
 
 
-#endif /* ! __PISTICK_STICK_H__ */
+#endif /* ! __PISTICK_STICK_HH__ */
