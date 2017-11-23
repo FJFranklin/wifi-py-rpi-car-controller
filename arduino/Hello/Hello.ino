@@ -1,37 +1,20 @@
 #include "util.hh"
 #include "pinmanager.hh"
 
-void user_command (int argc, char ** argv);
+bool user_command (int argc, char ** argv);
 void user_interrupt ();
 
 void reset_all ();
 
-static const char s_hello[] PROGMEM       = "This is a simple 'hello' program. Just say 'hi'! (Type 'help all' for more options.)";
-static const char s_interrupt[] PROGMEM   = "\r\n(interrupt)";
-static const char s_err_command[] PROGMEM = "(command error)";
+static const char s_hello[] PROGMEM = "This is a simple 'hello' program. Just say 'hi'! (Type 'help all' for more options.)";
 
-PinManager PM;
-
-/* input_check() feeds any input back to user_command() as an array of strings
+/* input_check() feeds any input back to user_command() via PinManager as an array of strings
  */
-void user_command (int argc, char ** argv) {
-  String first(argv[0]);
-
+bool user_command (String & first, int argc, char ** argv) {
   if (first.equalsIgnoreCase ("hello") || first.equalsIgnoreCase ("hi")) {
     Serial.println ("Hello.");
-  } else if (first.equalsIgnoreCase ("help") && (argc == 1)) {
+  } else if (first.equalsIgnoreCase ("help")) {
     print_pgm (s_hello);
-  } else if ((first == "help") ||
-	     (first == "list") ||
-	     (first == "dout") ||
-	     (first == "led") ||
-	     (first == "pwm") ||
-	     (first == "servo")) {
-    if (!PM.command (first, argc, argv)) {
-      print_pgm (s_err_command);
-    }
-  } else if (first == "echo") {
-    command_echo (argc, argv);
   } else { // mainly for debugging purposes, write out the arguments
     for (int arg = 0; arg < argc; arg++) {
       Serial.print ('"');
@@ -41,15 +24,11 @@ void user_command (int argc, char ** argv) {
   }
 }
 
-/* If the user presses CTRL-C.
- */
 void user_interrupt () {
-  print_pgm (s_interrupt);
-  // stop all activities
+  // ...
 }
 
 void reset_all () {
-  // ...
   print_pgm (s_hello);
   input_reset ();
 }
@@ -57,6 +36,11 @@ void reset_all () {
 void setup () {
   // put your setup code here, to run once:
   Serial.begin (115200);
+
+  /* Instantiate PinManager and set the input callbacks 
+   */
+  PinManager::manager()->input_callbacks (user_command, user_interrupt);
+
   reset_all ();
 }
 

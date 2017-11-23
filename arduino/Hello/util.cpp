@@ -1,9 +1,7 @@
 #include "util.hh"
 
-extern void user_command (int argc, char ** argv);
-extern void user_interrupt ();
-
-static const char s_echo[] PROGMEM = "usage: echo on|off";
+static const char s_err_command[] PROGMEM = "(command error)";
+static const char s_interrupt[] PROGMEM   = "\r\n(interrupt)";
 
 static void input_add (char c);
 static void input_delete ();
@@ -15,10 +13,26 @@ static char *    input_ptr = input_buffer;
 static int       input_count = 0;
 static char *    input_argv[(input_size/2)+1];
 
-static bool      s_bEchoOn = true;
+/* Function callbacks
+ */
+static void (*s_fn_interrupt) () = 0;                     // If the user presses CTRL-C.
+static bool (*s_fn_command) (int argc, char ** argv) = 0; // Handle the user's command
+
+void set_user_interrupt (void (*user_interrupt) ()) {
+  s_fn_interrupt = user_interrupt;
+}
+
+void set_user_command (bool (*user_command) (int argc, char ** argv)) {
+  s_fn_command = user_command;
+}
 
 /* Suppress printing if echo is off.
  */
+static bool s_bEchoOn = true;
+
+void echo (bool bOn) {
+  s_bEchoOn = bOn;
+}
 
 void print_pgm (const char * str_pgm) {
   if (!s_bEchoOn) return;
@@ -43,24 +57,6 @@ void print_char (char c) {
   }
 }
 
-void command_echo (int argc, char ** argv) {
-  bool bOkay = false;
-
-  if (argc == 2) {
-    String second(argv[1]);
-
-    if (second == "on") {
-      s_bEchoOn = true;
-      bOkay = true;
-    } else if (second == "off") {
-      s_bEchoOn = false;
-      bOkay = true;
-    }
-  }
-  if (!bOkay)
-    print_pgm (s_echo);
-}
-
 void input_check () {
   if (Serial.available () > 0) {
     byte c = Serial.read ();
@@ -69,7 +65,9 @@ void input_check () {
       if ((c == 10) || (c == 13)) { // newline || carriage return
         input_parse ();
       } else if (c == 3) { // ^C
-        user_interrupt ();
+	print_pgm (s_interrupt);
+	if (s_fn_interrupt)
+	  s_fn_interrupt ();
       }
       input_reset ();
     } else if (c == 127) {
@@ -109,7 +107,10 @@ static void input_parse () {
   }
   input_argv[argc] = 0;
 
-  if (argc) user_command (argc, input_argv);
+  if (argc && s_fn_command) {
+    if (!s_fn_command (argc, input_argv))
+      print_pgm (s_err_command);
+  }
 }
 
 static void input_add (char c) {

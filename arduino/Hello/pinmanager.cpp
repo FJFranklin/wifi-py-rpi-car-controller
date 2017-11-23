@@ -157,8 +157,18 @@ public:
   }
 };
 
+static PinManager * s_PM = 0;
 
-PinManager::PinManager () {
+PinManager * PinManager::manager () {
+  if (!s_PM) {
+    s_PM = new PinManager ();
+  }
+  return s_PM;
+}
+
+PinManager::PinManager () :
+  user_command(0)
+{
   /* initialise analog pins
    */
   for (int i = 0; i < 6; i++) {
@@ -194,10 +204,22 @@ PinManager::~PinManager () {
     delete DP[i];
 }
 
-bool PinManager::command (const String & first, int argc, char ** argv) {
-  bool bOkay = true;
+static bool s_command (int argc, char ** argv) { // callback for util input command
+  return s_PM->command (argc, argv);
+}
 
-  if (first == "help") { // second argument must exist and should be one of: all, servo, pwm, ...
+void PinManager::input_callbacks (bool (*user_command_callback) (String & first, int argc, char ** argv), void (*user_interrupt_callback) ()) {
+  user_command = user_command_callback;
+
+  set_user_interrupt (user_interrupt_callback);
+  set_user_command (s_command);
+}
+
+bool PinManager::command (int argc, char ** argv) {
+  bool bOkay = true;
+  String first(argv[0]);
+
+  if ((first == "help") && (argc > 1)) { // second argument must exist and should be one of: all, servo, pwm, ...
     bOkay = false;
 
     if (argc > 1) {
@@ -280,6 +302,20 @@ bool PinManager::command (const String & first, int argc, char ** argv) {
 	bOkay = true;
       }
     }
+  } else if (first == "echo") {
+    bOkay = false;
+
+    if (argc > 1) {
+      String second(argv[1]);
+
+      if (second == "on") {
+	echo (true);
+	bOkay = true;
+      } else if (second == "off") {
+	echo (false);
+	bOkay = true;
+      }
+    }
   } else if (first == "servo") {
     int pin_no = -1;
 
@@ -327,6 +363,8 @@ bool PinManager::command (const String & first, int argc, char ** argv) {
 	}
       }
     }
+  } else if (user_command) {
+    bOkay = user_command (first, argc, argv);
   }
 
   return bOkay;
