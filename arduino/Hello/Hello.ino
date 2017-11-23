@@ -23,6 +23,8 @@ void user_command (int argc, char ** argv) {
     print_pgm (s_hello);
   } else if ((first == "help") ||
 	     (first == "list") ||
+	     (first == "dout") ||
+	     (first == "led") ||
 	     (first == "servo")) {
     if (!PM.command (first, argc, argv)) {
       print_pgm (s_err_command);

@@ -10,6 +10,8 @@ public:
 
   ~PinManager ();
 
+  void dpin_write (int pin_no, bool value);
+
   bool command (const String & first, int argc, char ** argv);
 
 private:
