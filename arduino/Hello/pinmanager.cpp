@@ -5,10 +5,13 @@
 static const char s_usage_help[] PROGMEM = "help [all|servo]";
 static const char s_usage_echo[] PROGMEM = "echo on|off";
 static const char s_usage_list[] PROGMEM = "list [digital|analog]";
-static const char s_usage_dout[] PROGMEM = "dout [~]<pin#2-13> [[~]<pin#2-13>]*";
+static const char s_usage_dout[] PROGMEM = "dout [[~]<pin#2-13>]*";
 static const char s_usage_led[] PROGMEM  = "led on|off";
 
-static const char s_err_help[] PROGMEM   = "help: expected one of: \"all\", \"servo\"";
+static const char s_usage_pwm_on_off[] PROGMEM = "pwm <pin#3,5-6,9-11> on|off";
+static const char s_usage_pwm_duty[] PROGMEM   = "pwm <pin#3,5-6,9-11> duty <0-255>";
+
+static const char s_err_help[] PROGMEM   = "help: expected one of: \"all\", \"servo\", \"pwm\"";
 static const char s_err_pin_no[] PROGMEM = "invalid pin number";
 
 class APin {
@@ -33,8 +36,10 @@ public:
   }
 };
 
-#define DPIN_SERVO (1<<0)
-#define DPIN_D_OUT (1<<1)
+#define DPIN_SERVO (1<<0) // servo allowed
+#define DPIN_D_OUT (1<<1) // digital out allowed
+#define DPIN_PWM   (1<<2) // PWM allowed
+#define DPIN_PWMON (1<<3) // PWM is active
 
 class DPin {
 public:
@@ -44,12 +49,14 @@ public:
   enum PinType {
     pt_None = 0,
     pt_Servo,
+    pt_PWM,
     pt_D_In,
     pt_D_Out
   } m_type;
 
   union {
     PinServo * servo;
+    unsigned char duty_cycle;
     bool digital_value;
   } m_data;
 
@@ -74,6 +81,8 @@ public:
       state += "servo";
     else if (m_type == pt_D_Out)
       state += "digital out";
+    else if (m_type == pt_PWM)
+      state += "PWM";
 
     Serial.println (state);
   }
@@ -83,6 +92,9 @@ public:
       delete m_data.servo;
     } else if (m_type == pt_D_Out) {
       pinMode (m_pin_no, INPUT);
+    } else if (m_type == pt_PWM) {
+      pinMode (m_pin_no, INPUT);
+      m_flags &= ~DPIN_PWMON;
     }
     m_type = pt_None;
   }
@@ -113,6 +125,36 @@ public:
     else
       digitalWrite (m_pin_no, LOW);
   }
+
+  void pwm (bool bOn) {
+    if (m_type != pt_PWM) {
+      clear ();
+
+      pinMode (m_pin_no, OUTPUT);
+      m_type = pt_PWM;
+      m_data.duty_cycle = 0; // duty cycle defaults to 0
+    }
+    if (bOn) {
+      analogWrite (m_pin_no, m_data.duty_cycle);
+      m_flags |= DPIN_PWMON;
+    } else {
+      analogWrite (m_pin_no, 0);
+      m_flags &= ~DPIN_PWMON;
+    }
+  }
+
+  void pwm_duty (unsigned char duty_cycle) {
+    if (m_type != pt_PWM) {
+      clear ();
+
+      pinMode (m_pin_no, OUTPUT);
+      m_type = pt_PWM;
+    }
+    m_data.duty_cycle = duty_cycle;
+
+    if (m_flags & DPIN_PWMON) // if the PWM is currently active, then update
+      analogWrite (m_pin_no, m_data.duty_cycle);
+  }
 };
 
 
@@ -135,6 +177,13 @@ PinManager::PinManager () {
 
     DP[i] = new DPin (flags, i);
   }
+
+  DP[ 3]->m_flags |= DPIN_PWM;
+  DP[ 5]->m_flags |= DPIN_PWM;
+  DP[ 6]->m_flags |= DPIN_PWM;
+  DP[ 9]->m_flags |= DPIN_PWM;
+  DP[10]->m_flags |= DPIN_PWM;
+  DP[11]->m_flags |= DPIN_PWM;
 }
 
 PinManager::~PinManager () {
@@ -148,7 +197,7 @@ PinManager::~PinManager () {
 bool PinManager::command (const String & first, int argc, char ** argv) {
   bool bOkay = true;
 
-  if (first == "help") { // second argument must exist and should be one of: all, servo, ...
+  if (first == "help") { // second argument must exist and should be one of: all, servo, pwm, ...
     bOkay = false;
 
     if (argc > 1) {
@@ -168,9 +217,14 @@ bool PinManager::command (const String & first, int argc, char ** argv) {
 	PinServo::help ();
 	bOkay = true;
       }
+      if (bAll || (second == "pwm")) {
+	print_pgm (s_usage_pwm_on_off);
+	print_pgm (s_usage_pwm_duty);
+	bOkay = true;
+      }
     }
     if (!bOkay) {
-      print_pgm (s_err_help); // "help: expected one of: \"all\", \"servo\"";
+      print_pgm (s_err_help); // "help: expected one of: \"all\", \"servo\", \"pwm\"";
     }
   } else if (first == "list") {
     bool bAnalog  = true;
@@ -241,6 +295,37 @@ bool PinManager::command (const String & first, int argc, char ** argv) {
 	bOkay = PS->command (argc, argv); // let the class instance handle the rest
       else
 	bOkay = false;
+    }
+  } else if (first == "pwm") {
+    int pin_no = -1;
+
+    if (argc > 1) // there *must* be a second argument
+      pin_no = parse_pin_no (argv[1], DPIN_PWM, true);
+
+    if (pin_no < 0) { // oops
+      bOkay = false;
+    } else { // we have a valid pin!
+      bOkay = false;
+
+      if (argc > 2) { // need a 3rd argument at least
+	String third(argv[2]);
+
+	if (third == "on") {
+	  DP[pin_no]->pwm (true);
+	  bOkay = true;
+	} else if (third == "off") {
+	  DP[pin_no]->pwm (false);
+	  bOkay = true;
+	} else if ((third == "duty") && (argc > 3)) { // need a 4th argument for the duty cycle
+	  String duty(argv[3]);
+	  int cycle = duty.toInt ();
+
+	  if ((cycle >= 0) && (cycle <= 255)) {
+	    DP[pin_no]->pwm_duty ((unsigned char) cycle);
+	    bOkay = true;
+	  }
+	}
+      }
     }
   }
 

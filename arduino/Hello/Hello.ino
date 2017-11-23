@@ -25,6 +25,7 @@ void user_command (int argc, char ** argv) {
 	     (first == "list") ||
 	     (first == "dout") ||
 	     (first == "led") ||
+	     (first == "pwm") ||
 	     (first == "servo")) {
     if (!PM.command (first, argc, argv)) {
       print_pgm (s_err_command);
