@@ -3,7 +3,6 @@
  * Open Source under the MIT License - see LICENSE in the project's root folder
  */
 
-#include "util.hh"
 #include "pinmanager.hh"
 
 bool user_command (int argc, char ** argv);
@@ -43,8 +42,9 @@ void reset_all () {
   input_reset ();
 }
 
+unsigned long last_millis;
+
 void setup () {
-  // put your setup code here, to run once:
   Serial.begin (115200);
 
   /* Instantiate PinManager and set the input callbacks 
@@ -52,9 +52,16 @@ void setup () {
   PinManager::manager()->input_callbacks (user_command, user_interrupt);
 
   reset_all ();
+
+  last_millis = millis ();
 }
 
 void loop () {
-  // put your main code here, to run repeatedly:
+  unsigned long current_millis = millis ();
+  if (last_millis != current_millis) {
+    last_millis = current_millis;
+    // this code runs approximately every millisecond; delays may occur elsewhere
+  }
+
   input_check ();
 }

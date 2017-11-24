@@ -58,12 +58,12 @@ PinManager::PinManager () :
     DP[i] = new DPin (flags, i);
   }
 
-  DP[ 3]->m_flags |= DPIN_PWM;
+  DP[ 3]->m_flags |= DPIN_PWM; // conflicts with tone() (uses Timer 2)
   DP[ 5]->m_flags |= DPIN_PWM;
   DP[ 6]->m_flags |= DPIN_PWM;
-  DP[ 9]->m_flags |= DPIN_PWM;
-  DP[10]->m_flags |= DPIN_PWM;
-  DP[11]->m_flags |= DPIN_PWM;
+  // DP[ 9]->m_flags |= DPIN_PWM; // conflicts with Servo library (uses Timer 1)
+  // DP[10]->m_flags |= DPIN_PWM; // conflicts with Servo library: see https://arduino-info.wikispaces.com/Timers-Arduino
+  DP[11]->m_flags |= DPIN_PWM; // conflicts with tone() & SPI (MOSI)
 }
 
 PinManager::~PinManager () {
