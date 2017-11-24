@@ -344,7 +344,7 @@ CommandStatus PinManager::command (int argc, char ** argv) {
 int PinManager::parse_pin_no (const char * str, unsigned int flags, bool bDigital) const { // returns pin no if valid, otherwise -1
   int pin_no = -1;
 
-  char * ptr = str;
+  const char * ptr = str;
 
   bool bOkay = true;
     

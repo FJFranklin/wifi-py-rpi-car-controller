@@ -73,7 +73,9 @@ int main (int argc, char ** argv) {
 
   /* set up serial
    */
-  fd = open (device, O_RDWR | O_NOCTTY | O_NDELAY);
+  fprintf (stderr, "Opening \"%s\"...\n", device);
+
+  fd = open (device, O_RDWR | O_NOCTTY | O_NONBLOCK /* O_NDELAY */);
   if (fd == -1) {
     fprintf (stderr, "Failed to open \"%s\" - exiting.\n", device);
     return -1;
@@ -81,10 +83,13 @@ int main (int argc, char ** argv) {
 
   tcgetattr (fd, &options);
 
-  options.c_cflag = B115200 | CS8 | CLOCAL | CREAD;
+  options.c_cflag = CS8 | CLOCAL | CREAD;
   options.c_iflag = IGNPAR;
   options.c_oflag = 0;
   options.c_lflag = 0;
+
+  cfsetispeed (&options, B115200);
+  cfsetospeed (&options, B115200);
 
   tcflush (fd, TCIFLUSH);
   tcsetattr (fd, TCSANOW, &options);
@@ -98,7 +103,9 @@ int main (int argc, char ** argv) {
   ttystate.c_lflag &= ~(ICANON | ECHO);
   ttystate.c_cc[VMIN] = 1;
 
-  tcsetattr (STDIN_FILENO, TCSANOW, &ttystate);
+  if (tcsetattr (STDIN_FILENO, TCSANOW, &ttystate)) {
+    fprintf (stderr, "error: unable to set serial attributes correctly\n");
+  }
 
   if (!bArduino)
     if (write (fd, (const unsigned char *) "0D\n0F)02)0E)", 12) < 0) {
