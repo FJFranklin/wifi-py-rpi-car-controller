@@ -1,3 +1,8 @@
+/* Copyright 2017 Francis James Franklin
+ * 
+ * Open Source under the MIT License - see LICENSE in the project's root folder
+ */
+
 #include "util.hh"
 #include "pinservo.hh"
 
