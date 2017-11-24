@@ -5,6 +5,8 @@
 
 #include "util.hh"
 
+static const char s_err_usage[] PROGMEM   = "(incorrect usage - see: help all)";
+static const char s_err_pin_no[] PROGMEM  = "(invalid pin number)";
 static const char s_err_command[] PROGMEM = "(command error)";
 static const char s_interrupt[] PROGMEM   = "\r\n(interrupt)";
 
@@ -20,14 +22,14 @@ static char *    input_argv[(input_size/2)+1];
 
 /* Function callbacks
  */
-static void (*s_fn_interrupt) () = 0;                     // If the user presses CTRL-C.
-static bool (*s_fn_command) (int argc, char ** argv) = 0; // Handle the user's command
+static void (*s_fn_interrupt) () = 0;                              // If the user presses CTRL-C.
+static CommandStatus (*s_fn_command) (int argc, char ** argv) = 0; // Handle the user's command
 
 void set_user_interrupt (void (*user_interrupt) ()) {
   s_fn_interrupt = user_interrupt;
 }
 
-void set_user_command (bool (*user_command) (int argc, char ** argv)) {
+void set_user_command (CommandStatus (*user_command) (int argc, char ** argv)) {
   s_fn_command = user_command;
 }
 
@@ -113,7 +115,13 @@ static void input_parse () {
   input_argv[argc] = 0;
 
   if (argc && s_fn_command) {
-    if (!s_fn_command (argc, input_argv))
+    CommandStatus cs = s_fn_command (argc, input_argv);
+
+    if (cs == cs_InvalidPin)
+      print_pgm (s_err_pin_no);
+    else if (cs == cs_IncorrectUsage)
+      print_pgm (s_err_usage);
+    else if (cs)
       print_pgm (s_err_command);
   }
 }

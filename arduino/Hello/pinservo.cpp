@@ -76,11 +76,12 @@ void PinServo::set_exact (int exact) {
     m_servo.writeMicroseconds (exact);
 }
 
-bool PinServo::command (int argc, char ** argv) {
+CommandStatus PinServo::command (int argc, char ** argv) {
   /* To get here, the first word in the argv array is "servo"; the second is the pin number.
    * There must be a third, the sub-command (with optional parameters) handled here.
    */
-  bool bOkay = true;
+  CommandStatus cs = cs_Okay;
+
   String third(argv[2]);
 
   if (third == "minmax") { // add some limits for safety & sanity
@@ -94,11 +95,11 @@ bool PinServo::command (int argc, char ** argv) {
 	set_min_max_microseconds (d_min, d_max);
       } else {
 	print_pgm (s_servo_re_minmax); // "servo: minmax values out of range (500 <= min < max <= 2500)";
-	bOkay = false;
+	cs = cs_IncorrectUsage;
       }
     } else {
       print_pgm (s_usage_minmax); // "usage 1: servo <pin#2-13> minmax <min.us [544]> <max.us [2400]>";
-      bOkay = false;
+      cs = cs_IncorrectUsage;
     }
   } else if (third == "angle") { // must be 0-180
     if (argc == 4) {
@@ -109,11 +110,11 @@ bool PinServo::command (int argc, char ** argv) {
 	set_angle (d_angle);
       } else {
 	print_pgm (s_servo_re_angle); // "servo: angle value out of range (0 <= value <= 180)";
-	bOkay = false;
+	cs = cs_IncorrectUsage;
       }
     } else {
       print_pgm (s_usage_angle); // "usage 2: servo <pin#2-13> angle <0-180 [90]>";
-      bOkay = false;
+      cs = cs_IncorrectUsage;
     }
   } else if (third == "microseconds") { // add some limits for safety & sanity
     if (argc == 4) {
@@ -124,11 +125,11 @@ bool PinServo::command (int argc, char ** argv) {
 	set_exact (d_exact);
       } else {
 	print_pgm (s_servo_re_us); // "servo: microseconds value out of range (10 <= value < 10000)";
-	bOkay = false;
+	cs = cs_IncorrectUsage;
       }
     } else {
       print_pgm (s_usage_us); // "usage 3: servo <pin#2-13> microseconds <microseconds>";
-      bOkay = false;
+      cs = cs_IncorrectUsage;
     }
   } else if (third == "on") {
     on ();
@@ -136,7 +137,8 @@ bool PinServo::command (int argc, char ** argv) {
     off ();
   } else {
     // unexpected sub-command
-    bOkay = false;
+    cs = cs_IncorrectUsage;
   }
-  return bOkay;
+
+  return cs;
 }

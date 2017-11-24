@@ -15,7 +15,9 @@ static const char s_hello[] PROGMEM = "This is a simple 'hello' program. Just sa
 
 /* input_check() feeds any input back to user_command() via PinManager as an array of strings
  */
-bool user_command (String & first, int argc, char ** argv) {
+CommandStatus user_command (String & first, int argc, char ** argv) {
+  CommandStatus cs = cs_Okay;
+
   if (first.equalsIgnoreCase ("hello") || first.equalsIgnoreCase ("hi")) {
     Serial.println ("Hello.");
   } else if (first.equalsIgnoreCase ("help")) {
@@ -26,7 +28,10 @@ bool user_command (String & first, int argc, char ** argv) {
       Serial.print (argv[arg]);
       Serial.println ('"');
     }
+    cs = cs_UnknownCommand;
   }
+
+  return cs;
 }
 
 void user_interrupt () {

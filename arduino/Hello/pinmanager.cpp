@@ -23,7 +23,6 @@ static const char s_usage_pwm_on_off[] PROGMEM = "pwm <pin#3,5-6,9-11> on|off";
 static const char s_usage_pwm_duty[] PROGMEM   = "pwm <pin#3,5-6,9-11> duty <0-255>";
 
 static const char s_err_help[] PROGMEM   = "help: expected one of: \"all\", \"digital\", \"servo\", \"pwm\"";
-static const char s_err_pin_no[] PROGMEM = "invalid pin number";
 
 static PinManager * s_PM = 0;
 
@@ -40,9 +39,9 @@ PinManager::PinManager () :
   /* initialise analog pins
    */
   for (int i = 0; i < 6; i++) {
-    unsigned int flags = 0;
-    // ...
-    AP[i] = new APin (flags);
+    unsigned int flags = APIN_ANALOG;
+
+    AP[i] = new APin (flags, i);
   }
 
   /* initialise digital pins
@@ -75,23 +74,26 @@ PinManager::~PinManager () {
     delete DP[i];
 }
 
-static bool s_command (int argc, char ** argv) { // callback for util input command
+static CommandStatus s_command (int argc, char ** argv) { // callback for util input command
   return s_PM->command (argc, argv);
 }
 
-void PinManager::input_callbacks (bool (*user_command_callback) (String & first, int argc, char ** argv), void (*user_interrupt_callback) ()) {
+void PinManager::input_callbacks (CommandStatus (*user_command_callback) (String & first, int argc, char ** argv),
+				  void (*user_interrupt_callback) ())
+{
   user_command = user_command_callback;
 
   set_user_interrupt (user_interrupt_callback);
   set_user_command (s_command);
 }
 
-bool PinManager::command (int argc, char ** argv) {
-  bool bOkay = true;
+CommandStatus PinManager::command (int argc, char ** argv) {
+  CommandStatus cs = cs_UnknownCommand;
+
   String first(argv[0]);
 
   if ((first == "help") && (argc > 1)) { // second argument must exist and should be one of: all, digital, servo, pwm, ...
-    bOkay = false;
+    cs = cs_IncorrectUsage;
 
     if (argc > 1) {
       String second(argv[1]);
@@ -103,29 +105,31 @@ bool PinManager::command (int argc, char ** argv) {
 	print_pgm (s_usage_list);
 	print_pgm (s_usage_led);
 	bAll = true;
-	bOkay = true;
+	cs = cs_Okay;
       }
       if (bAll || (second == "digital")) {
 	print_pgm (s_usage_dclr);
 	print_pgm (s_usage_dout);
 	print_pgm (s_usage_din);
 	print_pgm (s_usage_dup);
-	bOkay = true;
+	cs = cs_Okay;
       }
       if (bAll || (second == "servo")) {
 	PinServo::help ();
-	bOkay = true;
+	cs = cs_Okay;
       }
       if (bAll || (second == "pwm")) {
 	print_pgm (s_usage_pwm_on_off);
 	print_pgm (s_usage_pwm_duty);
-	bOkay = true;
+	cs = cs_Okay;
       }
     }
-    if (!bOkay) {
+    if (cs != cs_Okay) {
       print_pgm (s_err_help); // "help: expected one of: \"all\", \"digital\", \"servo\", \"pwm\"";
     }
   } else if (first == "list") {
+    cs = cs_Okay;
+
     bool bAnalog  = true;
     bool bDigital = true;
 
@@ -137,31 +141,58 @@ bool PinManager::command (int argc, char ** argv) {
       } else if (second == "digital") {
 	bAnalog = false;
       } else {
-	bOkay = false;
+	cs = cs_IncorrectUsage;
       }
     }
-    if (bOkay) {
+    if (cs == cs_Okay) {
       list (bAnalog, bDigital);
     }
   } else if (first == "dclr") {
+    cs = cs_Okay;
+
     for (int arg = 1; arg < argc; arg++) {
       int pin_no = parse_pin_no (argv[arg], DPIN_D_CLR, true);
 
       if (pin_no < 0) { // oops
-	bOkay = false;
+	cs = cs_InvalidPin;
 	  continue;
 	}
 
       DP[pin_no]->clear ();
     }
+  } else if (first == "ain") {
+    cs = cs_Okay;
+
+    bool bFirst = true;
+
+    for (int arg = 1; arg < argc; arg++) {
+      int pin_no = parse_pin_no (argv[arg], APIN_ANALOG, false);
+
+      if (pin_no < 0) { // oops
+	cs = cs_InvalidPin;
+	  continue;
+	}
+
+      if (bFirst)
+	bFirst = false;
+      else
+	Serial.print (" ");
+
+      Serial.print (AP[pin_no]->apin_read ());
+    }
+    if (!bFirst) {
+      Serial.print ("\r\n");
+    }
   } else if (first == "din") {
+    cs = cs_Okay;
+
     bool bFirst = true;
 
     for (int arg = 1; arg < argc; arg++) {
       int pin_no = parse_pin_no (argv[arg], DPIN_D_IN, true);
 
       if (pin_no < 0) { // oops
-	bOkay = false;
+	cs = cs_InvalidPin;
 	  continue;
 	}
 
@@ -179,6 +210,8 @@ bool PinManager::command (int argc, char ** argv) {
       Serial.print ("\r\n");
     }
   } else if (first == "dout") {
+    cs = cs_Okay;
+
     for (int arg = 1; arg < argc; arg++) {
       bool bHigh = true;
       char * ptr = argv[arg];
@@ -186,7 +219,7 @@ bool PinManager::command (int argc, char ** argv) {
       if (*ptr == '~') { // set low rather than high
 	bHigh = false;
 	if (*++ptr == 0) { // unexpected end-of-string! a ~ by itself
-	  bOkay = false;
+	  cs = cs_IncorrectUsage;
 	  continue;
 	}
       }
@@ -194,13 +227,15 @@ bool PinManager::command (int argc, char ** argv) {
       int pin_no = parse_pin_no (ptr, DPIN_D_OUT, true);
 
       if (pin_no < 0) { // oops
-	bOkay = false;
+	cs = cs_InvalidPin;
 	  continue;
 	}
 
       DP[pin_no]->dpin_write (bHigh);
     }
   } else if (first == "dup") {
+    cs = cs_Okay;
+
     for (int arg = 1; arg < argc; arg++) {
       bool bUp = true;
       char * ptr = argv[arg];
@@ -208,7 +243,7 @@ bool PinManager::command (int argc, char ** argv) {
       if (*ptr == '~') { // set down rather than up
 	bUp = false;
 	if (*++ptr == 0) { // unexpected end-of-string! a ~ by itself
-	  bOkay = false;
+	  cs = cs_IncorrectUsage;
 	  continue;
 	}
       }
@@ -216,92 +251,94 @@ bool PinManager::command (int argc, char ** argv) {
       int pin_no = parse_pin_no (ptr, DPIN_D_IN, true);
 
       if (pin_no < 0) { // oops
-	bOkay = false;
+	cs = cs_InvalidPin;
 	  continue;
 	}
 
       DP[pin_no]->dpin_input (bUp);
     }
   } else if (first == "led") {
-    bOkay = false;
+    cs = cs_IncorrectUsage;
 
     if (argc > 1) {
       String second(argv[1]);
 
       if (second == "on") {
 	DP[13]->dpin_write (true);
-	bOkay = true;
+	cs = cs_Okay;
       } else if (second == "off") {
 	DP[13]->dpin_write (false);
-	bOkay = true;
+	cs = cs_Okay;
       }
     }
   } else if (first == "echo") {
-    bOkay = false;
+    cs = cs_IncorrectUsage;
 
     if (argc > 1) {
       String second(argv[1]);
 
       if (second == "on") {
 	echo (true);
-	bOkay = true;
+	cs = cs_Okay;
       } else if (second == "off") {
 	echo (false);
-	bOkay = true;
+	cs = cs_Okay;
       }
     }
   } else if (first == "servo") {
+    cs = cs_Okay;
+
     int pin_no = -1;
 
     if (argc > 1) // there *must* be a second argument
       pin_no = parse_pin_no (argv[1], DPIN_SERVO, true);
 
     if (pin_no < 0) { // oops
-      bOkay = false;
+      cs = cs_InvalidPin;
     } else { // we have a valid pin!
       PinServo * PS = DP[pin_no]->servo ();
-
-      if (PS)
-	bOkay = PS->command (argc, argv); // let the class instance handle the rest
-      else
-	bOkay = false;
+      cs = PS->command (argc, argv); // let the class instance handle the rest
     }
   } else if (first == "pwm") {
+    cs = cs_Okay;
+
     int pin_no = -1;
 
     if (argc > 1) // there *must* be a second argument
       pin_no = parse_pin_no (argv[1], DPIN_PWM, true);
 
     if (pin_no < 0) { // oops
-      bOkay = false;
+      cs = cs_InvalidPin;
     } else { // we have a valid pin!
-      bOkay = false;
+      cs = cs_IncorrectUsage;
 
       if (argc > 2) { // need a 3rd argument at least
 	String third(argv[2]);
 
 	if (third == "on") {
 	  DP[pin_no]->pwm (true);
-	  bOkay = true;
+	  cs = cs_Okay;
 	} else if (third == "off") {
 	  DP[pin_no]->pwm (false);
-	  bOkay = true;
+	  cs = cs_Okay;
 	} else if ((third == "duty") && (argc > 3)) { // need a 4th argument for the duty cycle
 	  String duty(argv[3]);
 	  int cycle = duty.toInt ();
 
 	  if ((cycle >= 0) && (cycle <= 255)) {
 	    DP[pin_no]->pwm_duty ((unsigned char) cycle);
-	    bOkay = true;
+	    cs = cs_Okay;
 	  }
 	}
       }
     }
-  } else if (user_command) {
-    bOkay = user_command (first, argc, argv);
+  }
+  
+  if (user_command && (cs == cs_UnknownCommand)) {
+    cs = user_command (first, argc, argv);
   }
 
-  return bOkay;
+  return cs;
 }
 
 int PinManager::parse_pin_no (const char * str, unsigned int flags, bool bDigital) const { // returns pin no if valid, otherwise -1
@@ -344,28 +381,173 @@ int PinManager::parse_pin_no (const char * str, unsigned int flags, bool bDigita
 	bOkay = false;
     }
   }
+
   if (!bOkay) {
-    print_pgm (s_err_pin_no); // "invalid pin number";
     pin_no = -1;
   }
-
   return pin_no;
 }
 
 void PinManager::list (bool bAnalog, bool bDigital) const {
   if (bAnalog)
     for (int i = 0; i < 6; i++)
-      AP[i]->status (i);
+      AP[i]->status ();
 
   if (bDigital)
     for (int i = 0; i < 14; i++)
       DP[i]->status ();
 }
 
-void PinManager::dpin_write (int pin_no, bool value) {
+/* set digital pin <pin_no> to high (true, 1) or low (false, 0)
+ */
+CommandStatus PinManager::cmd_dout (int pin_no, bool value) {
   if ((pin_no < 0) || (pin_no > 13))
-    return;
+    return cs_InvalidPin;
 
-  if (DP[pin_no]->m_flags & DPIN_D_OUT)
-    DP[pin_no]->dpin_write (value);
+  if (!(DP[pin_no]->m_flags & DPIN_D_OUT))
+    return cs_InvalidPin;
+
+  DP[pin_no]->dpin_write (value);
+
+  return cs_Okay;
+}
+
+/* read digital pin <pin_no> (0-1)
+ */
+CommandStatus PinManager::cmd_din (int pin_no, bool & bState) {
+  if ((pin_no < 0) || (pin_no > 13))
+    return cs_InvalidPin;
+
+  if (!(DP[pin_no]->m_flags & DPIN_D_IN))
+    return cs_InvalidPin;
+
+  bState = DP[pin_no]->dpin_read ();
+
+  return cs_Okay;
+}
+
+/* read analog pin A<pin_no> (0-1023)
+ */
+CommandStatus PinManager::cmd_ain (int pin_no, int & value) {
+  if ((pin_no < 0) || (pin_no > 5))
+    return cs_InvalidPin;
+
+  if (!(AP[pin_no]->m_flags & APIN_ANALOG))
+    return cs_InvalidPin;
+
+  value = AP[pin_no]->apin_read ();
+
+  return cs_Okay;
+}
+
+/* set digital pin <pin_no> to read with internal pull-up resistor
+ */
+CommandStatus PinManager::cmd_dup (int pin_no, bool bPullUp) {
+  if ((pin_no < 0) || (pin_no > 13))
+    return cs_InvalidPin;
+
+  if (!(DP[pin_no]->m_flags & DPIN_D_IN))
+    return cs_InvalidPin;
+
+  DP[pin_no]->dpin_input (bPullUp);
+
+  return cs_Okay;
+}
+
+/* deassociate & clear state of digital pin <pin_no>
+ */
+CommandStatus PinManager::cmd_dclr (int pin_no) {
+  if ((pin_no < 0) || (pin_no > 13))
+    return cs_InvalidPin;
+
+  if (!(DP[pin_no]->m_flags & DPIN_D_CLR))
+    return cs_InvalidPin;
+
+  DP[pin_no]->clear ();
+
+  return cs_Okay;
+}
+
+/* use (digital) pin <pin_no> as PWM and turn on/off
+ */
+CommandStatus PinManager::cmd_pwm (int pin_no, bool bOn) {
+  if ((pin_no < 0) || (pin_no > 13))
+    return cs_InvalidPin;
+
+  if (!(DP[pin_no]->m_flags & DPIN_PWM))
+    return cs_InvalidPin;
+
+  DP[pin_no]->pwm (bOn);
+
+  return cs_Okay;
+}
+
+/* set PWM duty cycle (0-255) for (digital) pin <pin_no>
+ */
+CommandStatus PinManager::cmd_pwm_duty (int pin_no, unsigned char duty_cycle) {
+  if ((pin_no < 0) || (pin_no > 13))
+    return cs_InvalidPin;
+
+  if (!(DP[pin_no]->m_flags & DPIN_PWM))
+    return cs_InvalidPin;
+
+  DP[pin_no]->pwm_duty (duty_cycle);
+
+  return cs_Okay;
+}
+
+/* use (digital) pin <pin_no> as a servo controller and turn on/off
+ */
+CommandStatus PinManager::cmd_servo (int pin_no, bool bOn) {
+  if ((pin_no < 0) || (pin_no > 13))
+    return cs_InvalidPin;
+
+  if (!(DP[pin_no]->m_flags & DPIN_SERVO))
+    return cs_InvalidPin;
+
+  PinServo * PS = DP[pin_no]->servo ();
+
+  return PS->cmd_servo (bOn);
+}
+
+/* set high/low range for servo on (digital) pin <pin_no>
+ */
+CommandStatus PinManager::cmd_servo_minmax (int pin_no, unsigned int range_min, unsigned int range_max) {
+  if ((pin_no < 0) || (pin_no > 13))
+    return cs_InvalidPin;
+
+  if (!(DP[pin_no]->m_flags & DPIN_SERVO))
+    return cs_InvalidPin;
+
+  PinServo * PS = DP[pin_no]->servo ();
+
+  return PS->cmd_servo_minmax (range_min, range_max);
+}
+
+/* set angle (0-180) for servo on (digital) pin <pin_no>
+ */
+CommandStatus PinManager::cmd_servo_angle (int pin_no, unsigned int angle) {
+  if ((pin_no < 0) || (pin_no > 13))
+    return cs_InvalidPin;
+
+  if (!(DP[pin_no]->m_flags & DPIN_SERVO))
+    return cs_InvalidPin;
+
+  PinServo * PS = DP[pin_no]->servo ();
+
+  return PS->cmd_servo_angle (angle);
+}
+
+/* set exact value for high for servo on (digital) pin <pin_no>
+ */
+CommandStatus PinManager::cmd_servo_microseconds (int pin_no, unsigned int microseconds) {
+  if ((pin_no < 0) || (pin_no > 13))
+    return cs_InvalidPin;
+
+  if (!(DP[pin_no]->m_flags & DPIN_SERVO))
+    return cs_InvalidPin;
+
+  PinServo * PS = DP[pin_no]->servo ();
+
+  return PS->cmd_servo_microseconds (microseconds);
 }
