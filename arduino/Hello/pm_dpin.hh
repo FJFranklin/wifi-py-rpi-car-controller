@@ -6,10 +6,13 @@
 /* Included directly by PinManager.cpp
  */
 
-#define DPIN_SERVO (1<<0) // servo allowed
-#define DPIN_D_OUT (1<<1) // digital out allowed
-#define DPIN_PWM   (1<<2) // PWM allowed
-#define DPIN_PWMON (1<<3) // PWM is active
+#define DPIN_D_CLR  (1<<0) // digital clear allowed
+#define DPIN_D_IN   (1<<1) // digital in allowed
+#define DPIN_D_OUT  (1<<2) // digital out allowed
+#define DPIN_SERVO  (1<<3) // servo allowed
+#define DPIN_PWM    (1<<4) // PWM allowed
+#define DPIN_PWMON  (1<<5) // PWM is active
+#define DPIN_PULLUP (1<<6) // digital in with pull-up
 
 class DPin {
 public:
@@ -44,15 +47,24 @@ public:
 
   void status () const {
     String state("D-Pin ");
+
     state = (state + m_pin_no) + " ";
-    if (m_type == pt_None)
+
+    if (m_type == pt_None) {
       state += "-";
-    else if (m_type == pt_Servo)
+    } else if (m_type == pt_Servo) {
       state += "servo";
-    else if (m_type == pt_D_Out)
+    } else if (m_type == pt_D_In) {
+      state += "digital in";
+      if (m_flags & DPIN_PULLUP)
+	state += " (up)";
+    } else if (m_type == pt_D_Out) {
       state += "digital out";
-    else if (m_type == pt_PWM)
+    } else if (m_type == pt_PWM) {
       state += "PWM";
+      if (m_flags & DPIN_PWMON)
+	state += " (active)";
+    }
 
     Serial.println (state);
   }
@@ -60,12 +72,14 @@ public:
   void clear () {
     if (m_type == pt_Servo) {
       delete m_data.servo;
+    } else if (m_type == pt_D_In) {
+      m_flags &= ~DPIN_PULLUP;
     } else if (m_type == pt_D_Out) {
-      pinMode (m_pin_no, INPUT);
+      // ...
     } else if (m_type == pt_PWM) {
-      pinMode (m_pin_no, INPUT);
       m_flags &= ~DPIN_PWMON;
     }
+    pinMode (m_pin_no, INPUT);
     m_type = pt_None;
   }
 
@@ -79,6 +93,40 @@ public:
 	m_type = pt_Servo;
     }
     return m_data.servo;
+  }
+
+  void dpin_input (bool bPullUp = false) {
+    if (m_type != pt_D_In) {
+      clear ();
+
+      if (bPullUp) {
+	pinMode (m_pin_no, INPUT_PULLUP);
+	m_flags |= DPIN_PULLUP;
+      }
+      m_type = pt_D_In;
+    } else if (bPullUp && ((m_flags & DPIN_PULLUP) == 0)) { // need to change
+      pinMode (m_pin_no, INPUT_PULLUP);
+      m_flags |= DPIN_PULLUP;
+    } else if (!bPullUp && (m_flags & DPIN_PULLUP)) { // need to change
+      pinMode (m_pin_no, INPUT);
+      m_flags &= ~DPIN_PULLUP;
+    }
+    if (digitalRead (m_pin_no) == HIGH)
+      m_data.digital_value = true;
+    else
+      m_data.digital_value = false;
+  }
+
+  bool dpin_read () {
+    if (m_type != pt_D_In)
+      dpin_input ();
+
+    if (digitalRead (m_pin_no) == HIGH)
+      m_data.digital_value = true;
+    else
+      m_data.digital_value = false;
+
+    return m_data.digital_value;
   }
 
   void dpin_write (bool value) {

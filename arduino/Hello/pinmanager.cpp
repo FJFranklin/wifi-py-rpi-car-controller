@@ -13,13 +13,16 @@
 static const char s_usage_help[] PROGMEM = "help [all|servo]";
 static const char s_usage_echo[] PROGMEM = "echo on|off";
 static const char s_usage_list[] PROGMEM = "list [digital|analog]";
+static const char s_usage_dclr[] PROGMEM = "dclr [<pin#2-13>]*";
 static const char s_usage_dout[] PROGMEM = "dout [[~]<pin#2-13>]*";
+static const char s_usage_din[] PROGMEM  = "din [<pin#2-12>]*";
+static const char s_usage_dup[] PROGMEM  = "dup [[~]<pin#2-12>]*";
 static const char s_usage_led[] PROGMEM  = "led on|off";
 
 static const char s_usage_pwm_on_off[] PROGMEM = "pwm <pin#3,5-6,9-11> on|off";
 static const char s_usage_pwm_duty[] PROGMEM   = "pwm <pin#3,5-6,9-11> duty <0-255>";
 
-static const char s_err_help[] PROGMEM   = "help: expected one of: \"all\", \"servo\", \"pwm\"";
+static const char s_err_help[] PROGMEM   = "help: expected one of: \"all\", \"digital\", \"servo\", \"pwm\"";
 static const char s_err_pin_no[] PROGMEM = "invalid pin number";
 
 static PinManager * s_PM = 0;
@@ -47,8 +50,11 @@ PinManager::PinManager () :
   for (int i = 0; i < 14; i++) {
     unsigned int flags = 0;
 
-    if (i > 1)
-      flags |= DPIN_SERVO | DPIN_D_OUT;
+    if (i > 1) {
+      flags |= DPIN_SERVO | DPIN_D_OUT | DPIN_D_CLR;
+      if (i < 13)
+	flags |= DPIN_D_IN;
+    }
 
     DP[i] = new DPin (flags, i);
   }
@@ -84,7 +90,7 @@ bool PinManager::command (int argc, char ** argv) {
   bool bOkay = true;
   String first(argv[0]);
 
-  if ((first == "help") && (argc > 1)) { // second argument must exist and should be one of: all, servo, pwm, ...
+  if ((first == "help") && (argc > 1)) { // second argument must exist and should be one of: all, digital, servo, pwm, ...
     bOkay = false;
 
     if (argc > 1) {
@@ -95,9 +101,15 @@ bool PinManager::command (int argc, char ** argv) {
 	print_pgm (s_usage_help);
 	print_pgm (s_usage_echo);
 	print_pgm (s_usage_list);
-	print_pgm (s_usage_dout);
 	print_pgm (s_usage_led);
 	bAll = true;
+	bOkay = true;
+      }
+      if (bAll || (second == "digital")) {
+	print_pgm (s_usage_dclr);
+	print_pgm (s_usage_dout);
+	print_pgm (s_usage_din);
+	print_pgm (s_usage_dup);
 	bOkay = true;
       }
       if (bAll || (second == "servo")) {
@@ -111,7 +123,7 @@ bool PinManager::command (int argc, char ** argv) {
       }
     }
     if (!bOkay) {
-      print_pgm (s_err_help); // "help: expected one of: \"all\", \"servo\", \"pwm\"";
+      print_pgm (s_err_help); // "help: expected one of: \"all\", \"digital\", \"servo\", \"pwm\"";
     }
   } else if (first == "list") {
     bool bAnalog  = true;
@@ -130,6 +142,41 @@ bool PinManager::command (int argc, char ** argv) {
     }
     if (bOkay) {
       list (bAnalog, bDigital);
+    }
+  } else if (first == "dclr") {
+    for (int arg = 1; arg < argc; arg++) {
+      int pin_no = parse_pin_no (argv[arg], DPIN_D_CLR, true);
+
+      if (pin_no < 0) { // oops
+	bOkay = false;
+	  continue;
+	}
+
+      DP[pin_no]->clear ();
+    }
+  } else if (first == "din") {
+    bool bFirst = true;
+
+    for (int arg = 1; arg < argc; arg++) {
+      int pin_no = parse_pin_no (argv[arg], DPIN_D_IN, true);
+
+      if (pin_no < 0) { // oops
+	bOkay = false;
+	  continue;
+	}
+
+      if (bFirst)
+	bFirst = false;
+      else
+	Serial.print (" ");
+
+      if (DP[pin_no]->dpin_read ())
+	Serial.print ("1");
+      else
+	Serial.print ("0");
+    }
+    if (!bFirst) {
+      Serial.print ("\r\n");
     }
   } else if (first == "dout") {
     for (int arg = 1; arg < argc; arg++) {
@@ -152,6 +199,28 @@ bool PinManager::command (int argc, char ** argv) {
 	}
 
       DP[pin_no]->dpin_write (bHigh);
+    }
+  } else if (first == "dup") {
+    for (int arg = 1; arg < argc; arg++) {
+      bool bUp = true;
+      char * ptr = argv[arg];
+      
+      if (*ptr == '~') { // set down rather than up
+	bUp = false;
+	if (*++ptr == 0) { // unexpected end-of-string! a ~ by itself
+	  bOkay = false;
+	  continue;
+	}
+      }
+
+      int pin_no = parse_pin_no (ptr, DPIN_D_IN, true);
+
+      if (pin_no < 0) { // oops
+	bOkay = false;
+	  continue;
+	}
+
+      DP[pin_no]->dpin_input (bUp);
     }
   } else if (first == "led") {
     bOkay = false;
