@@ -7,6 +7,7 @@
  */
 
 #define APIN_ANALOG (1<<0)
+#define APIN_NOTIFY (1<<7)
 
 class APin {
 public:
@@ -29,6 +30,19 @@ public:
 
   ~APin () {
     // ...
+  }
+
+  void set_notification (bool bNotify = true) {
+    if (bNotify)
+      m_flags |= APIN_NOTIFY;
+    else
+      m_flags &= ~APIN_NOTIFY;
+  }
+
+  bool notification () { // return notification flag state, & reset state to false
+    bool bNotify = m_flags & APIN_NOTIFY;
+    m_flags &= ~APIN_NOTIFY;
+    return bNotify;
   }
 
   void status () const {

@@ -1,4 +1,4 @@
-/* Copyright 2017 Francis James Franklin
+/* Copyright 2017-18 Francis James Franklin
  * 
  * Open Source under the MIT License - see LICENSE in the project's root folder
  */
@@ -7,6 +7,8 @@
 #define ArduinoHello_util_hh
 
 #include <Arduino.h>
+
+extern uint8_t local_address; // From EEPROM
 
 /* Specifically for printing a string stored in program memory (using PROGMEM),
  * with the option of a trailing newline.
@@ -24,8 +26,13 @@ extern void print_char (char c);
  */
 extern void echo (bool bOn);
 
+/* Raw send string to Serial for testing, where channel_no = '0' or, on Teensy, also '1', '2', '4', '5'
+ */
+extern void serial_ping (char channel_no, const char * str);
+
 /* Input parsing
  */
+extern void input_setup (); // call from main setup() function
 extern void input_check (); // check for input, and handle as necessary
 extern void input_reset (); // reset the input buffer
 

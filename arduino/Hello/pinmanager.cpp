@@ -87,6 +87,32 @@ void PinManager::input_callbacks (CommandStatus (*user_command_callback) (String
   set_user_command (s_command);
 }
 
+void PinManager::update (void (*notification_handler) (int pin_no, bool bDigital)) {
+  /* TODO: set notifications
+   */
+
+  for (int i = 0; i < 6; i++) {
+    if (AP[i]->notification ()) {
+      // TODO: Handle internally if required ??
+      //       Notifications may be requested by the command line, the user's program, or internally; how to manage?
+      //       Query: Are pin change interrupts on analog pins only relevant for digital input?
+
+      if (notification_handler)
+	notification_handler (i, false);
+    }
+  }
+
+  for (int i = 0; i < 14; i++) {
+    if (DP[i]->notification ()) {
+      // TODO: Handle internally if required ??
+      //       Notifications may be requested by the command line, the user's program, or internally; how to manage?
+
+      if (notification_handler)
+	notification_handler (i, false);
+    }
+  }
+}
+
 CommandStatus PinManager::command (int argc, char ** argv) {
   CommandStatus cs = cs_UnknownCommand;
 
@@ -127,6 +153,20 @@ CommandStatus PinManager::command (int argc, char ** argv) {
     if (cs != cs_Okay) {
       print_pgm (s_err_help); // "help: expected one of: \"all\", \"digital\", \"servo\", \"pwm\"";
     }
+  } else if (first == "ping") {
+    cs = cs_Okay;
+
+    char channel_no = '0';
+    const char * message = argv[0];
+
+    if (argc > 1) {
+      channel_no = *argv[1];
+    }
+    if (argc > 2) {
+      message = argv[2];
+    }
+
+    serial_ping (channel_no, message);
   } else if (first == "list") {
     cs = cs_Okay;
 

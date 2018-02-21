@@ -13,6 +13,7 @@
 #define DPIN_PWM    (1<<4) // PWM allowed
 #define DPIN_PWMON  (1<<5) // PWM is active
 #define DPIN_PULLUP (1<<6) // digital in with pull-up
+#define DPIN_NOTIFY (1<<7) // flag for notification
 
 class DPin {
 public:
@@ -43,6 +44,19 @@ public:
 
   ~DPin () {
     clear ();
+  }
+
+  void set_notification (bool bNotify = true) {
+    if (bNotify)
+      m_flags |= DPIN_NOTIFY;
+    else
+      m_flags &= ~DPIN_NOTIFY;
+  }
+
+  bool notification () { // return notification flag state, & reset state to false
+    bool bNotify = m_flags & DPIN_NOTIFY;
+    m_flags &= ~DPIN_NOTIFY;
+    return bNotify;
   }
 
   void status () const {

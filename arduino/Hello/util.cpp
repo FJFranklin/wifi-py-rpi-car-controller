@@ -1,20 +1,43 @@
-/* Copyright 2017 Francis James Franklin
+/* Copyright 2017-18 Francis James Franklin
  * 
  * Open Source under the MIT License - see LICENSE in the project's root folder
  */
 
+#include <EEPROM.h>
+
 #include "util.hh"
+
+uint8_t local_address; // Get from EEPROM
+
+static uint8_t s_src_default = 0; // default address for responses is 0, which is just Serial
+
+#ifdef CORE_TEENSY
+/* An Arduino Library that facilitates packet-based serial communication using COBS or SLIP encoding
+ * https://github.com/bakercp/PacketSerial
+ */
+#include <PacketSerial.h>
+
+static PacketSerial PS0;
+static PacketSerial PS1;
+static PacketSerial PS2;
+
+#endif /* CORE_TEENSY */
+
+static bool s_bUsePacketSerial = false;
+static bool s_bEchoOn = true;
 
 static const char s_err_usage[] PROGMEM   = "(incorrect usage - see: help all)";
 static const char s_err_pin_no[] PROGMEM  = "(invalid pin number)";
 static const char s_err_command[] PROGMEM = "(command error)";
 static const char s_interrupt[] PROGMEM   = "\r\n(interrupt)";
 
+static void input_push (byte c);
 static void input_add (char c);
 static void input_delete ();
-static void input_parse ();
+static void input_parse (uint8_t address_src, const char * buffer, size_t size);
 
-static const int input_size = 64;
+static const int input_size = 253;
+static char      input_bufcpy[input_size+1];
 static char      input_buffer[input_size+3];
 static char *    input_ptr = input_buffer;
 static int       input_count = 0;
@@ -35,8 +58,6 @@ void set_user_command (CommandStatus (*user_command) (int argc, char ** argv)) {
 
 /* Suppress printing if echo is off.
  */
-static bool s_bEchoOn = true;
-
 void echo (bool bOn) {
   s_bEchoOn = bOn;
 }
@@ -64,24 +85,156 @@ void print_char (char c) {
   }
 }
 
-void input_check () {
-  if (Serial.available () > 0) {
-    byte c = Serial.read ();
+#ifdef CORE_TEENSY
 
-    if (c < 32) {
-      if ((c == 10) || (c == 13)) { // newline || carriage return
-        input_parse ();
-      } else if (c == 3) { // ^C
-	print_pgm (s_interrupt);
-	if (s_fn_interrupt)
-	  s_fn_interrupt ();
-      }
-      input_reset ();
-    } else if (c == 127) {
-      input_delete ();
-    } else if (c < 127) {
-      input_add ((char) c);
+#define CMD_CLI_Command   0
+#define CMD_CLI_Response  1
+
+static void s_packet (uint8_t /* channel_no */, const uint8_t * buffer, size_t size) {
+  if (size < 4) {
+    // minimum packet size is 4
+    return;
+  }
+
+  uint8_t address_dest = buffer[0];
+  uint8_t address_src  = buffer[1];
+  uint8_t pkt_command  = buffer[2];
+  uint8_t pkt_data_len = buffer[3];
+
+  if (pkt_data_len > 252) {
+    // too long; packet total length < 256
+    return;
+  }
+  if ((uint8_t) (pkt_data_len + 4) != size) {
+    // incomplete/broken packet
+    return;
+  }
+
+  if (address_dest == local_address) {    // the packet has reached its destination
+    if (pkt_command == CMD_CLI_Command) { // it's a simple command
+      input_parse (address_src, (const char *) (buffer + 4), pkt_data_len);
+    } else {
+      // TODO: handle
     }
+  } else {
+    // TODO: redirect
+  }
+}
+
+static void s_PS0_onPacketReceived (const uint8_t * buffer, size_t size) {
+  s_packet (0, buffer, size);
+}
+
+static void s_PS1_onPacketReceived (const uint8_t * buffer, size_t size) {
+  s_packet (1, buffer, size);
+}
+
+static void s_PS2_onPacketReceived (const uint8_t * buffer, size_t size) {
+  s_packet (2, buffer, size);
+}
+
+#endif /* CORE_TEENSY */
+
+void input_setup () {
+  local_address = EEPROM.read (0);
+
+  Serial.begin (115200);
+#ifdef CORE_TEENSY
+  Serial1.begin (2000000);
+  Serial2.begin (2000000);
+
+  PS0.setStream (&Serial);
+  PS1.setStream (&Serial1);
+  PS2.setStream (&Serial2);
+
+  PS0.setPacketHandler (s_PS0_onPacketReceived);
+  PS1.setPacketHandler (s_PS1_onPacketReceived);
+  PS2.setPacketHandler (s_PS2_onPacketReceived);
+
+  Serial4.begin (9600); // or 500000 for fast serial compatible across Teensy 3.x range
+  Serial5.begin (9600);
+#endif /* CORE_TEENSY */
+}
+
+void serial_ping (char channel_no, const char * str) {
+  if (!s_bUsePacketSerial && (channel_no == '0')) {
+    Serial.print (str);
+  }
+#ifdef CORE_TEENSY
+  if (s_bUsePacketSerial && (channel_no == '0')) {
+    PS0.send ((const uint8_t *) str, strlen (str));
+  }
+  if (channel_no == '1') {
+    PS1.send ((const uint8_t *) str, strlen (str));
+  }
+  if (channel_no == '2') {
+    PS2.send ((const uint8_t *) str, strlen (str));
+  }
+  if (channel_no == '4') {
+    Serial4.print (str);
+  }
+  if (channel_no == '5') {
+    Serial5.print (str);
+  }
+#endif /* CORE_TEENSY */
+}
+
+static void s_input_check_stream (Stream * S, char channel_no) { // for diagnostics only
+  if (S->available () > 0) {
+    Serial.print ("[#");
+    Serial.write (channel_no);
+    while (S->available () > 0) {
+      byte c = S->read ();
+      Serial.print (' ');
+      Serial.print (c, HEX);
+    }
+    Serial.print (" ] ");
+  }
+}
+
+void input_check () {
+#ifdef CORE_TEENSY
+  PS1.update ();
+  PS2.update ();
+
+  s_input_check_stream (&Serial4, '4');
+  s_input_check_stream (&Serial5, '5');
+
+  if (s_bUsePacketSerial) {
+    PS0.update ();
+    return; // don't process any further input on Serial
+  }
+#endif /* CORE_TEENSY */
+
+  while (true) {
+    int c = Serial.peek ();
+    if (c > 0) {
+      input_push ((byte) Serial.read ());
+      continue;
+    }
+    if (c == 0) {
+      s_bUsePacketSerial = true;
+      input_reset ();
+    }
+    break;
+  }
+}
+
+static void input_push (byte c) {
+  if (c < 32) {
+    if ((c == 10) || (c == 13)) { // newline || carriage return
+      print_str ("\r\n");
+      input_parse (s_src_default, input_buffer + 2, input_count);
+    } else if (c == 3) { // ^C
+      print_pgm (s_interrupt);
+      if (s_fn_interrupt)
+	s_fn_interrupt ();
+    }
+    input_reset ();
+  } else if (c == 127) {
+    input_delete ();
+  } else if (c < 127) {
+    input_add ((char) c);
   }
 }
 
@@ -97,11 +250,17 @@ void input_reset () {
   print_str (input_buffer);
 }
 
-static void input_parse () {
-  char * ptr = input_buffer + 2;
+static void input_parse (uint8_t /* address_src */, const char * buffer, size_t size) {
+  if (!buffer || (size > 255)) {
+    // too long!
+    return;
+  }
+
+  char * ptr = input_bufcpy;
   int    argc = 0;
 
-  print_str ("\r\n");
+  memcpy (input_bufcpy, buffer, size);
+  input_bufcpy[size] = 0;
 
   while (*ptr) {
     if (*ptr == ' ') {

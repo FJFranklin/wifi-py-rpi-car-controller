@@ -26,6 +26,10 @@ public:
    */  
   void input_callbacks (CommandStatus (*user_command_callback) (String & first, int argc, char ** argv), void (*user_interrupt_callback) ());
 
+  /* call at the start of each loop iteration
+   */
+  void update (void (*notification_handler) (int pin_no, bool bDigital) = 0);
+
   CommandStatus command (int argc, char ** argv); // commands handled by PinManager
 
 private:
@@ -57,7 +61,7 @@ public:
   /* turn LED (digital pin #13) on or off
    */
   inline CommandStatus cmd_led (bool bOn) {
-    cmd_dout (13, bOn);
+    return cmd_dout (13, bOn);
   }
 
   /* use (digital) pin <pin_no> as PWM and turn on/off
