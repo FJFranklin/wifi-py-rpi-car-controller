@@ -45,44 +45,49 @@ static char *    input_argv[(input_size/2)+1];
 
 /* Function callbacks
  */
-static void (*s_fn_interrupt) () = 0;                              // If the user presses CTRL-C.
-static CommandStatus (*s_fn_command) (int argc, char ** argv) = 0; // Handle the user's command
+static void (*s_fn_interrupt) () = 0;                                                   // If the user presses CTRL-C.
+static CommandStatus (*s_fn_command) (uint8_t address_src, int argc, char ** argv) = 0; // Handle the user's command
 
 void set_user_interrupt (void (*user_interrupt) ()) {
   s_fn_interrupt = user_interrupt;
 }
 
-void set_user_command (CommandStatus (*user_command) (int argc, char ** argv)) {
+void set_user_command (CommandStatus (*user_command) (uint8_t address_src, int argc, char ** argv)) {
   s_fn_command = user_command;
+}
+
+Message Message::pgm_message (const char * pgm) { // create new message with string stored in PROGMEM
+  Message M;
+  M.append_pgm (pgm);
+  return M;
+}
+
+void Message::append_pgm (const char * pgm) { // append string stored in PROGMEM
+  if (!pgm) return;
+
+  while (true) {
+    byte c = pgm_read_byte_near (pgm++);
+    if (!c) break;
+    text += (char) c;
+  }
+}
+
+void Message::send (uint8_t address) {
+  if (s_bEchoOn && (address != local_address)) { // don't send to self
+    if (address) {
+      // ...
+    } else {
+      Serial.print (text);
+      Serial.print ("\r\n");
+    }
+  }
+  text = "";
 }
 
 /* Suppress printing if echo is off.
  */
 void echo (bool bOn) {
   s_bEchoOn = bOn;
-}
-
-void print_pgm (const char * str_pgm) {
-  if (!s_bEchoOn) return;
-
-  while (true) {
-    byte c = pgm_read_byte_near (str_pgm++);
-    if (!c) break;
-    Serial.write (c);
-  }
-  Serial.print ("\r\n");
-}
-
-void print_str (const char * str) {
-  if (s_bEchoOn) {
-    Serial.print (str);
-  }
-}
-
-void print_char (char c) {
-  if (s_bEchoOn) {
-    Serial.write (c);
-  }
 }
 
 #ifdef CORE_TEENSY
@@ -214,7 +219,6 @@ void input_check () {
     }
     if (c == 0) {
       s_bUsePacketSerial = true;
-      input_reset ();
     }
     break;
   }
@@ -223,10 +227,10 @@ void input_check () {
 static void input_push (byte c) {
   if (c < 32) {
     if ((c == 10) || (c == 13)) { // newline || carriage return
-      print_str ("\r\n");
+      Message().send ();
       input_parse (s_src_default, input_buffer + 2, input_count);
     } else if (c == 3) { // ^C
-      print_pgm (s_interrupt);
+      Message::pgm_message(s_interrupt).send ();
       if (s_fn_interrupt)
 	s_fn_interrupt ();
     }
@@ -247,10 +251,10 @@ void input_reset () {
 
   input_count = 0;
 
-  print_str (input_buffer);
+  Serial.print (input_buffer);
 }
 
-static void input_parse (uint8_t /* address_src */, const char * buffer, size_t size) {
+static void input_parse (uint8_t address_src, const char * buffer, size_t size) {
   if (!buffer || (size > 255)) {
     // too long!
     return;
@@ -274,20 +278,20 @@ static void input_parse (uint8_t /* address_src */, const char * buffer, size_t 
   input_argv[argc] = 0;
 
   if (argc && s_fn_command) {
-    CommandStatus cs = s_fn_command (argc, input_argv);
+    CommandStatus cs = s_fn_command (address_src, argc, input_argv);
 
     if (cs == cs_InvalidPin)
-      print_pgm (s_err_pin_no);
+      Message::pgm_message(s_err_pin_no).send (address_src);
     else if (cs == cs_IncorrectUsage)
-      print_pgm (s_err_usage);
+      Message::pgm_message(s_err_usage).send (address_src);
     else if (cs)
-      print_pgm (s_err_command);
+      Message::pgm_message(s_err_command).send (address_src);
   }
 }
 
 static void input_add (char c) {
   if (input_count < input_size) { // otherwise just ignore
-    print_char (c);
+    Serial.print (c);
     *input_ptr++ = c;
     *input_ptr = 0;
     ++input_count;
@@ -296,7 +300,7 @@ static void input_add (char c) {
 
 static void input_delete () {
   if (input_count > 0) { // otherwise just ignore
-    print_str ("\b \b");
+    Serial.print ("\b \b");
     *--input_ptr = 0;
     --input_count;
   }

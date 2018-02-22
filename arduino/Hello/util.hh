@@ -8,19 +8,32 @@
 
 #include <Arduino.h>
 
-extern uint8_t local_address; // From EEPROM
+extern uint8_t local_address; // From EEPROM; valid device addresses are 1-127
 
-/* Specifically for printing a string stored in program memory (using PROGMEM),
- * with the option of a trailing newline.
- * 
- * Suppress printing if echo is off.
- */
-extern void print_pgm (const char * str_pgm); // adds a newline automatically at the end
+class Message {
+public:
+  String text;
 
-/* Suppress printing if echo is off.
- */
-extern void print_str (const char * str);
-extern void print_char (char c);
+  Message () {
+    // ...
+  }
+
+  Message (const String & S) :
+    text(S)
+  {
+    // ...
+  }
+
+  ~Message () {
+    // ...
+  }
+
+  static Message pgm_message (const char * pgm); // create new message with string stored in PROGMEM
+
+  void append_pgm (const char * pgm);              // append string stored in PROGMEM
+
+  void send (uint8_t address = 0); // default address for Serial
+};
 
 /* Turn echo on/off
  */
@@ -46,6 +59,6 @@ enum CommandStatus {
 /* Set callback functions for user command & interrupt
  */
 extern void set_user_interrupt (void (*user_interrupt) ());
-extern void set_user_command (CommandStatus (*user_command) (int argc, char ** argv));
+extern void set_user_command (CommandStatus (*user_command) (uint8_t address_src, int argc, char ** argv));
 
 #endif /* !ArduinoHello_util_hh */

@@ -16,12 +16,12 @@ static const char s_servo_re_minmax[] PROGMEM = "servo: minmax values out of ran
 static const char s_servo_re_angle[] PROGMEM  = "servo: angle value out of range (0 <= value <= 180)";
 static const char s_servo_re_us[] PROGMEM     = "servo: microseconds value out of range (10 <= value < 10000)";
 
-void PinServo::help () {
-  print_pgm (s_usage_minmax);
-  print_pgm (s_usage_angle);
-  print_pgm (s_usage_us);
-  print_pgm (s_usage_on);
-  print_pgm (s_usage_off);
+void PinServo::help (uint8_t address_src) {
+  Message::pgm_message(s_usage_minmax).send (address_src);
+  Message::pgm_message(s_usage_angle).send (address_src);
+  Message::pgm_message(s_usage_us).send (address_src);
+  Message::pgm_message(s_usage_on).send (address_src);
+  Message::pgm_message(s_usage_off).send (address_src);
 }
 
 PinServo::PinServo (int pin_no) :
@@ -76,7 +76,7 @@ void PinServo::set_exact (int exact) {
     m_servo.writeMicroseconds (exact);
 }
 
-CommandStatus PinServo::command (int argc, char ** argv) {
+CommandStatus PinServo::command (uint8_t address_src, int argc, char ** argv) {
   /* To get here, the first word in the argv array is "servo"; the second is the pin number.
    * There must be a third, the sub-command (with optional parameters) handled here.
    */
@@ -94,11 +94,11 @@ CommandStatus PinServo::command (int argc, char ** argv) {
       if ((d_min >= 500) && (d_min < d_max) && (d_max <= 2500)) {
 	set_min_max_microseconds (d_min, d_max);
       } else {
-	print_pgm (s_servo_re_minmax); // "servo: minmax values out of range (500 <= min < max <= 2500)";
+	Message::pgm_message(s_servo_re_minmax).send (address_src); // "servo: minmax values out of range (500 <= min < max <= 2500)";
 	cs = cs_IncorrectUsage;
       }
     } else {
-      print_pgm (s_usage_minmax); // "usage 1: servo <pin#2-13> minmax <min.us [544]> <max.us [2400]>";
+      Message::pgm_message(s_usage_minmax).send (address_src); // "usage 1: servo <pin#2-13> minmax <min.us [544]> <max.us [2400]>";
       cs = cs_IncorrectUsage;
     }
   } else if (third == "angle") { // must be 0-180
@@ -109,11 +109,11 @@ CommandStatus PinServo::command (int argc, char ** argv) {
       if ((d_angle >= 0) && (d_angle <= 180)) {
 	set_angle (d_angle);
       } else {
-	print_pgm (s_servo_re_angle); // "servo: angle value out of range (0 <= value <= 180)";
+	Message::pgm_message(s_servo_re_angle).send (address_src); // "servo: angle value out of range (0 <= value <= 180)";
 	cs = cs_IncorrectUsage;
       }
     } else {
-      print_pgm (s_usage_angle); // "usage 2: servo <pin#2-13> angle <0-180 [90]>";
+      Message::pgm_message(s_usage_angle).send (address_src); // "usage 2: servo <pin#2-13> angle <0-180 [90]>";
       cs = cs_IncorrectUsage;
     }
   } else if (third == "microseconds") { // add some limits for safety & sanity
@@ -124,11 +124,11 @@ CommandStatus PinServo::command (int argc, char ** argv) {
       if ((d_exact >= 10) && (d_exact < 10000)) {
 	set_exact (d_exact);
       } else {
-	print_pgm (s_servo_re_us); // "servo: microseconds value out of range (10 <= value < 10000)";
+	Message::pgm_message(s_servo_re_us).send (address_src); // "servo: microseconds value out of range (10 <= value < 10000)";
 	cs = cs_IncorrectUsage;
       }
     } else {
-      print_pgm (s_usage_us); // "usage 3: servo <pin#2-13> microseconds <microseconds>";
+      Message::pgm_message(s_usage_us).send (address_src); // "usage 3: servo <pin#2-13> microseconds <microseconds>";
       cs = cs_IncorrectUsage;
     }
   } else if (third == "on") {

@@ -74,11 +74,11 @@ PinManager::~PinManager () {
     delete DP[i];
 }
 
-static CommandStatus s_command (int argc, char ** argv) { // callback for util input command
-  return s_PM->command (argc, argv);
+static CommandStatus s_command (uint8_t address_src, int argc, char ** argv) { // callback for util input command
+  return s_PM->command (address_src, argc, argv);
 }
 
-void PinManager::input_callbacks (CommandStatus (*user_command_callback) (String & first, int argc, char ** argv),
+void PinManager::input_callbacks (CommandStatus (*user_command_callback) (uint8_t address_src, String & first, int argc, char ** argv),
 				  void (*user_interrupt_callback) ())
 {
   user_command = user_command_callback;
@@ -113,7 +113,7 @@ void PinManager::update (void (*notification_handler) (int pin_no, bool bDigital
   }
 }
 
-CommandStatus PinManager::command (int argc, char ** argv) {
+CommandStatus PinManager::command (uint8_t address_src, int argc, char ** argv) {
   CommandStatus cs = cs_UnknownCommand;
 
   String first(argv[0]);
@@ -126,32 +126,32 @@ CommandStatus PinManager::command (int argc, char ** argv) {
       bool bAll = false;
 
       if (second == "all") {
-	print_pgm (s_usage_help);
-	print_pgm (s_usage_echo);
-	print_pgm (s_usage_list);
-	print_pgm (s_usage_led);
+	Message::pgm_message(s_usage_help).send (address_src);
+	Message::pgm_message(s_usage_echo).send (address_src);
+	Message::pgm_message(s_usage_list).send (address_src);
+	Message::pgm_message(s_usage_led).send (address_src);
 	bAll = true;
 	cs = cs_Okay;
       }
       if (bAll || (second == "digital")) {
-	print_pgm (s_usage_dclr);
-	print_pgm (s_usage_dout);
-	print_pgm (s_usage_din);
-	print_pgm (s_usage_dup);
+	Message::pgm_message(s_usage_dclr).send (address_src);
+	Message::pgm_message(s_usage_dout).send (address_src);
+	Message::pgm_message(s_usage_din).send (address_src);
+	Message::pgm_message(s_usage_dup).send (address_src);
 	cs = cs_Okay;
       }
       if (bAll || (second == "servo")) {
-	PinServo::help ();
+	PinServo::help (address_src);
 	cs = cs_Okay;
       }
       if (bAll || (second == "pwm")) {
-	print_pgm (s_usage_pwm_on_off);
-	print_pgm (s_usage_pwm_duty);
+	Message::pgm_message(s_usage_pwm_on_off).send (address_src);
+	Message::pgm_message(s_usage_pwm_duty).send (address_src);
 	cs = cs_Okay;
       }
     }
     if (cs != cs_Okay) {
-      print_pgm (s_err_help); // "help: expected one of: \"all\", \"digital\", \"servo\", \"pwm\"";
+      Message::pgm_message(s_err_help).send (address_src); // "help: expected one of: \"all\", \"digital\", \"servo\", \"pwm\"";
     }
   } else if (first == "ping") {
     cs = cs_Okay;
@@ -185,7 +185,7 @@ CommandStatus PinManager::command (int argc, char ** argv) {
       }
     }
     if (cs == cs_Okay) {
-      list (bAnalog, bDigital);
+      list (address_src, bAnalog, bDigital);
     }
   } else if (first == "dclr") {
     cs = cs_Okay;
@@ -201,6 +201,8 @@ CommandStatus PinManager::command (int argc, char ** argv) {
       DP[pin_no]->clear ();
     }
   } else if (first == "ain") {
+    Message response;
+
     cs = cs_Okay;
 
     bool bFirst = true;
@@ -216,14 +218,16 @@ CommandStatus PinManager::command (int argc, char ** argv) {
       if (bFirst)
 	bFirst = false;
       else
-	Serial.print (" ");
+	response.text += ' ';
 
-      Serial.print (AP[pin_no]->apin_read ());
+      response.text += String (AP[pin_no]->apin_read ());
     }
     if (!bFirst) {
-      Serial.print ("\r\n");
+      response.send (address_src);
     }
   } else if (first == "din") {
+    Message response;
+
     cs = cs_Okay;
 
     bool bFirst = true;
@@ -239,15 +243,15 @@ CommandStatus PinManager::command (int argc, char ** argv) {
       if (bFirst)
 	bFirst = false;
       else
-	Serial.print (" ");
+	response.text += ' ';
 
       if (DP[pin_no]->dpin_read ())
-	Serial.print ("1");
+	response.text += '1';
       else
-	Serial.print ("0");
+	response.text += '0';
     }
     if (!bFirst) {
-      Serial.print ("\r\n");
+      response.send (address_src);
     }
   } else if (first == "dout") {
     cs = cs_Okay;
@@ -337,7 +341,7 @@ CommandStatus PinManager::command (int argc, char ** argv) {
       cs = cs_InvalidPin;
     } else { // we have a valid pin!
       PinServo * PS = DP[pin_no]->servo ();
-      cs = PS->command (argc, argv); // let the class instance handle the rest
+      cs = PS->command (address_src, argc, argv); // let the class instance handle the rest
     }
   } else if (first == "pwm") {
     cs = cs_Okay;
@@ -375,7 +379,7 @@ CommandStatus PinManager::command (int argc, char ** argv) {
   }
   
   if (user_command && (cs == cs_UnknownCommand)) {
-    cs = user_command (first, argc, argv);
+    cs = user_command (address_src, first, argc, argv);
   }
 
   return cs;
@@ -428,14 +432,14 @@ int PinManager::parse_pin_no (const char * str, unsigned int flags, bool bDigita
   return pin_no;
 }
 
-void PinManager::list (bool bAnalog, bool bDigital) const {
+void PinManager::list (uint8_t address_src, bool bAnalog, bool bDigital) const {
   if (bAnalog)
     for (int i = 0; i < 6; i++)
-      AP[i]->status ();
+      Message(AP[i]->status ()).send (address_src);
 
   if (bDigital)
     for (int i = 0; i < 14; i++)
-      DP[i]->status ();
+      Message(DP[i]->status ()).send (address_src);
 }
 
 /* set digital pin <pin_no> to high (true, 1) or low (false, 0)

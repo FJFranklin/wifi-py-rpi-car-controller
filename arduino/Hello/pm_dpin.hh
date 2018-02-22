@@ -59,7 +59,7 @@ public:
     return bNotify;
   }
 
-  void status () const {
+  String status () const {
     String state("D-Pin ");
 
     state = (state + m_pin_no) + " ";
@@ -80,7 +80,7 @@ public:
 	state += " (active)";
     }
 
-    Serial.println (state);
+    return state;
   }
 
   void clear () {

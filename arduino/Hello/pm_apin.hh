@@ -41,16 +41,18 @@ public:
 
   bool notification () { // return notification flag state, & reset state to false
     bool bNotify = m_flags & APIN_NOTIFY;
+
     m_flags &= ~APIN_NOTIFY;
+
     return bNotify;
   }
 
-  void status () const {
+  String status () const {
     String state("A-Pin A");
 
     state = (state + m_pin_no) + " analog";
 
-    Serial.println (state);
+    return state;
   }
 
   int apin_read () {

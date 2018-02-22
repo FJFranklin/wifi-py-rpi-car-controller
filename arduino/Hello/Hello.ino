@@ -5,11 +5,10 @@
 
 #include "pinmanager.hh"
 
-CommandStatus  user_command (String & first, int argc, char ** argv);
+CommandStatus  user_command (uint8_t address_src, String & first, int argc, char ** argv);
 void           user_interrupt ();
 void           notification (int pin_no, bool bDigital);
 
-void           reset_all ();
 void           time_check ();
 
 static const char s_hello[] PROGMEM = "This is a simple 'hello' program. Just say 'hi'! (Type 'help all' for more options.)";
@@ -29,25 +28,30 @@ unsigned char time_10ms;
 unsigned char time_100ms;
 unsigned long time_1s;
 
-bool bTickTock = false;
-
 /* input_check() feeds any input back to user_command() via PinManager as an array of strings
  */
-CommandStatus user_command (String & first, int argc, char ** argv) {
+CommandStatus user_command (uint8_t address_src, String & first, int argc, char ** argv) {
   CommandStatus cs = cs_Okay;
 
   if (first.equalsIgnoreCase ("hello") || first.equalsIgnoreCase ("hi")) {
-    Serial.println ("Hello.");
+    Message response;
+    response.text = "Hello.";
+    response.send (address_src);
   } else if (first.equalsIgnoreCase ("help")) {
-    print_pgm (s_hello);
-  } else if (first == "ticktock") {
-    bTickTock = true;
+    Message response;
+    response.append_pgm (s_hello);
+    response.send (address_src);
   } else { // mainly for debugging purposes, write out the arguments
+    Message response;
     for (int arg = 0; arg < argc; arg++) {
-      Serial.print ('"');
-      Serial.print (argv[arg]);
-      Serial.println ('"');
+      if (arg) {
+	response.text += ',';
+      }
+      response.text += '"';
+      response.text += argv[arg];
+      response.text += '"';
     }
+    response.send (address_src);
     cs = cs_UnknownCommand;
   }
 
@@ -55,22 +59,7 @@ CommandStatus user_command (String & first, int argc, char ** argv) {
 }
 
 void user_interrupt () {
-  bTickTock = false;
-}
-
-void reset_all () {
-  print_pgm (s_hello);
-  input_reset ();
-
-  bTickTock = false;
-
-  time_flags = 0;
-  time_1ms = 0;
-  time_10ms = 0;
-  time_100ms = 0;
-  time_1s = 0;
-
-  last_millis = millis ();
+  // ...
 }
 
 void time_check () {
@@ -121,7 +110,19 @@ void setup () {
   PM = PinManager::manager ();
   PM->input_callbacks (user_command, user_interrupt);
 
-  reset_all ();
+  Message response;
+  response.append_pgm (s_hello);
+  response.send ();
+
+  input_reset ();
+
+  time_flags = 0;
+  time_1ms = 0;
+  time_10ms = 0;
+  time_100ms = 0;
+  time_1s = 0;
+
+  last_millis = millis ();
 }
 
 void notification (int pin_no, bool bDigital) { // passes pin no. & clears notification
@@ -163,12 +164,6 @@ void loop () { // approximately 178 loops per millisecond on the Uno when idling
   }
 
   if (time_flags & LOOPTIME_1s) { // things to do roughly every second
-    if (bTickTock) {
-      if (time_1s & 1)
-	Serial.print ("\r\ntick...");
-      else
-	Serial.print (" tock.");
-    }
     // ...
     time_flags &= ~LOOPTIME_1s;
     return;
