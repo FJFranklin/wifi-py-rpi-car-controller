@@ -216,7 +216,7 @@ private:
 
     for (uint32_t i = 0; i < count; i++) {
       if (!sd.card()->writeBlock (bgn + i, m_cache.data)) {
-	Message response;
+	Message response(Message::Text_Error);
 	response.text = "SD: Error while attempting to format: Clear FAT/DIR writeBlock failed";
 	response.send (address_src);
 
@@ -235,7 +235,7 @@ public:
     uint16_t c = cylinder (relSector);
 
     if (c > 1023) {
-      Message response;
+      Message response(Message::Text_Error);
       response.text = "SD: Error while attempting to format: MBR CHS";
       response.send (address_src);
 
@@ -273,7 +273,7 @@ public:
       p->totalSectors = partSize;
 
       if (!cache_write (0)) {
-	Message response;
+	Message response(Message::Text_Error);
 	response.text = "SD: Error while attempting to format: write MBR";
 	response.send (address_src);
 
@@ -321,7 +321,7 @@ public:
 
     // write partition boot sector and backup
     if (!cache_write (relSector) || !cache_write (relSector + 6)) {
-      Message response;
+      Message response(Message::Text_Error);
       response.text = "SD: Error while attempting to format: FAT32 write PBS failed";
       response.send (address_src);
 
@@ -331,7 +331,7 @@ public:
 
       // write extra boot area and backup
       if (!cache_write (relSector + 2) || !cache_write (relSector + 8)) {
-	Message response;
+	Message response(Message::Text_Error);
 	response.text = "SD: Error while attempting to format: FAT32 PBS ext failed";
 	response.send (address_src);
 
@@ -346,7 +346,7 @@ public:
 
 	// write FSINFO sector and backup
 	if (!cache_write (relSector + 1) || !cache_write (relSector + 7)) {
-	  Message response;
+	  Message response(Message::Text_Error);
 	  response.text = "SD: Error while attempting to format: FAT32 FSINFO failed";
 	  response.send (address_src);
 
@@ -363,7 +363,7 @@ public:
 
 	    // write first block of FAT and backup for reserved clusters
 	    if (!cache_write (fatStart) || !cache_write (fatStart + fatSize)) {
-	      Message response;
+	      Message response(Message::Text_Error);
 	      response.text = "SD: Error while attempting to format: FAT32 reserve failed";
 	      response.send (address_src);
 
@@ -411,7 +411,7 @@ public:
 
     // write partition boot sector
     if (!cache_write (relSector)) {
-      Message response;
+      Message response(Message::Text_Error);
       response.text = "SD: Error while attempting to format: FAT16 write PBS failed";
       response.send (address_src);
 
@@ -428,7 +428,7 @@ public:
 
 	// write first block of FAT and backup for reserved clusters
 	if (!cache_write (fatStart) || !cache_write (fatStart + fatSize)) {
-	  Message response;
+	  Message response(Message::Text_Error);
 	  response.text = "SD: Error while attempting to format: FAT16 reserve failed";
 	  response.send (address_src);
 
@@ -440,9 +440,8 @@ public:
   }
 
   static void format (uint8_t address_src) {
-    Message response;
-
     if (!sd.card()->begin ()) {
+      Message response(Message::Text_Error);
       response.text = "SD: Unable to initialise card.";
       response.send (address_src);
     } else {
@@ -453,6 +452,7 @@ public:
       SD_Geometry geometry (block_count, bSDHC);
 
       if (!geometry.valid ()) {
+	Message response(Message::Text_Error);
 	response.text = "SD: Card capacity too low, or bad cluster count.";
 	response.send (address_src);
       } else {
@@ -465,6 +465,7 @@ public:
 	    bOkay = geometry.write_FAT16 (address_src);
 	  }
 	  if (bOkay) {
+	    Message response;
 	    response.text = "SD: Card formatted.";
 	    response.send (address_src);
 	  }
@@ -474,9 +475,8 @@ public:
   }
 
   static void erase (uint8_t address_src) {
-    Message response;
-
     if (!sd.card()->begin ()) {
+      Message response(Message::Text_Error);
       response.text = "SD: Unable to initialise card.";
       response.send (address_src);
     } else {
@@ -498,6 +498,7 @@ public:
 	}
 
 	if (!sd.card()->erase (block_start, block_end)) {
+	  Message response(Message::Text_Error);
 	  response.text = "SD: Error attempting to erase card: ";
 	  response.text += String (block_start) + " - " + String (block_end);
 	  response.send (address_src);
@@ -508,6 +509,7 @@ public:
 	block_start += ERASE_SIZE;
       }
       if (bOkay) {
+	Message response;
 	response.text = "SD: Card erased.";
 	response.send (address_src);
       }

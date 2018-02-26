@@ -94,11 +94,15 @@ CommandStatus PinServo::command (uint8_t address_src, int argc, char ** argv) {
       if ((d_min >= 500) && (d_min < d_max) && (d_max <= 2500)) {
 	set_min_max_microseconds (d_min, d_max);
       } else {
-	Message::pgm_message(s_servo_re_minmax).send (address_src); // "servo: minmax values out of range (500 <= min < max <= 2500)";
+	Message response(Message::Text_Error);
+	response.append_pgm (s_servo_re_minmax);
+	response.send (address_src); // "servo: minmax values out of range (500 <= min < max <= 2500)";
 	cs = cs_IncorrectUsage;
       }
     } else {
-      Message::pgm_message(s_usage_minmax).send (address_src); // "usage 1: servo <pin#2-13> minmax <min.us [544]> <max.us [2400]>";
+      Message response(Message::Text_Error);
+      response.append_pgm (s_usage_minmax);
+      response.send (address_src); // "usage 1: servo <pin#2-13> minmax <min.us [544]> <max.us [2400]>";
       cs = cs_IncorrectUsage;
     }
   } else if (third == "angle") { // must be 0-180
@@ -109,11 +113,15 @@ CommandStatus PinServo::command (uint8_t address_src, int argc, char ** argv) {
       if ((d_angle >= 0) && (d_angle <= 180)) {
 	set_angle (d_angle);
       } else {
-	Message::pgm_message(s_servo_re_angle).send (address_src); // "servo: angle value out of range (0 <= value <= 180)";
+	Message response(Message::Text_Error);
+	response.append_pgm (s_servo_re_angle);
+	response.send (address_src); // "servo: angle value out of range (0 <= value <= 180)";
 	cs = cs_IncorrectUsage;
       }
     } else {
-      Message::pgm_message(s_usage_angle).send (address_src); // "usage 2: servo <pin#2-13> angle <0-180 [90]>";
+      Message response(Message::Text_Error);
+      response.append_pgm (s_usage_angle);
+      response.send (address_src); // "usage 2: servo <pin#2-13> angle <0-180 [90]>";
       cs = cs_IncorrectUsage;
     }
   } else if (third == "microseconds") { // add some limits for safety & sanity
@@ -124,11 +132,15 @@ CommandStatus PinServo::command (uint8_t address_src, int argc, char ** argv) {
       if ((d_exact >= 10) && (d_exact < 10000)) {
 	set_exact (d_exact);
       } else {
-	Message::pgm_message(s_servo_re_us).send (address_src); // "servo: microseconds value out of range (10 <= value < 10000)";
+	Message response(Message::Text_Error);
+	response.append_pgm (s_servo_re_us);
+	response.send (address_src); // "servo: microseconds value out of range (10 <= value < 10000)";
 	cs = cs_IncorrectUsage;
       }
     } else {
-      Message::pgm_message(s_usage_us).send (address_src); // "usage 3: servo <pin#2-13> microseconds <microseconds>";
+      Message response(Message::Text_Error);
+      response.append_pgm (s_usage_us);
+      response.send (address_src); // "usage 3: servo <pin#2-13> microseconds <microseconds>";
       cs = cs_IncorrectUsage;
     }
   } else if (third == "on") {

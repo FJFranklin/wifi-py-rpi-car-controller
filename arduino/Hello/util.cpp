@@ -227,7 +227,7 @@ void input_check () {
 static void input_push (byte c) {
   if (c < 32) {
     if ((c == 10) || (c == 13)) { // newline || carriage return
-      Message().send ();
+      Serial.write (c);
       input_parse (s_src_default, input_buffer + 2, input_count);
     } else if (c == 3) { // ^C
       Message::pgm_message(s_interrupt).send ();
@@ -280,12 +280,18 @@ static void input_parse (uint8_t address_src, const char * buffer, size_t size) 
   if (argc && s_fn_command) {
     CommandStatus cs = s_fn_command (address_src, argc, input_argv);
 
-    if (cs == cs_InvalidPin)
-      Message::pgm_message(s_err_pin_no).send (address_src);
-    else if (cs == cs_IncorrectUsage)
-      Message::pgm_message(s_err_usage).send (address_src);
-    else if (cs)
-      Message::pgm_message(s_err_command).send (address_src);
+    if (cs != cs_Okay) {
+      Message response(Message::Text_Error);
+
+      if (cs == cs_InvalidPin) {
+	response.append_pgm (s_err_pin_no);
+      } else if (cs == cs_IncorrectUsage) {
+	response.append_pgm (s_err_usage);
+      } else {
+	response.append_pgm (s_err_command);
+      }
+      response.send (address_src);
+    }
   }
 }
 

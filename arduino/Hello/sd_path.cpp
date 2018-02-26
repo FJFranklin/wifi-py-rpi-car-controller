@@ -20,12 +20,13 @@ static SD_Path s_path_cwd;
 static SD_Path s_path_tmp;
 
 void SD_Card_Info (uint8_t address_src) { // FIXME / TODO
-  Message response;
-
   if (!sd.card()->begin ()) {
+    Message response(Message::Text_Error);
     response.text = "SD: Unable to initialise card.";
     response.send (address_src);
   } else {
+    Message response;
+
     bool bSDHC = (sd.card()->type () == SD_CARD_TYPE_SDHC);
 
     if (!bSDHC) {
@@ -36,9 +37,9 @@ void SD_Card_Info (uint8_t address_src) { // FIXME / TODO
 
     uint32_t block_count = sd.card()->cardSize (); // no. of 512-byte blocks
 
-    response.text += String (block_count);
+    response.text += String(block_count);
     response.text += " (512-byte) blocks = ";
-    response.text += String (block_count / 2048);
+    response.text += String(block_count / 2048);
     response.text += "MB";
     response.send (address_src);
   }
@@ -135,7 +136,7 @@ bool SD_Path::push (const char * name) {
       bOkay = false;
       break;
     }
-    if (ptr2 - ptr1 > 12) { // path component too long; ignoring long file names here // TODO ??
+    if (ptr2 - ptr1 > SD_FILE_MAX) { // path component too long
       bOkay = false;
       break;
     }
@@ -173,7 +174,7 @@ bool SD_Path::fs_init (uint8_t address_src) const {
 
   if (!FatFile::cwd ()) {
     if (!sd.begin ()) {
-      Message response;
+      Message response(Message::Text_Error);
       response.text = "SD: Unable to initialise SD device.";
       response.send (address_src);
       bOkay = false;
@@ -187,11 +188,10 @@ FatFile * SD_Path::open (uint8_t address_src) const {
     return 0;
   }
 
-  Message response;
-
   FatVolume * vol = sd.vol ();
 
   if (!vol) {
+    Message response(Message::Text_Error);
     response.text = "SD: No volume available.";
     response.send (address_src);
     return 0;
@@ -203,10 +203,12 @@ FatFile * SD_Path::open (uint8_t address_src) const {
   bool bOkay = true;
 
   if (!dir || !file) {
+    Message response(Message::Text_Error);
     response.text = "Memory error.";
     response.send (address_src);
     bOkay = false;
   } else if (!dir->openRoot (vol)) {
+    Message response(Message::Text_Error);
     response.text = "SD: Unable to open volume root.";
     response.send (address_src);
     bOkay = false;
@@ -215,6 +217,7 @@ FatFile * SD_Path::open (uint8_t address_src) const {
 
     for (uint16_t n = 1; n <= m_count; n++) {
       if (!file->open (dir, f, O_READ)) {
+	Message response(Message::Text_Error);
 	response.text  = "SD: Unable to open '";
 	response.text += f;
 	response.text += "'.";
@@ -223,6 +226,7 @@ FatFile * SD_Path::open (uint8_t address_src) const {
 	break;
       }
       if (!file->isDir ()) {
+	Message response(Message::Text_Error);
 	response.text  = "SD: '";
 	response.text += f;
 	response.text += "' exists but is not a folder.";
@@ -254,11 +258,10 @@ FatFile * SD_Path::mkdir (uint8_t address_src) const {
     return 0;
   }
 
-  Message response;
-
   FatVolume * vol = sd.vol ();
 
   if (!vol) {
+    Message response(Message::Text_Error);
     response.text = "SD: No volume available.";
     response.send (address_src);
     return 0;
@@ -270,10 +273,12 @@ FatFile * SD_Path::mkdir (uint8_t address_src) const {
   bool bOkay = true;
 
   if (!dir || !file) {
+    Message response(Message::Text_Error);
     response.text = "Memory error.";
     response.send (address_src);
     bOkay = false;
   } else if (!dir->openRoot (vol)) {
+    Message response(Message::Text_Error);
     response.text = "SD: Unable to open volume root.";
     response.send (address_src);
     bOkay = false;
@@ -283,6 +288,7 @@ FatFile * SD_Path::mkdir (uint8_t address_src) const {
     for (uint16_t n = 1; n <= m_count; n++) {
       if (file->open (dir, f, O_READ)) {
 	if (!file->isDir ()) {
+	  Message response(Message::Text_Error);
 	  response.text  = "SD: '";
 	  response.text += f;
 	  response.text += "' exists but is not a folder.";
@@ -292,6 +298,7 @@ FatFile * SD_Path::mkdir (uint8_t address_src) const {
 	}
       } else { // we need to create a new folder
 	if (!file->mkdir (dir, f, false)) {
+	  Message response(Message::Text_Error);
 	  response.text  = "SD: Unable to create folder '";
 	  response.text += f;
 	  response.text += "'.";
@@ -325,16 +332,16 @@ bool SD_Path::ls (uint8_t address_src) const {
     return false;
   }
 
-  Message response;
-  path (response.text);
-  response.text += ":";
-  response.send (address_src);
+  Message listing;
+  path (listing.text);
+  listing.text += ":";
+  listing.send (address_src);
 
   bool bOkay = true;
 
   FatFile entry;
       
-  char buffer[16];
+  char buffer[SD_FILE_MAX+1];
 
   while (bOkay) {
     if (!entry.openNext (dir)) {
@@ -348,16 +355,20 @@ bool SD_Path::ls (uint8_t address_src) const {
     } else {
       buffer[1] = '-';
     }
-    response.text = buffer;
+    if (entry.isLFN ()) {
+      buffer[2] = 'l';
+    }
+    listing.text = buffer;
 
-    if (!entry.getSFN (buffer)) {
+    if (!entry.getName (buffer, sizeof buffer)) {
+      Message response(Message::Text_Error);
       response.text = "SD: Unable to get short file name.";
+      response.send (address_src);
       bOkay = false;
     } else {
-      response.text += buffer;
+      listing.text += buffer;
+      listing.send (address_src);
     }
-    response.send (address_src);
-
     entry.close ();
   }
   delete dir;
@@ -390,10 +401,9 @@ bool SD_Path::cd (uint8_t address_src, const char * path) {
     s_path_tmp = s_path_cwd;
   }
 
-  Message response;
-
   if (!bSetRoot) {
     if (!s_path_tmp.push (path)) {
+      Message response(Message::Text_Error);
       response.text  = "SD: Invalid path: '";
       response.text += path;
       response.text += "'.";
@@ -410,6 +420,7 @@ bool SD_Path::cd (uint8_t address_src, const char * path) {
     bOkay = false;
   } else {
     if (!FatFile::setCwd (dir)) {
+      Message response(Message::Text_Error);
       response.text = "SD: Unable to change working directory.";
       response.send (address_src);
       bOkay = false;
@@ -437,10 +448,9 @@ bool SD_Path::ls (uint8_t address_src, const char * path) {
     s_path_tmp = s_path_cwd;
   }
 
-  Message response;
-
   if (!bSetRoot) {
     if (!s_path_tmp.push (path)) {
+      Message response(Message::Text_Error);
       response.text  = "SD: Invalid path: '";
       response.text += path;
       response.text += "'.";
@@ -466,9 +476,8 @@ bool SD_Path::mkdir (uint8_t address_src, const char * path) {
     return false;
   }
 
-  Message response;
-
   if (!s_path_tmp.push (path)) {
+    Message response(Message::Text_Error);
     response.text  = "SD: Invalid path: '";
     response.text += path;
     response.text += "'.";
@@ -481,12 +490,62 @@ bool SD_Path::mkdir (uint8_t address_src, const char * path) {
   FatFile * dir = s_path_tmp.mkdir (address_src);
 
   if (!dir) {
+    Message response(Message::Text_Error);
     response.text  = "SD: mkdir: Failed to create '";
     response.text += path;
     response.text += "'.";
     response.send (address_src);
     bOkay = false;
   } else {
+    delete dir;
+  }
+  return bOkay;
+}
+
+bool SD_Path::rmdir (uint8_t address_src, const char * path) {
+  if (!path) return false;
+
+  if (*path == '/') { // an absolute path
+    s_path_tmp.clear ();
+    if (!(*++path)) { // allow "/" by itself - but root has to exist anyway
+      return false;
+    }
+  } else {
+    s_path_tmp = s_path_cwd;
+  }
+  if (!(*path)) {
+    return false;
+  }
+
+  if (!s_path_tmp.push (path)) {
+    Message response(Message::Text_Error);
+    response.text  = "SD: Invalid path: '";
+    response.text += path;
+    response.text += "'.";
+    response.send (address_src);
+    return false;
+  }
+
+  bool bOkay = true;
+
+  FatFile * dir = s_path_tmp.open (address_src);
+
+  if (!dir) {
+    Message response(Message::Text_Error);
+    response.text  = "SD: rmdir: Unable to open path '";
+    response.text += path;
+    response.text += "'.";
+    response.send (address_src);
+    bOkay = false;
+  } else {
+    if (!dir->rmdir ()) {
+      Message response(Message::Text_Error);
+      response.text  = "SD: rmdir: Unable to remove path '";
+      response.text += path;
+      response.text += "'.";
+      response.send (address_src);
+      bOkay = false;
+    }
     delete dir;
   }
   return bOkay;

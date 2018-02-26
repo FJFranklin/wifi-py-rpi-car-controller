@@ -46,12 +46,23 @@ CommandStatus SD_Manager::command (uint8_t address_src, const String & first, in
     cs = cs_Okay;
   } else if (first == "mkdir") {
     if (argc == 1) {
-      Message response;
+      Message response(Message::Text_Error);
       response.text = "usage: mkdir <path> [<path>]*";
       response.send (address_src);
     } else {
       for (int arg = 1; arg < argc; arg++) {
 	SD_Path::mkdir (address_src, argv[arg]);
+      }
+    }
+    cs = cs_Okay;
+  } else if (first == "rmdir") {
+    if (argc == 1) {
+      Message response(Message::Text_Error);
+      response.text = "usage: rmdir <path> [<path>]*";
+      response.send (address_src);
+    } else {
+      for (int arg = 1; arg < argc; arg++) {
+	SD_Path::rmdir (address_src, argv[arg]);
       }
     }
     cs = cs_Okay;
@@ -61,7 +72,7 @@ CommandStatus SD_Manager::command (uint8_t address_src, const String & first, in
     } else if (argc == 2) {
       SD_Path::cd (address_src, argv[1]);
     } else {
-      Message response;
+      Message response(Message::Text_Error);
       response.text = "usage: cd [<path>]";
       response.send (address_src);
     }

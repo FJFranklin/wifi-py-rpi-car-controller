@@ -42,7 +42,7 @@ CommandStatus user_command (uint8_t address_src, String & first, int argc, char 
     response.append_pgm (s_hello);
     response.send (address_src);
   } else { // mainly for debugging purposes, write out the arguments
-    Message response;
+    Message response(Message::Text_Error);
     for (int arg = 0; arg < argc; arg++) {
       if (arg) {
 	response.text += ',';

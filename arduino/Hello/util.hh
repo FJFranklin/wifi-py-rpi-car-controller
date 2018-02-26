@@ -12,13 +12,22 @@ extern uint8_t local_address; // From EEPROM; valid device addresses are 1-127
 
 class Message {
 public:
+  enum MessageType {
+    Text_Command  = 0,
+    Text_Response = 1,
+    Text_Error    = 2
+  } type;
+
   String text;
 
-  Message () {
+  Message (MessageType mt = Text_Response) :
+    type(mt)
+  {
     // ...
   }
 
   Message (const String & S) :
+    type(Text_Response),
     text(S)
   {
     // ...
@@ -30,7 +39,7 @@ public:
 
   static Message pgm_message (const char * pgm); // create new message with string stored in PROGMEM
 
-  void append_pgm (const char * pgm);              // append string stored in PROGMEM
+  void append_pgm (const char * pgm);            // append string stored in PROGMEM
 
   void send (uint8_t address = 0); // default address for Serial
 };

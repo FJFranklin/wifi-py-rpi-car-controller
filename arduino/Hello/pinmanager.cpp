@@ -152,7 +152,9 @@ CommandStatus PinManager::command (uint8_t address_src, int argc, char ** argv) 
       }
     }
     if (cs != cs_Okay) {
-      Message::pgm_message(s_err_help).send (address_src); // "help: expected one of: \"all\", \"digital\", \"servo\", \"pwm\"";
+      Message response(Message::Text_Error);
+      response.append_pgm (s_err_help); // "help: expected one of: \"all\", \"digital\", \"servo\", \"pwm\"";
+      response.send (address_src);
     }
   } else if (first == "ping") {
     cs = cs_Okay;

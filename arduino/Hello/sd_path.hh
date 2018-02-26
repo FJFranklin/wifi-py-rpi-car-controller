@@ -7,7 +7,8 @@
 
 #include <SdFat.h>
 
-#define SD_PATH_MAX 255
+#define SD_PATH_MAX 255 // maximum length of path
+#define SD_FILE_MAX  63 // maximum length of filename
 
 extern void SD_Card_Info (uint8_t address_src);
 extern void SD_Card_Erase (uint8_t address_src);
@@ -55,6 +56,7 @@ public:
   static bool cd (uint8_t address_src, const char * path);
   static bool ls (uint8_t address_src, const char * path);
   static bool mkdir (uint8_t address_src, const char * path);
+  static bool rmdir (uint8_t address_src, const char * path);
 };
 
 #endif /* CORE_TEENSY */
