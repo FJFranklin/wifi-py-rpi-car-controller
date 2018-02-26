@@ -188,3 +188,4 @@ public:
       analogWrite (m_pin_no, m_data.duty_cycle);
   }
 };
+

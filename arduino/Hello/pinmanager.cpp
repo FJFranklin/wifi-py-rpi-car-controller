@@ -6,6 +6,7 @@
 #include "util.hh"
 #include "pinservo.hh"
 #include "pinmanager.hh"
+#include "sd.hh"
 
 #include "pm_apin.hh"
 #include "pm_dpin.hh"
@@ -378,6 +379,13 @@ CommandStatus PinManager::command (uint8_t address_src, int argc, char ** argv) 
     }
   }
   
+  if (cs == cs_UnknownCommand) {
+    SD_Manager * SD = SD_Manager::manager ();
+    if (SD) {
+      cs = SD->command (address_src, first, argc, argv);
+    }
+  }
+
   if (user_command && (cs == cs_UnknownCommand)) {
     cs = user_command (address_src, first, argc, argv);
   }
@@ -595,3 +603,4 @@ CommandStatus PinManager::cmd_servo_microseconds (int pin_no, unsigned int micro
 
   return PS->cmd_servo_microseconds (microseconds);
 }
+

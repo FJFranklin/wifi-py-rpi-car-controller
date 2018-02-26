@@ -1,4 +1,4 @@
-/* Copyright 2017 Francis James Franklin
+/* Copyright 2017-18 Francis James Franklin
  * 
  * Open Source under the MIT License - see LICENSE in the project's root folder
  */
@@ -61,3 +61,4 @@ public:
     return m_data;
   }
 };
+

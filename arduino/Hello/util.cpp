@@ -305,3 +305,4 @@ static void input_delete () {
     --input_count;
   }
 }
+
