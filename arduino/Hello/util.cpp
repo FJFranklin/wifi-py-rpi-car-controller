@@ -7,6 +7,14 @@
 
 #include "util.hh"
 
+Writer * Channel_0 = 0;
+Writer * Channel_1 = 0;
+Writer * Channel_2 = 0;
+Writer * Channel_3 = 0;
+Writer * Channel_4 = 0;
+Writer * Channel_5 = 0;
+Writer * Channel_6 = 0;
+
 uint8_t local_address; // Get from EEPROM
 
 static uint8_t s_src_default = 0; // default address for responses is 0, which is just Serial
@@ -56,6 +64,132 @@ void set_user_command (CommandStatus (*user_command) (uint8_t address_src, int a
   s_fn_command = user_command;
 }
 
+void Writer::update () {
+  if (!next) return;
+
+  if (next->update (*this)) { // task complete; remove & advance
+    Task * task = next;
+    next = task->next;
+    delete task;
+  }
+}
+
+void Writer::add (Task * task) {
+  if (!task) return;
+
+  if (!next) { // nothing queued, just add
+    next = task;
+  } else if (task->priority < next->priority) { // first item in queue has lower priority; insert at front
+    task->next = next;
+    next = task;
+  } else { // work through the queue
+    Task * T = next;
+
+    while (true) {
+      if (!T->next) { // nothing else queued, just add at end
+	T->next = task;
+      } else if (task->priority < T->next->priority) { // next item in queue has lower priority; insert here
+	task->next = next;
+	next = task;
+      } else {
+	T = T->next;
+	continue;
+      }
+      break;
+    }
+  }
+}
+
+class SerialWriter : public Writer {
+private:
+  Stream & m_serial;
+
+public:
+  SerialWriter (Stream & serial) :
+    m_serial(serial)
+  {
+    // ...
+  }
+
+  ~SerialWriter () {
+    // ...
+  }
+
+  virtual int available () {
+    return m_serial.availableForWrite ();
+  }
+
+  virtual int write (uint8_t * buffer, int length) {
+    if (!buffer || (length < 1)) return -1; // error
+
+    int nbytes = available ();
+
+    if (length > nbytes) {
+      length = nbytes;
+    }
+    return m_serial.write (buffer, length);
+  }
+};
+
+class MessageTask : public Task {
+public:
+  uint8_t * m_buffer;
+  uint8_t * m_ptr;
+
+  uint8_t m_address_src;
+  uint8_t m_address_dest;
+  uint8_t m_length;
+
+  Message::MessageType m_type;
+
+  bool m_bCopyBuffer;
+
+  MessageTask (Message::MessageType type, uint8_t address_src, uint8_t address_dest, uint8_t * buffer, uint8_t length, bool bCopyBuffer = true) :
+    Task(Task::p_High),
+    m_buffer(buffer),
+    m_ptr(0),
+    m_address_src(address_src),
+    m_address_dest(address_dest),
+    m_length(length),
+    m_type(type),
+    m_bCopyBuffer(bCopyBuffer)
+  {
+    if (!buffer) {
+      m_length = 0;
+    }
+    if (m_length && m_bCopyBuffer) {
+      m_buffer = new uint8_t[m_length];
+
+      if (m_buffer) {
+	memcpy (m_buffer, buffer, m_length);
+      }
+    }
+    m_ptr = m_buffer;
+  }
+
+  ~MessageTask () {
+    if (m_buffer && m_bCopyBuffer) delete [] m_buffer;
+  }
+
+  bool update (Writer & W) { // returns true when task complete
+    uint8_t bytes_remaining = m_length - (m_ptr - m_buffer);
+    uint8_t bytes_writable = W.available ();
+    uint8_t bytes = bytes_remaining;
+
+    bool bComplete = true;
+
+    if (bytes_writable < bytes_remaining) {
+      bytes = bytes_writable;
+      bComplete = false;
+    }
+    W.write (m_ptr, bytes);
+
+    m_ptr += bytes;
+
+    return bComplete;
+  }
+};
+
 Message Message::pgm_message (const char * pgm) { // create new message with string stored in PROGMEM
   Message M;
   M.append_pgm (pgm);
@@ -77,8 +211,10 @@ void Message::send (uint8_t address) {
     if (address) {
       // ...
     } else {
-      Serial.print (text);
-      Serial.print ("\r\n");
+      text += "\r\n";
+      Channel_0->add (new MessageTask(type, local_address, address, (uint8_t *) text.c_str (), (uint8_t) text.length ()));
+      // Serial.print (text);
+      // Serial.print ("\r\n");
     }
   }
   text = "";
@@ -144,6 +280,9 @@ void input_setup () {
   local_address = EEPROM.read (0);
 
   Serial.begin (115200);
+
+  Channel_0 = new SerialWriter(Serial);
+
 #ifdef CORE_TEENSY
   Serial1.begin (2000000);
   Serial2.begin (2000000);
@@ -197,7 +336,17 @@ static void s_input_check_stream (Stream * S, char channel_no) { // for diagnost
   }
 }
 
-void input_check () {
+void io_check () {
+  /* Check & update output streams
+   */
+  if (Channel_0) Channel_0->update ();
+  if (Channel_1) Channel_1->update ();
+  if (Channel_2) Channel_2->update ();
+  if (Channel_3) Channel_3->update ();
+  if (Channel_4) Channel_4->update ();
+  if (Channel_5) Channel_5->update ();
+  if (Channel_6) Channel_6->update ();
+
 #ifdef CORE_TEENSY
   PS1.update ();
   PS2.update ();
@@ -311,4 +460,3 @@ static void input_delete () {
     --input_count;
   }
 }
-

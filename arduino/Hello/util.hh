@@ -10,6 +10,66 @@
 
 extern uint8_t local_address; // From EEPROM; valid device addresses are 1-127
 
+class Writer;
+
+extern Writer * Channel_0;
+extern Writer * Channel_1;
+extern Writer * Channel_2;
+extern Writer * Channel_3;
+extern Writer * Channel_4;
+extern Writer * Channel_5;
+extern Writer * Channel_6;
+
+class Task {
+public:
+  enum Priority {
+    p_High   = 0, // can't be interrupted
+    p_Normal = 1,
+    p_Low    = 2
+  };
+
+private:
+  friend Writer;
+
+  Task * next;
+
+  Priority priority;
+
+  virtual bool update (Writer & W) = 0; // returns true when task complete
+
+public:
+  Task (Priority p) :
+    next(0),
+    priority(p)
+  {
+    // ...
+  }
+
+  virtual ~Task () { }
+};
+
+class Writer {
+private:
+  Task * next;
+
+public:
+  Writer () :
+    next(0)
+  {
+    // ...
+  }
+
+  void update ();
+
+  void add (Task * task);
+
+  virtual int available () = 0;
+
+  virtual int write (uint8_t * buffer, int length) = 0;
+
+  virtual ~Writer () { }
+};
+
 class Message {
 public:
   enum MessageType {
@@ -54,8 +114,9 @@ extern void serial_ping (char channel_no, const char * str);
 
 /* Input parsing
  */
+extern void io_check ();    // check for input, and handle as necessary; update output streams also
+
 extern void input_setup (); // call from main setup() function
-extern void input_check (); // check for input, and handle as necessary
 extern void input_reset (); // reset the input buffer
 
 enum CommandStatus {
