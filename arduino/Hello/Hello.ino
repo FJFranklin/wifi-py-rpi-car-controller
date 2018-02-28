@@ -103,7 +103,7 @@ void time_check () {
 }
 
 void setup () {
-  input_setup ();
+  io_setup ();
 
   /* Instantiate PinManager and set the input callbacks 
    */

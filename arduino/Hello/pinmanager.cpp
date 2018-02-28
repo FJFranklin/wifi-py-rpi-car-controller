@@ -156,20 +156,6 @@ CommandStatus PinManager::command (uint8_t address_src, int argc, char ** argv) 
       response.append_pgm (s_err_help); // "help: expected one of: \"all\", \"digital\", \"servo\", \"pwm\"";
       response.send (address_src);
     }
-  } else if (first == "ping") {
-    cs = cs_Okay;
-
-    char channel_no = '0';
-    const char * message = argv[0];
-
-    if (argc > 1) {
-      channel_no = *argv[1];
-    }
-    if (argc > 2) {
-      message = argv[2];
-    }
-
-    serial_ping (channel_no, message);
   } else if (first == "list") {
     cs = cs_Okay;
 
