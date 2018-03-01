@@ -8,6 +8,10 @@
 
 #include <Arduino.h>
 
+#define MESSAGE_BUFSIZE  256
+#define MESSAGE_MAXSIZE  (MESSAGE_BUFSIZE-6) // maximum message data length is therefore 250 characters
+                                             // which must therefore be the maximum allowable path length
+
 extern uint8_t local_address; // From EEPROM; valid device addresses are 1-127
 extern uint8_t input_default; // address 0, reserved for direct input over Serial
 
@@ -58,17 +62,35 @@ class Writer {
 private:
   Task * next;
 
+  bool m_bEncoded;
+  bool m_bNewlines;
+
 public:
   Writer () :
-    next(0)
+    next(0),
+    m_bEncoded(false),
+    m_bNewlines(true)
   {
     // ...
   }
 
+  inline bool encoded () const {
+    return m_bEncoded;
+  }
+  inline void set_encoded (bool bEncoded) {
+    m_bEncoded = bEncoded;
+  }
+  inline bool newlines () const {
+    return m_bNewlines;
+  }
+  inline void set_newlines (bool bNewlines) {
+    m_bNewlines = bNewlines;
+  }
+
   void update ();
-private:
+
   void add (Task * task);
-public:
+
   virtual int available () = 0;
 
   virtual int write (uint8_t * buffer, int length) = 0;
@@ -77,41 +99,93 @@ public:
 
   static void init_channels ();
   static void update_all ();
-  static void add_task (Task * task);
+
+  static Writer * channel (uint8_t address);
 };
 
-class Message { // TODO: This needs a rewrite // FIXME
+class Message {
 public:
   enum MessageType {
     Text_Command  = 0,
     Text_Response = 1,
     Text_Error    = 2
-  } type;
+  };
 
-  String text;
+  enum COBS_State {
+    cobs_HavePacket = 0,
+    cobs_InProgress,
+    cobs_UnexpectedEOP,
+    cobs_InvalidPacket,
+    cobs_TooLong
+  };
 
-  Message (MessageType mt = Text_Response) :
-    type(mt)
-  {
-    // ...
+private:
+  uint8_t buffer[MESSAGE_BUFSIZE];
+  uint8_t offset;
+  uint8_t cobsin;
+public:
+  inline void set_address_src (uint8_t address_src) {
+    buffer[0] = address_src;
+  }
+  inline void set_address_dest (uint8_t address_dest) {
+    buffer[1] = address_dest;
+  }
+  inline void set_type (MessageType type) {
+    buffer[2] = (uint8_t) type;
+  }
+private:
+  inline void set_length (uint8_t length) {
+    buffer[3] = length;
+  }
+public:
+  inline uint8_t get_address_src () const {
+    return buffer[0];
+  }
+  inline uint8_t get_address_dest () const {
+    return buffer[1];
+  }
+  inline MessageType get_type () const {
+    return (MessageType) buffer[2];
+  }
+  inline uint8_t get_length () const {
+    return buffer[3];
+  }
+  inline uint8_t * get_buffer () {
+    return buffer + 4;
   }
 
-  Message (const String & S) :
-    type(Text_Response),
-    text(S)
+  inline void clear () {
+    offset = 0;
+    cobsin = 0;
+    set_length (0);
+  }
+
+  Message (uint8_t address_src, uint8_t address_dest, MessageType type = Text_Response) : 
+    offset(0),
+    cobsin(0)
   {
-    // ...
+    set_address_src (address_src);
+    set_address_dest (address_dest);
+    set_type (type);
+    set_length (0);
   }
 
   ~Message () {
     // ...
   }
 
-  static Message pgm_message (const char * pgm); // create new message with string stored in PROGMEM
+  Message & operator+= (uint8_t uc);
+  Message & operator+= (const char * right);
+  Message & operator= (const char * right);
 
-  void append_pgm (const char * pgm);            // append string stored in PROGMEM
+  Message & append_int (int i);     // change number to string, and append
+  Message & pgm (const char * str); // append string stored in PROGMEM
 
-  void send (uint8_t address = 0); // default address for Serial
+  void send ();
+
+  void encode (uint8_t *& bytes, int & size);
+
+  COBS_State decode (uint8_t c);
 };
 
 class MessageTask : public Task {
@@ -119,13 +193,13 @@ public:
   uint8_t * m_buffer;
   uint8_t * m_ptr;
 
-  uint8_t m_length;
+  int m_length; // encoded buffer length may be > 255, i.e., MESSAGE_BUFSIZE
 
   Message::MessageType m_type;
 
   bool m_bCopyBuffer;
 
-  MessageTask (Message::MessageType type, uint8_t address_src, uint8_t address_dest, uint8_t * buffer, uint8_t length, bool bCopyBuffer = true);
+  MessageTask (uint8_t address_src, uint8_t address_dest, Message::MessageType type, uint8_t * buffer, int length, bool bCopyBuffer = true);
 
   ~MessageTask ();
 

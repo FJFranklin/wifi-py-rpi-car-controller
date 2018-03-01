@@ -92,6 +92,10 @@ public:
 void Writer::init_channels () {
   local_address = EEPROM.read (0);
 
+  if ((local_address == 0) || (local_address > 0x7f)) { // oops - not set properly?
+    local_address = 0x7f;
+  }
+
   s_pkt_default = local_address | 0x80;
 
   Serial.begin (115200);
@@ -125,31 +129,27 @@ void Writer::update_all () {
   if (Channel_6) Channel_6->update ();
 }
 
-void Writer::add_task (Task * task) {
-  if (!task) return;
-
-  if (task->address_dest == local_address) { // don't send anything to ourselves!
-    return;
+Writer * Writer::channel (uint8_t address) {
+  if (address == local_address) { // don't send anything to ourselves!
+    return 0;
   }
-  if (task->address_dest == s_broadcast) {   // handle broadcast messages elsewhere
-    return;
+  if (address == s_broadcast) {   // handle broadcast messages elsewhere
+    return 0;
   }
 
-  if (task->address_dest == input_default) { // default address for normal responses
-    Channel_0->add (task);
-    return;
+  if (address == input_default) { // default address for normal responses
+    return Channel_0;
   }
-  if (task->address_dest == s_pkt_default) { // default address for packet responses
-    Channel_0->add (task);
-    return;
+  if (address == s_pkt_default) { // default address for packet responses
+    return Channel_0;
   }
 
   /* Otherwise, need to work out which channel to send the messages to... // TODO // FIXME
    */
-  Channel_0->add (task);
+  return 0;
 }
 
-MessageTask::MessageTask (Message::MessageType type, uint8_t address_src, uint8_t address_dest, uint8_t * buffer, uint8_t length, bool bCopyBuffer) :
+MessageTask::MessageTask (uint8_t address_src, uint8_t address_dest, Message::MessageType type, uint8_t * buffer, int length, bool bCopyBuffer) :
   Task(Task::p_High,address_src,address_dest),
   m_buffer(buffer),
   m_ptr(0),
@@ -192,32 +192,138 @@ bool MessageTask::update (Writer & W) { // returns true when task complete
   return bComplete;
 }
 
-Message Message::pgm_message (const char * pgm) { // create new message with string stored in PROGMEM
-  Message M;
-  M.append_pgm (pgm);
-  return M;
+Message & Message::append_int (int i) { // change number to string, and append
+  static char buffer[12];
+  sprintf (buffer, "%d", i);
+  *this += buffer;
+  return *this;
 }
 
-void Message::append_pgm (const char * pgm) { // append string stored in PROGMEM
-  if (!pgm) return;
+Message & Message::pgm (const char * str) { // append string stored in PROGMEM
+  if (str) {
+    while (true) {
+      byte c = pgm_read_byte_near (str++);
+      if (!c) break;
+      *this += (uint8_t) c;
+    }
+  }
+  return *this;
+}
+
+void Message::send () {
+  uint8_t address_src  = get_address_src ();
+  uint8_t address_dest = get_address_dest ();
+
+  Writer * W = Writer::channel (address_dest);
+
+  if (W) {
+    MessageType type = get_type ();
+
+    uint8_t * data_buffer = get_buffer ();
+
+    int length = (int) get_length ();
+
+    if (W->encoded ()) {
+      encode (data_buffer, length); // this provides values for data_buffer and length
+    } else if (W->newlines ()) {
+	*this += "\r\n";
+    }
+    W->add (new MessageTask(address_src, address_dest, type, buffer, length, true /* copy data */));
+  }
+  clear ();
+}
+
+Message & Message::operator+= (uint8_t uc) {
+  uint8_t length = get_length ();
+
+  if (length < MESSAGE_MAXSIZE) {
+    buffer[4+(length++)] = uc;
+  }
+  set_length (length);
+
+  return *this;
+}
+
+Message & Message::operator+= (const char * right) {
+  if (right) {
+    uint8_t length = get_length ();
+    uint8_t spaces = MESSAGE_MAXSIZE - length;
+
+    while (spaces--) {
+      if (!*right) break;
+      buffer[4+(length++)] = *right++;
+    }
+    set_length (length);
+  }
+  return *this;
+}
+
+Message & Message::operator= (const char * right) {
+  uint8_t length = 0;
+
+  if (right) {
+    uint8_t spaces = MESSAGE_MAXSIZE;
+
+    while (spaces--) {
+      if (!*right) break;
+      buffer[4+(length++)] = *right++;
+    }
+    set_length (length);
+  }
+  return *this;
+}
+
+Message::COBS_State Message::decode (uint8_t c) {
+  if (!c) { // EOP
+    if (cobsin) { // we were expecting something non-zero
+      clear ();   // reset
+      return cobs_UnexpectedEOP;
+    }
+    if (offset < 4) { // invalid packet
+      clear ();   // reset
+      return cobs_InvalidPacket;
+    }
+    if (get_length () != (offset - 4)) { // invalid packet
+      clear ();   // reset
+      return cobs_InvalidPacket;
+    }
+    return cobs_HavePacket;
+  }
+  if (offset >= (MESSAGE_MAXSIZE + 4)) { // packet too long
+    return cobs_TooLong;
+  }
+  if (cobsin) {
+    --cobsin;
+    buffer[offset++] = c;
+  } else {
+    cobsin = c - 1;
+    buffer[offset++] = 0;
+  }
+  return cobs_InProgress;
+}
+
+void Message::encode (uint8_t *& bytes, int & size) {
+  uint8_t * ptr1 = buffer + get_length () + 3;
+  uint8_t * ptr2 = buffer + MESSAGE_BUFSIZE - 1;
+
+  uint8_t count = 0;
+
+  *ptr2 = 0; // EOP
 
   while (true) {
-    byte c = pgm_read_byte_near (pgm++);
-    if (!c) break;
-    text += (char) c;
-  }
-}
-
-void Message::send (uint8_t address) {
-  // if (s_bEchoOn && (address != local_address)) { // don't send to self
-    if (address) {
-      // ...
+    if (*ptr1 == 0) {
+      *--ptr2 = ++count;
+      count = 0;
     } else {
-      text += "\r\n";
-      Writer::add_task (new MessageTask(type, local_address, address, (uint8_t *) text.c_str (), (uint8_t) text.length ()));
-      // Serial.print (text);
-      // Serial.print ("\r\n");
+      *--ptr2 = *ptr1;
+      ++count;
     }
-  // }
-  text = "";
+    if (ptr1 == buffer) {
+      break;
+    }
+    --ptr1;
+  }
+
+  bytes = ptr2;
+  size = MESSAGE_BUFSIZE - (ptr2 - buffer);
 }

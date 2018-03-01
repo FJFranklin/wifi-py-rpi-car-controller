@@ -20,61 +20,61 @@ SD_Manager * SD_Manager::manager () {
   return s_manager;
 }
 
-CommandStatus SD_Manager::command (uint8_t address_src, const String & first, int argc, char ** argv) {
+CommandStatus SD_Manager::command (Message & response, const String & first, int argc, char ** argv) {
   CommandStatus cs = cs_UnknownCommand;
 #ifdef CORE_TEENSY
   if (first == "sd") {
-    SD_Card_Info (address_src);
+    SD_Card_Info (response);
     cs = cs_Okay;
   } else if (first == "sd-erase") {
-    SD_Card_Erase (address_src);
+    SD_Card_Erase (response);
     cs = cs_Okay;
   } else if (first == "sd-format") {
-    SD_Card_Format (address_src);
+    SD_Card_Format (response);
     cs = cs_Okay;
   } else if (first == "pwd") {
-    SD_Path::pwd (address_src);
+    SD_Path::pwd (response);
     cs = cs_Okay;
   } else if (first == "ls") {
     if (argc == 1) {
-      SD_Path::pwd().ls (address_src);
+      SD_Path::pwd().ls (response);
     } else {
       for (int arg = 1; arg < argc; arg++) {
-	SD_Path::ls (address_src, argv[arg]);
+	SD_Path::ls (response, argv[arg]);
       }
     }
     cs = cs_Okay;
   } else if (first == "mkdir") {
     if (argc == 1) {
-      Message response(Message::Text_Error);
-      response.text = "usage: mkdir <path> [<path>]*";
-      response.send (address_src);
+      response.set_type (Message::Text_Error);
+      response = "usage: mkdir <path> [<path>]*";
+      response.send ();
     } else {
       for (int arg = 1; arg < argc; arg++) {
-	SD_Path::mkdir (address_src, argv[arg]);
+	SD_Path::mkdir (response, argv[arg]);
       }
     }
     cs = cs_Okay;
   } else if (first == "rmdir") {
     if (argc == 1) {
-      Message response(Message::Text_Error);
-      response.text = "usage: rmdir <path> [<path>]*";
-      response.send (address_src);
+      response.set_type (Message::Text_Error);
+      response = "usage: rmdir <path> [<path>]*";
+      response.send ();
     } else {
       for (int arg = 1; arg < argc; arg++) {
-	SD_Path::rmdir (address_src, argv[arg]);
+	SD_Path::rmdir (response, argv[arg]);
       }
     }
     cs = cs_Okay;
   } else if (first == "cd") {
     if (argc == 1) {
-      SD_Path::cd (address_src, "/");
+      SD_Path::cd (response, "/");
     } else if (argc == 2) {
-      SD_Path::cd (address_src, argv[1]);
+      SD_Path::cd (response, argv[1]);
     } else {
-      Message response(Message::Text_Error);
-      response.text = "usage: cd [<path>]";
-      response.send (address_src);
+      response.set_type (Message::Text_Error);
+      response = "usage: cd [<path>]";
+      response.send ();
     }
     cs = cs_Okay;
   }

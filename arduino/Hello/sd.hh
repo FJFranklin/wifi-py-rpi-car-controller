@@ -22,7 +22,7 @@ public:
     // ...
   }
 
-  CommandStatus command (uint8_t address_src, const String & first, int argc, char ** argv);
+  CommandStatus command (Message & response, const String & first, int argc, char ** argv);
 
   bool lock () {
     if (m_bLocked) {

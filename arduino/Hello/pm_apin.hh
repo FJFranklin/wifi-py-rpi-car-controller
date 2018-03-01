@@ -47,12 +47,12 @@ public:
     return bNotify;
   }
 
-  String status () const {
-    String state("A-Pin A");
+  void status (Message & response) const {
+    response = "A-Pin A";
+    response.append_int (m_pin_no);
+    response += " analog";
 
-    state = (state + m_pin_no) + " analog";
-
-    return state;
+    response.send ();
   }
 
   int apin_read () {

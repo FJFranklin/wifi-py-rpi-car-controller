@@ -7,19 +7,6 @@
 
 #include "util.hh"
 
-#ifdef CORE_TEENSY
-/* An Arduino Library that facilitates packet-based serial communication using COBS or SLIP encoding
- * https://github.com/bakercp/PacketSerial
- */
-#include <PacketSerial.h>
-
-static PacketSerial PS0;
-static PacketSerial PS1;
-static PacketSerial PS2;
-
-#endif /* CORE_TEENSY */
-
-static bool s_bUsePacketSerial = false;
 static bool s_bEchoOn = true;
 
 static const char s_err_usage[] PROGMEM   = "(incorrect usage - see: help all)";
@@ -42,13 +29,13 @@ static char *    input_argv[(input_size/2)+1];
 /* Function callbacks
  */
 static void (*s_fn_interrupt) () = 0;                                                   // If the user presses CTRL-C.
-static CommandStatus (*s_fn_command) (uint8_t address_src, int argc, char ** argv) = 0; // Handle the user's command
+static CommandStatus (*s_fn_command) (Message & response, int argc, char ** argv) = 0;  // Handle the user's command
 
 void set_user_interrupt (void (*user_interrupt) ()) {
   s_fn_interrupt = user_interrupt;
 }
 
-void set_user_command (CommandStatus (*user_command) (uint8_t address_src, int argc, char ** argv)) {
+void set_user_command (CommandStatus (*user_command) (Message & response, int argc, char ** argv)) {
   s_fn_command = user_command;
 }
 
@@ -57,69 +44,6 @@ void set_user_command (CommandStatus (*user_command) (uint8_t address_src, int a
 void echo (bool bOn) {
   s_bEchoOn = bOn;
 }
-
-#if 0
-
-#define CMD_CLI_Command   0
-#define CMD_CLI_Response  1
-
-static void s_packet (uint8_t /* channel_no */, const uint8_t * buffer, size_t size) {
-  if (size < 4) {
-    // minimum packet size is 4
-    return;
-  }
-
-  uint8_t address_dest = buffer[0];
-  uint8_t address_src  = buffer[1];
-  uint8_t pkt_command  = buffer[2];
-  uint8_t pkt_data_len = buffer[3];
-
-  if (pkt_data_len > 252) {
-    // too long; packet total length < 256
-    return;
-  }
-  if ((uint8_t) (pkt_data_len + 4) != size) {
-    // incomplete/broken packet
-    return;
-  }
-
-  if (address_dest == local_address) {    // the packet has reached its destination
-    if (pkt_command == CMD_CLI_Command) { // it's a simple command
-      input_parse (address_src, (const char *) (buffer + 4), pkt_data_len);
-    } else {
-      // TODO: handle
-    }
-  } else {
-    // TODO: redirect
-  }
-}
-
-static void s_PS0_onPacketReceived (const uint8_t * buffer, size_t size) {
-  s_packet (0, buffer, size);
-}
-
-static void s_PS1_onPacketReceived (const uint8_t * buffer, size_t size) {
-  s_packet (1, buffer, size);
-}
-
-static void s_PS2_onPacketReceived (const uint8_t * buffer, size_t size) {
-  s_packet (2, buffer, size);
-}
-
-static void s_input_check_stream (Stream * S, char channel_no) { // for diagnostics only
-  if (S->available () > 0) {
-    Serial.print ("[#");
-    Serial.write (channel_no);
-    while (S->available () > 0) {
-      byte c = S->read ();
-      Serial.print (' ');
-      Serial.print (c, HEX);
-    }
-    Serial.print (" ] ");
-  }
-}
-
-#endif
 
 void io_setup () {
   Writer::init_channels ();
@@ -130,27 +54,11 @@ void io_check () {
    */
   Writer::update_all ();
 
-#if 0
-  PS1.update ();
-  PS2.update ();
-
-  s_input_check_stream (&Serial4, '4');
-  s_input_check_stream (&Serial5, '5');
-
-  if (s_bUsePacketSerial) {
-    PS0.update ();
-    return; // don't process any further input on Serial
-  }
-#endif /* CORE_TEENSY */
-
   while (true) {
     int c = Serial.peek ();
     if (c > 0) {
       input_push ((byte) Serial.read ());
       continue;
-    }
-    if (c == 0) {
-      s_bUsePacketSerial = true;
     }
     break;
   }
@@ -162,7 +70,7 @@ static void input_push (byte c) {
       Serial.write (c);
       input_parse (input_default, input_buffer + 2, input_count);
     } else if (c == 3) { // ^C
-      Message::pgm_message(s_interrupt).send ();
+      Message(local_address, input_default).pgm(s_interrupt).send ();
       if (s_fn_interrupt)
 	s_fn_interrupt ();
     }
@@ -192,6 +100,8 @@ static void input_parse (uint8_t address_src, const char * buffer, size_t size) 
     return;
   }
 
+  Message response(local_address, address_src);
+
   char * ptr = input_bufcpy;
   int    argc = 0;
 
@@ -210,19 +120,20 @@ static void input_parse (uint8_t address_src, const char * buffer, size_t size) 
   input_argv[argc] = 0;
 
   if (argc && s_fn_command) {
-    CommandStatus cs = s_fn_command (address_src, argc, input_argv);
+    CommandStatus cs = s_fn_command (response, argc, input_argv);
 
     if (cs != cs_Okay) {
-      Message response(Message::Text_Error);
+      response.clear ();
+      response.set_type (Message::Text_Error);
 
       if (cs == cs_InvalidPin) {
-	response.append_pgm (s_err_pin_no);
+	response.pgm (s_err_pin_no);
       } else if (cs == cs_IncorrectUsage) {
-	response.append_pgm (s_err_usage);
+	response.pgm (s_err_usage);
       } else {
-	response.append_pgm (s_err_command);
+	response.pgm (s_err_command);
       }
-      response.send (address_src);
+      response.send ();
     }
   }
 }

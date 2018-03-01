@@ -31,7 +31,7 @@ enum CommandStatus {
 /* Set callback functions for user command & interrupt
  */
 extern void set_user_interrupt (void (*user_interrupt) ());
-extern void set_user_command (CommandStatus (*user_command) (uint8_t address_src, int argc, char ** argv));
+extern void set_user_command (CommandStatus (*user_command) (Message & response, int argc, char ** argv));
 
 #endif /* !ArduinoHello_util_hh */
 

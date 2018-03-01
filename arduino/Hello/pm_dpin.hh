@@ -59,28 +59,27 @@ public:
     return bNotify;
   }
 
-  String status () const {
-    String state("D-Pin ");
-
-    state = (state + m_pin_no) + " ";
+  void status (Message & response) const {
+    response = "D-Pin ";
+    response.append_int (m_pin_no);
+    response += " ";
 
     if (m_type == pt_None) {
-      state += "-";
+      response += "-";
     } else if (m_type == pt_Servo) {
-      state += "servo";
+      response += "servo";
     } else if (m_type == pt_D_In) {
-      state += "digital in";
+      response += "digital in";
       if (m_flags & DPIN_PULLUP)
-	state += " (up)";
+	response += " (up)";
     } else if (m_type == pt_D_Out) {
-      state += "digital out";
+      response += "digital out";
     } else if (m_type == pt_PWM) {
-      state += "PWM";
+      response += "PWM";
       if (m_flags & DPIN_PWMON)
-	state += " (active)";
+	response += " (active)";
     }
-
-    return state;
+    response.send ();
   }
 
   void clear () {

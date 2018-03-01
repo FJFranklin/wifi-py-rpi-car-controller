@@ -13,7 +13,7 @@ private:
   APin * AP[6];
   DPin * DP[14];
 
-  CommandStatus (*user_command) (uint8_t address_src, String & first, int argc, char ** argv);
+  CommandStatus (*user_command) (Message & response, String & first, int argc, char ** argv);
 
   PinManager ();
 
@@ -24,18 +24,18 @@ public:
 
   /* Allow PinManager to intercept and handle user's commands, and then forward any that are not recognised
    */  
-  void input_callbacks (CommandStatus (*user_command_callback) (uint8_t address_src, String & first, int argc, char ** argv), void (*user_interrupt_callback) ());
+  void input_callbacks (CommandStatus (*user_command_callback) (Message & response, String & first, int argc, char ** argv), void (*user_interrupt_callback) ());
 
   /* call at the start of each loop iteration
    */
   void update (void (*notification_handler) (int pin_no, bool bDigital) = 0);
 
-  CommandStatus command (uint8_t address_src, int argc, char ** argv); // commands handled by PinManager
+  CommandStatus command (Message & response, int argc, char ** argv); // commands handled by PinManager
 
 private:
   int parse_pin_no (const char * str, unsigned int flags, bool bDigital) const; // returns pin no if valid, otherwise -1
 
-  void list (uint8_t address_src, bool bAnalog, bool bDigital) const;
+  void list (Message & response, bool bAnalog, bool bDigital) const;
 
 public:
   /* set digital pin <pin_no> to high (true, 1) or low (false, 0)

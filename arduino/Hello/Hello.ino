@@ -1,11 +1,11 @@
-/* Copyright 2017 Francis James Franklin
+/* Copyright 2017-18 Francis James Franklin
  * 
  * Open Source under the MIT License - see LICENSE in the project's root folder
  */
 
 #include "pinmanager.hh"
 
-CommandStatus  user_command (uint8_t address_src, String & first, int argc, char ** argv);
+CommandStatus  user_command (Message & response, String & first, int argc, char ** argv);
 void           user_interrupt ();
 void           notification (int pin_no, bool bDigital);
 
@@ -30,28 +30,26 @@ unsigned long time_1s;
 
 /* input_check() feeds any input back to user_command() via PinManager as an array of strings
  */
-CommandStatus user_command (uint8_t address_src, String & first, int argc, char ** argv) {
+CommandStatus user_command (Message & response, String & first, int argc, char ** argv) {
   CommandStatus cs = cs_Okay;
 
   if (first.equalsIgnoreCase ("hello") || first.equalsIgnoreCase ("hi")) {
-    Message response;
-    response.text = "Hello.";
-    response.send (address_src);
+    response = "Hello.";
+    response.send ();
   } else if (first.equalsIgnoreCase ("help")) {
-    Message response;
-    response.append_pgm (s_hello);
-    response.send (address_src);
+    response.pgm (s_hello);
+    response.send ();
   } else { // mainly for debugging purposes, write out the arguments
-    Message response(Message::Text_Error);
+    response.set_type (Message::Text_Error);
     for (int arg = 0; arg < argc; arg++) {
       if (arg) {
-	response.text += ',';
+	response += ',';
       }
-      response.text += '"';
-      response.text += argv[arg];
-      response.text += '"';
+      response += '"';
+      response += argv[arg];
+      response += '"';
     }
-    response.send (address_src);
+    response.send ();
     cs = cs_UnknownCommand;
   }
 
@@ -110,8 +108,8 @@ void setup () {
   PM = PinManager::manager ();
   PM->input_callbacks (user_command, user_interrupt);
 
-  Message response;
-  response.append_pgm (s_hello);
+  Message response(local_address, input_default);
+  response.pgm (s_hello);
   response.send ();
 
   input_reset ();

@@ -20,7 +20,7 @@ private:
   bool m_bAngle; // true if set by angle; false if set exactly
 
 public:
-  static void help (uint8_t address_src);
+  static void help (Message & response);
 
   PinServo (int pin_no);
 
@@ -37,7 +37,7 @@ private:
 public:
   /* Called by PinManager::command ()
    */
-  CommandStatus command (uint8_t address_src, int argc, char ** argv);
+  CommandStatus command (Message & response, int argc, char ** argv);
 
   inline CommandStatus cmd_servo (bool bOn) {
     CommandStatus cs = cs_Okay;
