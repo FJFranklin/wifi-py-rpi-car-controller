@@ -209,16 +209,16 @@ private:
   }
 
   // zero FAT and root dir area on SD
-  bool clear_root (uint8_t address_src, uint32_t bgn, uint32_t count) {
+  bool clear_root (Message & response, uint32_t bgn, uint32_t count) {
     bool bOkay = true;
 
     cache_clear (false);
 
     for (uint32_t i = 0; i < count; i++) {
       if (!sd.card()->writeBlock (bgn + i, m_cache.data)) {
-	Message response(Message::Text_Error);
-	response.text = "SD: Error while attempting to format: Clear FAT/DIR writeBlock failed";
-	response.send (address_src);
+	response.set_type (Message::Text_Error);
+	response = "SD: Error while attempting to format: Clear FAT/DIR writeBlock failed";
+	response.send ();
 
 	bOkay = false;
 	break;
@@ -229,15 +229,15 @@ private:
 
 public:
   // format and write the Master Boot Record
-  bool write_MBR (uint8_t address_src) {
+  bool write_MBR (Message & response) {
     bool bOkay = true;
 
     uint16_t c = cylinder (relSector);
 
     if (c > 1023) {
-      Message response(Message::Text_Error);
-      response.text = "SD: Error while attempting to format: MBR CHS";
-      response.send (address_src);
+      response.set_type (Message::Text_Error);
+      response = "SD: Error while attempting to format: MBR CHS";
+      response.send ();
 
       bOkay = false;
     } else {
@@ -273,9 +273,9 @@ public:
       p->totalSectors = partSize;
 
       if (!cache_write (0)) {
-	Message response(Message::Text_Error);
-	response.text = "SD: Error while attempting to format: write MBR";
-	response.send (address_src);
+	response.set_type (Message::Text_Error);
+	response = "SD: Error while attempting to format: write MBR";
+	response.send ();
 
 	bOkay = false;
       }
@@ -284,7 +284,7 @@ public:
     return bOkay;
   }
 
-  bool write_FAT32 (uint8_t address_src) {
+  bool write_FAT32 (Message & response) {
     bool bOkay = true;
 
     cache_clear (true);
@@ -321,9 +321,9 @@ public:
 
     // write partition boot sector and backup
     if (!cache_write (relSector) || !cache_write (relSector + 6)) {
-      Message response(Message::Text_Error);
-      response.text = "SD: Error while attempting to format: FAT32 write PBS failed";
-      response.send (address_src);
+      response.set_type (Message::Text_Error);
+      response = "SD: Error while attempting to format: FAT32 write PBS failed";
+      response.send ();
 
       bOkay = false;
     } else {
@@ -331,9 +331,9 @@ public:
 
       // write extra boot area and backup
       if (!cache_write (relSector + 2) || !cache_write (relSector + 8)) {
-	Message response(Message::Text_Error);
-	response.text = "SD: Error while attempting to format: FAT32 PBS ext failed";
-	response.send (address_src);
+	response.set_type (Message::Text_Error);
+	response = "SD: Error while attempting to format: FAT32 PBS ext failed";
+	response.send ();
 
 	bOkay = false;
       } else {
@@ -346,13 +346,13 @@ public:
 
 	// write FSINFO sector and backup
 	if (!cache_write (relSector + 1) || !cache_write (relSector + 7)) {
-	  Message response(Message::Text_Error);
-	  response.text = "SD: Error while attempting to format: FAT32 FSINFO failed";
-	  response.send (address_src);
+	  response.set_type (Message::Text_Error);
+	  response = "SD: Error while attempting to format: FAT32 FSINFO failed";
+	  response.send ();
 
 	  bOkay = false;
 	} else {
-	  bOkay = clear_root (address_src, fatStart, 2 * fatSize + sectorsPerCluster);
+	  bOkay = clear_root (response, fatStart, 2 * fatSize + sectorsPerCluster);
 
 	  if (bOkay) {
 	    cache_clear (false);
@@ -363,9 +363,9 @@ public:
 
 	    // write first block of FAT and backup for reserved clusters
 	    if (!cache_write (fatStart) || !cache_write (fatStart + fatSize)) {
-	      Message response(Message::Text_Error);
-	      response.text = "SD: Error while attempting to format: FAT32 reserve failed";
-	      response.send (address_src);
+	      response.set_type (Message::Text_Error);
+	      response = "SD: Error while attempting to format: FAT32 reserve failed";
+	      response.send ();
 
 	      bOkay = false;
 	    }
@@ -376,7 +376,7 @@ public:
     return bOkay;
   }
 
-  bool write_FAT16 (uint8_t address_src) {
+  bool write_FAT16 (Message & response) {
     bool bOkay = true;
 
     cache_clear (true);
@@ -411,14 +411,14 @@ public:
 
     // write partition boot sector
     if (!cache_write (relSector)) {
-      Message response(Message::Text_Error);
-      response.text = "SD: Error while attempting to format: FAT16 write PBS failed";
-      response.send (address_src);
+      response.set_type (Message::Text_Error);
+      response = "SD: Error while attempting to format: FAT16 write PBS failed";
+      response.send ();
 
       bOkay = false;
     } else {
       // clear FAT and root directory
-      bOkay = clear_root (address_src, fatStart, dataStart - fatStart);
+      bOkay = clear_root (response, fatStart, dataStart - fatStart);
 
       if (bOkay) {
 	cache_clear (false);
@@ -428,9 +428,9 @@ public:
 
 	// write first block of FAT and backup for reserved clusters
 	if (!cache_write (fatStart) || !cache_write (fatStart + fatSize)) {
-	  Message response(Message::Text_Error);
-	  response.text = "SD: Error while attempting to format: FAT16 reserve failed";
-	  response.send (address_src);
+	  response.set_type (Message::Text_Error);
+	  response = "SD: Error while attempting to format: FAT16 reserve failed";
+	  response.send ();
 
 	  bOkay = false;
 	}
@@ -439,11 +439,11 @@ public:
     return bOkay;
   }
 
-  static void format (uint8_t address_src) {
+  static void format (Message & response) {
     if (!sd.card()->begin ()) {
-      Message response(Message::Text_Error);
-      response.text = "SD: Unable to initialise card.";
-      response.send (address_src);
+      response.set_type (Message::Text_Error);
+      response = "SD: Unable to initialise card.";
+      response.send ();
     } else {
       bool bSDHC = (sd.card()->type () == SD_CARD_TYPE_SDHC);
 
@@ -452,33 +452,32 @@ public:
       SD_Geometry geometry (block_count, bSDHC);
 
       if (!geometry.valid ()) {
-	Message response(Message::Text_Error);
-	response.text = "SD: Card capacity too low, or bad cluster count.";
-	response.send (address_src);
+	response.set_type (Message::Text_Error);
+	response = "SD: Card capacity too low, or bad cluster count.";
+	response.send ();
       } else {
-	if (geometry.write_MBR (address_src)) {
+	if (geometry.write_MBR (response)) {
 	  bool bOkay;
 
 	  if (bSDHC) { // FAT32
-	    bOkay = geometry.write_FAT32 (address_src);
+	    bOkay = geometry.write_FAT32 (response);
 	  } else { // FAT16
-	    bOkay = geometry.write_FAT16 (address_src);
+	    bOkay = geometry.write_FAT16 (response);
 	  }
 	  if (bOkay) {
-	    Message response;
-	    response.text = "SD: Card formatted.";
-	    response.send (address_src);
+	    response = "SD: Card formatted.";
+	    response.send ();
 	  }
 	}
       }
     }
   }
 
-  static void erase (uint8_t address_src) {
+  static void erase (Message & response) {
     if (!sd.card()->begin ()) {
-      Message response(Message::Text_Error);
-      response.text = "SD: Unable to initialise card.";
-      response.send (address_src);
+      response.set_type (Message::Text_Error);
+      response = "SD: Unable to initialise card.";
+      response.send ();
     } else {
       uint32_t block_count = sd.card()->cardSize (); // no. of 512-byte blocks
 
@@ -498,10 +497,12 @@ public:
 	}
 
 	if (!sd.card()->erase (block_start, block_end)) {
-	  Message response(Message::Text_Error);
-	  response.text = "SD: Error attempting to erase card: ";
-	  response.text += String (block_start) + " - " + String (block_end);
-	  response.send (address_src);
+	  response.set_type (Message::Text_Error);
+	  response = "SD: Error attempting to erase card: ";
+	  response.append_lu (block_start);
+	  response += " - ";
+	  response.append_lu (block_end);
+	  response.send ();
 
 	  bOkay = false;
 	  break;
@@ -509,9 +510,8 @@ public:
 	block_start += ERASE_SIZE;
       }
       if (bOkay) {
-	Message response;
-	response.text = "SD: Card erased.";
-	response.send (address_src);
+	response = "SD: Card erased.";
+	response.send ();
       }
     }
   }

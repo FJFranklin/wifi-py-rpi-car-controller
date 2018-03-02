@@ -76,18 +76,19 @@ void PinServo::set_exact (int exact) {
     m_servo.writeMicroseconds (exact);
 }
 
-CommandStatus PinServo::command (Message & response, int argc, char ** argv) {
+CommandStatus PinServo::command (Message & response, const ArgList & Args) {
   /* To get here, the first word in the argv array is "servo"; the second is the pin number.
    * There must be a third, the sub-command (with optional parameters) handled here.
    */
   CommandStatus cs = cs_Okay;
 
-  String third(argv[2]);
+  Arg third = Args[2];
+  uint8_t argc = Args.count ();
 
   if (third == "minmax") { // add some limits for safety & sanity
     if (argc == 5) {
-      String us_min(argv[3]);
-      String us_max(argv[4]);
+      Arg us_min = Args[3];
+      Arg us_max = Args[4];
       int d_min = us_min.toInt ();
       int d_max = us_max.toInt ();
 
@@ -105,7 +106,7 @@ CommandStatus PinServo::command (Message & response, int argc, char ** argv) {
     }
   } else if (third == "angle") { // must be 0-180
     if (argc == 4) {
-      String angle(argv[3]);
+      Arg angle = Args[3];
       int d_angle = angle.toInt ();
 
       if ((d_angle >= 0) && (d_angle <= 180)) {
@@ -122,7 +123,7 @@ CommandStatus PinServo::command (Message & response, int argc, char ** argv) {
     }
   } else if (third == "microseconds") { // add some limits for safety & sanity
     if (argc == 4) {
-      String exact(argv[3]);
+      Arg exact = Args[3];
       int d_exact = exact.toInt ();
 
       if ((d_exact >= 10) && (d_exact < 10000)) {

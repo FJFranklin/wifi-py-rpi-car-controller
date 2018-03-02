@@ -192,6 +192,13 @@ bool MessageTask::update (Writer & W) { // returns true when task complete
   return bComplete;
 }
 
+Message & Message::append_lu (unsigned long i) { // change number to string, and append
+  static char buffer[12];
+  sprintf (buffer, "%lu", i);
+  *this += buffer;
+  return *this;
+}
+
 Message & Message::append_int (int i) { // change number to string, and append
   static char buffer[12];
   sprintf (buffer, "%d", i);
@@ -219,16 +226,18 @@ void Message::send () {
   if (W) {
     MessageType type = get_type ();
 
+    if (W->newlines ()) {
+      *this += "\r\n";
+    }
+
     uint8_t * data_buffer = get_buffer ();
 
     int length = (int) get_length ();
 
     if (W->encoded ()) {
       encode (data_buffer, length); // this provides values for data_buffer and length
-    } else if (W->newlines ()) {
-	*this += "\r\n";
     }
-    W->add (new MessageTask(address_src, address_dest, type, buffer, length, true /* copy data */));
+    W->add (new MessageTask(address_src, address_dest, type, data_buffer, length, true /* copy data */));
   }
   clear ();
 }

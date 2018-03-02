@@ -150,10 +150,11 @@ public:
   inline uint8_t get_length () const {
     return buffer[3];
   }
+private:
   inline uint8_t * get_buffer () {
     return buffer + 4;
   }
-
+public:
   inline void clear () {
     offset = 0;
     cobsin = 0;
@@ -178,8 +179,9 @@ public:
   Message & operator+= (const char * right);
   Message & operator= (const char * right);
 
-  Message & append_int (int i);     // change number to string, and append
-  Message & pgm (const char * str); // append string stored in PROGMEM
+  Message & append_lu (unsigned long i); // change number to string, and append
+  Message & append_int (int i);          // change number to string, and append
+  Message & pgm (const char * str);      // append string stored in PROGMEM
 
   void send ();
 

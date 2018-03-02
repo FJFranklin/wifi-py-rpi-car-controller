@@ -75,11 +75,11 @@ PinManager::~PinManager () {
     delete DP[i];
 }
 
-static CommandStatus s_command (Message & response, int argc, char ** argv) { // callback for util input command
-  return s_PM->command (response, argc, argv);
+static CommandStatus s_command (Message & response, const ArgList & Args) { // callback for util input command
+  return s_PM->command (response, Args);
 }
 
-void PinManager::input_callbacks (CommandStatus (*user_command_callback) (Message & response, String & first, int argc, char ** argv),
+void PinManager::input_callbacks (CommandStatus (*user_command_callback) (Message & response, const ArgList & Args),
 				  void (*user_interrupt_callback) ())
 {
   user_command = user_command_callback;
@@ -114,16 +114,17 @@ void PinManager::update (void (*notification_handler) (int pin_no, bool bDigital
   }
 }
 
-CommandStatus PinManager::command (Message & response, int argc, char ** argv) {
+CommandStatus PinManager::command (Message & response, const ArgList & Args) {
   CommandStatus cs = cs_UnknownCommand;
 
-  String first(argv[0]);
+  Arg first = Args[0];
+  uint8_t argc = Args.count ();
 
   if ((first == "help") && (argc > 1)) { // second argument must exist and should be one of: all, digital, servo, pwm, ...
     cs = cs_IncorrectUsage;
 
     if (argc > 1) {
-      String second(argv[1]);
+      Arg second = Args[1];
       bool bAll = false;
 
       if (second == "all") {
@@ -162,7 +163,7 @@ CommandStatus PinManager::command (Message & response, int argc, char ** argv) {
     bool bDigital = true;
 
     if (argc > 1) {
-      String second(argv[1]);
+      Arg second = Args[1];
 
       if (second == "analog") {
 	bDigital = false;
@@ -179,7 +180,7 @@ CommandStatus PinManager::command (Message & response, int argc, char ** argv) {
     cs = cs_Okay;
 
     for (int arg = 1; arg < argc; arg++) {
-      int pin_no = parse_pin_no (argv[arg], DPIN_D_CLR, true);
+      int pin_no = parse_pin_no (Args[arg].c_str (), DPIN_D_CLR, true);
 
       if (pin_no < 0) { // oops
 	cs = cs_InvalidPin;
@@ -194,7 +195,7 @@ CommandStatus PinManager::command (Message & response, int argc, char ** argv) {
     bool bFirst = true;
 
     for (int arg = 1; arg < argc; arg++) {
-      int pin_no = parse_pin_no (argv[arg], APIN_ANALOG, false);
+      int pin_no = parse_pin_no (Args[arg].c_str (), APIN_ANALOG, false);
 
       if (pin_no < 0) { // oops
 	cs = cs_InvalidPin;
@@ -217,7 +218,7 @@ CommandStatus PinManager::command (Message & response, int argc, char ** argv) {
     bool bFirst = true;
 
     for (int arg = 1; arg < argc; arg++) {
-      int pin_no = parse_pin_no (argv[arg], DPIN_D_IN, true);
+      int pin_no = parse_pin_no (Args[arg].c_str (), DPIN_D_IN, true);
 
       if (pin_no < 0) { // oops
 	cs = cs_InvalidPin;
@@ -242,7 +243,7 @@ CommandStatus PinManager::command (Message & response, int argc, char ** argv) {
 
     for (int arg = 1; arg < argc; arg++) {
       bool bHigh = true;
-      char * ptr = argv[arg];
+      const char * ptr = Args[arg].c_str ();
       
       if (*ptr == '~') { // set low rather than high
 	bHigh = false;
@@ -266,7 +267,7 @@ CommandStatus PinManager::command (Message & response, int argc, char ** argv) {
 
     for (int arg = 1; arg < argc; arg++) {
       bool bUp = true;
-      char * ptr = argv[arg];
+      const char * ptr = Args[arg].c_str ();
       
       if (*ptr == '~') { // set down rather than up
 	bUp = false;
@@ -289,7 +290,7 @@ CommandStatus PinManager::command (Message & response, int argc, char ** argv) {
     cs = cs_IncorrectUsage;
 
     if (argc > 1) {
-      String second(argv[1]);
+      Arg second = Args[1];
 
       if (second == "on") {
 	DP[13]->dpin_write (true);
@@ -303,7 +304,7 @@ CommandStatus PinManager::command (Message & response, int argc, char ** argv) {
     cs = cs_IncorrectUsage;
 
     if (argc > 1) {
-      String second(argv[1]);
+      Arg second = Args[1];
 
       if (second == "on") {
 	echo (true);
@@ -319,13 +320,13 @@ CommandStatus PinManager::command (Message & response, int argc, char ** argv) {
     int pin_no = -1;
 
     if (argc > 1) // there *must* be a second argument
-      pin_no = parse_pin_no (argv[1], DPIN_SERVO, true);
+      pin_no = parse_pin_no (Args[1].c_str (), DPIN_SERVO, true);
 
     if (pin_no < 0) { // oops
       cs = cs_InvalidPin;
     } else { // we have a valid pin!
       PinServo * PS = DP[pin_no]->servo ();
-      cs = PS->command (response, argc, argv); // let the class instance handle the rest
+      cs = PS->command (response, Args); // let the class instance handle the rest
     }
   } else if (first == "pwm") {
     cs = cs_Okay;
@@ -333,7 +334,7 @@ CommandStatus PinManager::command (Message & response, int argc, char ** argv) {
     int pin_no = -1;
 
     if (argc > 1) // there *must* be a second argument
-      pin_no = parse_pin_no (argv[1], DPIN_PWM, true);
+      pin_no = parse_pin_no (Args[1].c_str (), DPIN_PWM, true);
 
     if (pin_no < 0) { // oops
       cs = cs_InvalidPin;
@@ -341,7 +342,7 @@ CommandStatus PinManager::command (Message & response, int argc, char ** argv) {
       cs = cs_IncorrectUsage;
 
       if (argc > 2) { // need a 3rd argument at least
-	String third(argv[2]);
+	Arg third = Args[2];
 
 	if (third == "on") {
 	  DP[pin_no]->pwm (true);
@@ -350,7 +351,7 @@ CommandStatus PinManager::command (Message & response, int argc, char ** argv) {
 	  DP[pin_no]->pwm (false);
 	  cs = cs_Okay;
 	} else if ((third == "duty") && (argc > 3)) { // need a 4th argument for the duty cycle
-	  String duty(argv[3]);
+	  Arg duty = Args[3];
 	  int cycle = duty.toInt ();
 
 	  if ((cycle >= 0) && (cycle <= 255)) {
@@ -365,12 +366,12 @@ CommandStatus PinManager::command (Message & response, int argc, char ** argv) {
   if (cs == cs_UnknownCommand) {
     SD_Manager * SD = SD_Manager::manager ();
     if (SD) {
-      cs = SD->command (response, first, argc, argv);
+      cs = SD->command (response, Args);
     }
   }
 
   if (user_command && (cs == cs_UnknownCommand)) {
-    cs = user_command (response, first, argc, argv);
+    cs = user_command (response, Args);
   }
 
   return cs;
@@ -396,8 +397,7 @@ int PinManager::parse_pin_no (const char * str, unsigned int flags, bool bDigita
   }
 
   if (bOkay) {         // we have a 1-2 digit number
-    String second(str);
-    pin_no = second.toInt ();
+    pin_no = atoi (str);
 
     if (bDigital) {    // digital pin
       if (pin_no > 13) // too high!

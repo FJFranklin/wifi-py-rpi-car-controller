@@ -3,16 +3,21 @@
  * Open Source under the MIT License - see LICENSE in the project's root folder
  */
 
+#ifndef ArduinoHello_sd_path_hh
+#define ArduinoHello_sd_path_hh
+
+#include "util.hh"
+
 #ifdef CORE_TEENSY
 
 #include <SdFat.h>
 
-#define SD_PATH_MAX 255 // maximum length of path
-#define SD_FILE_MAX  63 // maximum length of filename
+#define SD_PATH_MAX MESSAGE_MAXSIZE // maximum length of path, i.e., 250
+#define SD_FILE_MAX 63              // maximum length of filename - an arbitrary choice here; arguably should be (SD_PATH_MAX-1)
 
-extern void SD_Card_Info (uint8_t address_src);
-extern void SD_Card_Erase (uint8_t address_src);
-extern void SD_Card_Format (uint8_t address_src);
+extern void SD_Card_Info (Message & response);
+extern void SD_Card_Erase (Message & response);
+extern void SD_Card_Format (Message & response);
 
 class SD_Path {
 private:
@@ -40,23 +45,25 @@ private:
 public:
   bool push (const char * name);
 
-  void path (String & str) const; // append full path to string
+  void path (Message & M) const; // append full path to message
 private:
-  bool fs_init (uint8_t address_src) const;
+  bool fs_init (Message & response) const;
 public:
-  FatFile * open (uint8_t address_src) const;
+  FatFile * open (Message & response) const;
 
-  FatFile * mkdir (uint8_t address_src) const;
+  FatFile * mkdir (Message & response) const;
 
-  bool ls (uint8_t address_src) const;
+  bool ls (Message & response) const;
 
   static const SD_Path & pwd ();
 
-  static void pwd (uint8_t address_src);
-  static bool cd (uint8_t address_src, const char * path);
-  static bool ls (uint8_t address_src, const char * path);
-  static bool mkdir (uint8_t address_src, const char * path);
-  static bool rmdir (uint8_t address_src, const char * path);
+  static void pwd (Message & response);
+  static bool cd (Message & response, const char * path);
+  static bool ls (Message & response, const char * path);
+  static bool mkdir (Message & response, const char * path);
+  static bool rmdir (Message & response, const char * path);
 };
 
 #endif /* CORE_TEENSY */
+
+#endif /* ! ArduinoHello_sd_path_hh */

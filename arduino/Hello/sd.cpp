@@ -20,9 +20,12 @@ SD_Manager * SD_Manager::manager () {
   return s_manager;
 }
 
-CommandStatus SD_Manager::command (Message & response, const String & first, int argc, char ** argv) {
+CommandStatus SD_Manager::command (Message & response, const ArgList & Args) {
   CommandStatus cs = cs_UnknownCommand;
 #ifdef CORE_TEENSY
+  Arg first = Args[0];
+  uint8_t argc = Args.count ();
+
   if (first == "sd") {
     SD_Card_Info (response);
     cs = cs_Okay;
@@ -40,7 +43,7 @@ CommandStatus SD_Manager::command (Message & response, const String & first, int
       SD_Path::pwd().ls (response);
     } else {
       for (int arg = 1; arg < argc; arg++) {
-	SD_Path::ls (response, argv[arg]);
+	SD_Path::ls (response, Args[arg].c_str ());
       }
     }
     cs = cs_Okay;
@@ -51,7 +54,7 @@ CommandStatus SD_Manager::command (Message & response, const String & first, int
       response.send ();
     } else {
       for (int arg = 1; arg < argc; arg++) {
-	SD_Path::mkdir (response, argv[arg]);
+	SD_Path::mkdir (response, Args[arg].c_str ());
       }
     }
     cs = cs_Okay;
@@ -62,7 +65,7 @@ CommandStatus SD_Manager::command (Message & response, const String & first, int
       response.send ();
     } else {
       for (int arg = 1; arg < argc; arg++) {
-	SD_Path::rmdir (response, argv[arg]);
+	SD_Path::rmdir (response, Args[arg].c_str ());
       }
     }
     cs = cs_Okay;
@@ -70,7 +73,7 @@ CommandStatus SD_Manager::command (Message & response, const String & first, int
     if (argc == 1) {
       SD_Path::cd (response, "/");
     } else if (argc == 2) {
-      SD_Path::cd (response, argv[1]);
+      SD_Path::cd (response, Args[1].c_str ());
     } else {
       response.set_type (Message::Text_Error);
       response = "usage: cd [<path>]";

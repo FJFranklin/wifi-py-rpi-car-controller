@@ -19,23 +19,21 @@ static void input_add (char c);
 static void input_delete ();
 static void input_parse (uint8_t address_src, const char * buffer, size_t size);
 
-static const int input_size = 253;
-static char      input_bufcpy[input_size+1];
+static const int input_size = MESSAGE_MAXSIZE; // i.e., 250
 static char      input_buffer[input_size+3];
 static char *    input_ptr = input_buffer;
 static int       input_count = 0;
-static char *    input_argv[(input_size/2)+1];
 
 /* Function callbacks
  */
-static void (*s_fn_interrupt) () = 0;                                                   // If the user presses CTRL-C.
-static CommandStatus (*s_fn_command) (Message & response, int argc, char ** argv) = 0;  // Handle the user's command
+static void (*s_fn_interrupt) () = 0;                                                 // If the user presses CTRL-C.
+static CommandStatus (*s_fn_command) (Message & response, const ArgList & Args) = 0;  // Handle the user's command
 
 void set_user_interrupt (void (*user_interrupt) ()) {
   s_fn_interrupt = user_interrupt;
 }
 
-void set_user_command (CommandStatus (*user_command) (Message & response, int argc, char ** argv)) {
+void set_user_command (CommandStatus (*user_command) (Message & response, const ArgList & Args)) {
   s_fn_command = user_command;
 }
 
@@ -95,32 +93,17 @@ void input_reset () {
 }
 
 static void input_parse (uint8_t address_src, const char * buffer, size_t size) {
-  if (!buffer || (size > 255)) {
+  if (!buffer || (size > MESSAGE_MAXSIZE)) {
     // too long!
     return;
   }
 
   Message response(local_address, address_src);
 
-  char * ptr = input_bufcpy;
-  int    argc = 0;
+  ArgList Args(buffer, size);
 
-  memcpy (input_bufcpy, buffer, size);
-  input_bufcpy[size] = 0;
-
-  while (*ptr) {
-    if (*ptr == ' ') {
-      ++ptr;
-      continue;
-    }
-    input_argv[argc++] = ptr;
-    while (*ptr && (*ptr != ' ')) ++ptr;
-    if (*ptr) *ptr++ = 0;
-  }
-  input_argv[argc] = 0;
-
-  if (argc && s_fn_command) {
-    CommandStatus cs = s_fn_command (response, argc, input_argv);
+  if (Args.count () && s_fn_command) {
+    CommandStatus cs = s_fn_command (response, Args);
 
     if (cs != cs_Okay) {
       response.clear ();
@@ -152,5 +135,41 @@ static void input_delete () {
     Serial.print ("\b \b");
     *--input_ptr = 0;
     --input_count;
+  }
+}
+
+bool Arg::equals (const char * rhs, bool bCaseSensitive) const {
+  if (!m_arg || !rhs) {
+    return false;
+  }
+  if (bCaseSensitive) {
+    return (strcmp (m_arg, rhs) == 0);
+  }
+  return (strcasecmp (m_arg, rhs) == 0);
+}
+
+int Arg::toInt () const {
+  return m_arg ? atoi (m_arg) : 0;
+}
+
+ArgList::ArgList (const char * buffer, uint8_t size) :
+  m_count(0)
+{
+  memcpy (m_buffer, buffer, size);
+  m_buffer[size] = 0;
+
+  char * ptr = m_buffer;
+
+  while (*ptr && (m_count < INPUT_MAXARGS)) {
+    if (*ptr == ' ') {
+      ++ptr;
+      continue;
+    }
+    m_args[m_count++] = ptr;
+
+    while (*ptr && (*ptr != ' ')) {
+      ++ptr;
+    }
+    if (*ptr) *ptr++ = 0;
   }
 }

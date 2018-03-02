@@ -37,7 +37,7 @@ private:
 public:
   /* Called by PinManager::command ()
    */
-  CommandStatus command (Message & response, int argc, char ** argv);
+  CommandStatus command (Message & response, const ArgList & Args);
 
   inline CommandStatus cmd_servo (bool bOn) {
     CommandStatus cs = cs_Okay;

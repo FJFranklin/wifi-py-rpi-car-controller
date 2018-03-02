@@ -5,7 +5,7 @@
 
 #include "pinmanager.hh"
 
-CommandStatus  user_command (Message & response, String & first, int argc, char ** argv);
+CommandStatus  user_command (Message & response, const ArgList & Args);
 void           user_interrupt ();
 void           notification (int pin_no, bool bDigital);
 
@@ -30,23 +30,25 @@ unsigned long time_1s;
 
 /* input_check() feeds any input back to user_command() via PinManager as an array of strings
  */
-CommandStatus user_command (Message & response, String & first, int argc, char ** argv) {
+CommandStatus user_command (Message & response, const ArgList & Args) {
   CommandStatus cs = cs_Okay;
 
-  if (first.equalsIgnoreCase ("hello") || first.equalsIgnoreCase ("hi")) {
+  Arg first = Args[0];
+
+  if (first.equals ("hello", false) || first.equals ("hi", false)) { // false => ignore case
     response = "Hello.";
     response.send ();
-  } else if (first.equalsIgnoreCase ("help")) {
+  } else if (first.equals ("help", false)) { // false => ignore case
     response.pgm (s_hello);
     response.send ();
   } else { // mainly for debugging purposes, write out the arguments
     response.set_type (Message::Text_Error);
-    for (int arg = 0; arg < argc; arg++) {
+    for (int arg = 0; arg < Args.count (); arg++) {
       if (arg) {
 	response += ',';
       }
       response += '"';
-      response += argv[arg];
+      response += Args[arg].c_str ();
       response += '"';
     }
     response.send ();
