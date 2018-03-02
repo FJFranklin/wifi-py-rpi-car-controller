@@ -89,7 +89,7 @@ void input_reset () {
 
   input_count = 0;
 
-  Serial.print (input_buffer);
+  // Serial.print (input_buffer); // command prompt pointless for asynchronous communication
 }
 
 static void input_parse (uint8_t address_src, const char * buffer, size_t size) {
