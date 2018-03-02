@@ -12,18 +12,41 @@
 #define MESSAGE_MAXSIZE  (MESSAGE_BUFSIZE-6) // maximum message data length is therefore 250 characters
                                              // which must therefore be the maximum allowable path length
 
+#define ENABLE_CHANNEL_0 // for Serial or, equivalently, SerialUSB
+#define ENABLE_CHANNEL_1
+#ifdef CORE_TEENSY
+#define ENABLE_CHANNEL_2
+#define ENABLE_CHANNEL_3
+#define ENABLE_CHANNEL_4
+// #define ENABLE_CHANNEL_5
+// #define ENABLE_CHANNEL_6
+#endif /* CORE_TEENSY */
+
+#define CHANNEL_0_BAUD  115200 // (although may differ in practice if it's a USB connection)
+#define CHANNEL_1_BAUD 2000000 // 2000000 capability on Teensy 3.x. Note 1. Raspberry Pi & Arduino should be able
+#define CHANNEL_2_BAUD 1000000 // 2000000 capability                        to handle 1000000 without glitches.
+#define CHANNEL_3_BAUD  500000 // 2000000 capability                Note 2. Teensy LC okay at 500000.
+#define CHANNEL_4_BAUD    9600 // 2000000 capability
+#define CHANNEL_5_BAUD  921600 // 2000000 capability; 4608000 possible but with 0.16% error on Teensy 3.5/3.6
+#define CHANNEL_6_BAUD 4608000 // 2000000 capability                         ( -0.79% )             ( 3.2 )
+
 extern uint8_t local_address; // From EEPROM; valid device addresses are 1-127
 extern uint8_t input_default; // address 0, reserved for direct input over Serial
 
+extern void set_local_address (uint8_t address); // Program a new address in EEPROM
+
+class Reader;
 class Writer;
 
-extern Writer * Channel_0;
-extern Writer * Channel_1;
-extern Writer * Channel_2;
-extern Writer * Channel_3;
-extern Writer * Channel_4;
-extern Writer * Channel_5;
-extern Writer * Channel_6;
+class Channel;
+
+extern Channel * Channel_0;
+extern Channel * Channel_1;
+extern Channel * Channel_2;
+extern Channel * Channel_3;
+extern Channel * Channel_4;
+extern Channel * Channel_5;
+extern Channel * Channel_6;
 
 class Task {
 public:
@@ -101,6 +124,35 @@ public:
   static void update_all ();
 
   static Writer * channel (uint8_t address);
+};
+
+class Reader {
+public:
+  inline void update () {
+    // ...
+  }
+};
+
+class Channel {
+public:
+  Writer * writer;
+  Reader * reader;
+
+  Channel (Writer * W) :
+    writer(W),
+    reader(0)
+  {
+    // ...
+  }
+
+  ~Channel () {
+    // ...
+  }
+
+  inline void update () {
+    if (writer) writer->update ();
+    if (reader) reader->update ();
+  }
 };
 
 class Message {
@@ -181,6 +233,7 @@ public:
 
   Message & append_lu (unsigned long i); // change number to string, and append
   Message & append_int (int i);          // change number to string, and append
+  Message & append_hex (uint8_t i);      // change number to string, and append
   Message & pgm (const char * str);      // append string stored in PROGMEM
 
   void send ();

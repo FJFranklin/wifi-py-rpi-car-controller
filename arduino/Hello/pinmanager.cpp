@@ -13,6 +13,7 @@
 
 static const char s_usage_help[] PROGMEM = "help [all|servo]";
 static const char s_usage_echo[] PROGMEM = "echo on|off";
+static const char s_usage_addr[] PROGMEM = "address [<address>]";
 static const char s_usage_list[] PROGMEM = "list [digital|analog]";
 static const char s_usage_dclr[] PROGMEM = "dclr [<pin#2-13>]*";
 static const char s_usage_dout[] PROGMEM = "dout [[~]<pin#2-13>]*";
@@ -130,6 +131,7 @@ CommandStatus PinManager::command (Message & response, const ArgList & Args) {
       if (second == "all") {
 	response.pgm(s_usage_help).send ();
 	response.pgm(s_usage_echo).send ();
+	response.pgm(s_usage_addr).send ();
 	response.pgm(s_usage_list).send ();
 	response.pgm(s_usage_led).send ();
 	bAll = true;
@@ -314,6 +316,14 @@ CommandStatus PinManager::command (Message & response, const ArgList & Args) {
 	cs = cs_Okay;
       }
     }
+  } else if (first == "address") {
+    if (argc > 1) {
+      set_local_address (Args[1].toInt ());
+    }
+    response = "local address: ";
+    response.append_hex (local_address);
+    response.send ();
+    cs = cs_Okay;
   } else if (first == "servo") {
     cs = cs_Okay;
 

@@ -8,14 +8,6 @@
 
 #include <EEPROM.h>
 
-Writer * Channel_0 = 0;
-Writer * Channel_1 = 0;
-Writer * Channel_2 = 0;
-Writer * Channel_3 = 0;
-Writer * Channel_4 = 0;
-Writer * Channel_5 = 0;
-Writer * Channel_6 = 0;
-
 uint8_t local_address;     // Get from EEPROM; shuold be unique & in range 0x01-0x7f
 uint8_t input_default = 0; // default address for normal responses is 0, which is just Serial
 
@@ -89,33 +81,92 @@ public:
   }
 };
 
+#ifdef ENABLE_CHANNEL_0
+static SerialWriter SW_0(Serial);
+static Channel s_channel_0(&SW_0);
+Channel * Channel_0 = &s_channel_0;
+#else
+Channel * Channel_0 = 0;
+#endif
+#ifdef ENABLE_CHANNEL_1
+static SerialWriter SW_1(Serial1);
+static Channel s_channel_1(&SW_1);
+Channel * Channel_1 = &s_channel_1;
+#else
+Channel * Channel_1 = 0;
+#endif
+#ifdef ENABLE_CHANNEL_2
+static SerialWriter SW_2(Serial2);
+static Channel s_channel_2(&SW_2);
+Channel * Channel_2 = &s_channel_2;
+#else
+Channel * Channel_2 = 0;
+#endif
+#ifdef ENABLE_CHANNEL_3
+static SerialWriter SW_3(Serial3);
+static Channel s_channel_3(&SW_3);
+Channel * Channel_3 = &s_channel_3;
+#else
+Channel * Channel_3 = 0;
+#endif
+#ifdef ENABLE_CHANNEL_4
+static SerialWriter SW_4(Serial4);
+static Channel s_channel_4(&SW_4);
+Channel * Channel_4 = &s_channel_4;
+#else
+Channel * Channel_4 = 0;
+#endif
+#ifdef ENABLE_CHANNEL_5
+static SerialWriter SW_5(Serial5);
+static Channel s_channel_5(&SW_5);
+Channel * Channel_5 = &s_channel_5;
+#else
+Channel * Channel_5 = 0;
+#endif
+#ifdef ENABLE_CHANNEL_6
+static SerialWriter SW_6(Serial6);
+static Channel s_channel_6(&SW_6);
+Channel * Channel_6 = &s_channel_6;
+#else
+Channel * Channel_6 = 0;
+#endif
+
+void set_local_address (uint8_t address) { // Program a new address in EEPROM; use with caution
+  if ((address > 0) && (address < 0x7f)) {
+    EEPROM.write (0, address);
+  }
+  local_address = EEPROM.read (0);
+}
+
 void Writer::init_channels () {
   local_address = EEPROM.read (0);
 
-  if ((local_address == 0) || (local_address > 0x7f)) { // oops - not set properly?
+  if ((local_address == 0) || (local_address >= 0x7f)) { // oops - not set properly?
     local_address = 0x7f;
   }
 
   s_pkt_default = local_address | 0x80;
 
-  Serial.begin (115200);
-
-  Channel_0 = new SerialWriter(Serial);
-
-#if 0
-  Serial1.begin (2000000);
-  Serial2.begin (2000000);
-
-  PS0.setStream (&Serial);
-  PS1.setStream (&Serial1);
-  PS2.setStream (&Serial2);
-
-  PS0.setPacketHandler (s_PS0_onPacketReceived);
-  PS1.setPacketHandler (s_PS1_onPacketReceived);
-  PS2.setPacketHandler (s_PS2_onPacketReceived);
-
-  Serial4.begin (9600); // or 500000 for fast serial compatible across Teensy 3.x range
-  Serial5.begin (9600);
+#ifdef ENABLE_CHANNEL_0
+  Serial.begin (CHANNEL_0_BAUD);
+#endif
+#ifdef ENABLE_CHANNEL_1
+  Serial1.begin (CHANNEL_1_BAUD);
+#endif
+#ifdef ENABLE_CHANNEL_2
+  Serial2.begin (CHANNEL_2_BAUD);
+#endif
+#ifdef ENABLE_CHANNEL_3
+  Serial3.begin (CHANNEL_3_BAUD);
+#endif
+#ifdef ENABLE_CHANNEL_4
+  Serial4.begin (CHANNEL_4_BAUD);
+#endif
+#ifdef ENABLE_CHANNEL_5
+  Serial5.begin (CHANNEL_5_BAUD);
+#endif
+#ifdef ENABLE_CHANNEL_6
+  Serial6.begin (CHANNEL_6_BAUD);
 #endif
 }
 
@@ -138,10 +189,10 @@ Writer * Writer::channel (uint8_t address) {
   }
 
   if (address == input_default) { // default address for normal responses
-    return Channel_0;
+    return Channel_0->writer;
   }
   if (address == s_pkt_default) { // default address for packet responses
-    return Channel_0;
+    return Channel_0->writer;
   }
 
   /* Otherwise, need to work out which channel to send the messages to... // TODO // FIXME
@@ -202,6 +253,13 @@ Message & Message::append_lu (unsigned long i) { // change number to string, and
 Message & Message::append_int (int i) { // change number to string, and append
   static char buffer[12];
   sprintf (buffer, "%d", i);
+  *this += buffer;
+  return *this;
+}
+
+Message & Message::append_hex (uint8_t i) { // change number to string, and append
+  static char buffer[4];
+  sprintf (buffer, "%02x", (unsigned int) i);
   *this += buffer;
   return *this;
 }
