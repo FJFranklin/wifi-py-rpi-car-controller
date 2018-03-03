@@ -22,6 +22,9 @@
 // #define ENABLE_CHANNEL_6
 #endif /* CORE_TEENSY */
 
+#define CHANNEL_CONSOLE 0 // Default channel for console I/O
+#define CHANNEL_COUNT   7 // Number of serial channels
+
 #define CHANNEL_0_BAUD  115200 // (although may differ in practice if it's a USB connection)
 #define CHANNEL_1_BAUD 2000000 // 2000000 capability on Teensy 3.x. Note 1. Raspberry Pi & Arduino should be able
 #define CHANNEL_2_BAUD 1000000 // 2000000 capability                        to handle 1000000 without glitches.
@@ -35,18 +38,24 @@ extern uint8_t input_default; // address 0, reserved for direct input over Seria
 
 extern void set_local_address (uint8_t address); // Program a new address in EEPROM
 
+class Message;
+
 class Reader;
 class Writer;
 
 class Channel;
 
-extern Channel * Channel_0;
-extern Channel * Channel_1;
-extern Channel * Channel_2;
-extern Channel * Channel_3;
-extern Channel * Channel_4;
-extern Channel * Channel_5;
-extern Channel * Channel_6;
+extern Channel * channels[CHANNEL_COUNT];
+
+class MessageHandler {
+public:
+  virtual ~MessageHandler () {
+    // ...
+  }
+
+  virtual void message_received (Message & message) = 0;
+  virtual void interrupt (Message & message) = 0;
+};
 
 class Task {
 public:
@@ -86,13 +95,13 @@ private:
   Task * next;
 
   bool m_bEncoded;
-  bool m_bNewlines;
+  bool m_bConsole;
 
 public:
   Writer () :
     next(0),
     m_bEncoded(false),
-    m_bNewlines(true)
+    m_bConsole(true)
   {
     // ...
   }
@@ -103,11 +112,11 @@ public:
   inline void set_encoded (bool bEncoded) {
     m_bEncoded = bEncoded;
   }
-  inline bool newlines () const {
-    return m_bNewlines;
+  inline bool console () const {
+    return m_bConsole;
   }
-  inline void set_newlines (bool bNewlines) {
-    m_bNewlines = bNewlines;
+  inline void set_console (bool bConsole) {
+    m_bConsole = bConsole;
   }
 
   void update ();
@@ -120,17 +129,47 @@ public:
 
   virtual ~Writer () { }
 
-  static void init_channels ();
-  static void update_all ();
-
-  static Writer * channel (uint8_t address);
+  static Writer * lookup (uint8_t address);
 };
 
 class Reader {
+private:
+  bool m_bEncoded;
+  bool m_bConsole;
+protected:
+  MessageHandler * m_handler;
+
 public:
-  inline void update () {
+  Reader () :
+    m_bEncoded(false),
+    m_bConsole(true),
+    m_handler(0)
+  {
     // ...
   }
+
+  virtual ~Reader () {
+    // ...
+  }
+
+  inline bool encoded () const {
+    return m_bEncoded;
+  }
+  inline void set_encoded (bool bEncoded) {
+    m_bEncoded = bEncoded;
+  }
+  inline bool console () const {
+    return m_bConsole;
+  }
+  inline void set_console (bool bConsole) {
+    m_bConsole = bConsole;
+  }
+
+  inline void set_handler (MessageHandler * handler) {
+    m_handler = handler;
+  }
+
+  virtual void update () = 0;
 };
 
 class Channel {
@@ -138,9 +177,9 @@ public:
   Writer * writer;
   Reader * reader;
 
-  Channel (Writer * W) :
+  Channel (Writer * W, Reader * R) :
     writer(W),
-    reader(0)
+    reader(R)
   {
     // ...
   }
@@ -149,18 +188,32 @@ public:
     // ...
   }
 
+  inline void set_encoded (bool bEncoded) {
+    if (writer) writer->set_encoded (bEncoded);
+    if (reader) reader->set_encoded (bEncoded);
+  }
+  inline void set_console (bool bConsole) {
+    if (writer) writer->set_console (bConsole);
+    if (reader) reader->set_console (bConsole);
+  }
+
   inline void update () {
     if (writer) writer->update ();
     if (reader) reader->update ();
   }
+
+  static void init_all ();
+  static void update_all ();
 };
 
 class Message {
 public:
   enum MessageType {
-    Text_Command  = 0,
-    Text_Response = 1,
-    Text_Error    = 2
+    Raw_Data       = 0,
+    User_Interrupt = 1,
+    Text_Command   = 2,
+    Text_Response  = 3,
+    Text_Error     = 4
   };
 
   enum COBS_State {
@@ -202,15 +255,17 @@ public:
   inline uint8_t get_length () const {
     return buffer[3];
   }
-private:
   inline uint8_t * get_buffer () {
     return buffer + 4;
   }
-public:
+  inline const char * c_str () const {
+    return (const char *) (buffer + 4);
+  }
   inline void clear () {
     offset = 0;
     cobsin = 0;
     set_length (0);
+    buffer[4] = 0;
   }
 
   Message (uint8_t address_src, uint8_t address_dest, MessageType type = Text_Response) : 
@@ -221,11 +276,14 @@ public:
     set_address_dest (address_dest);
     set_type (type);
     set_length (0);
+    buffer[4] = 0;
   }
 
   ~Message () {
     // ...
   }
+
+  Message & operator-- ();
 
   Message & operator+= (uint8_t uc);
   Message & operator+= (const char * right);
@@ -259,6 +317,25 @@ public:
   ~MessageTask ();
 
   virtual bool update (Writer & W);
+};
+
+class Network : public MessageHandler {
+private:
+  uint8_t m_ports[63];
+
+public:
+  Network ();
+
+  ~Network () {
+    // 
+  }
+
+  int get_channel (uint8_t address) const; // returns channel number (0-6), or -1 if none set, for address (1-126)
+
+  void set_channel (uint8_t address, uint8_t channel); // returns channel number (0-6) for address (1-126)
+
+  virtual void message_received (Message & message);
+  virtual void interrupt (Message & message);
 };
 
 #endif /* !ArduinoHello_comms_hh */

@@ -81,12 +81,14 @@ static CommandStatus s_command (Message & response, const ArgList & Args) { // c
 }
 
 void PinManager::input_callbacks (CommandStatus (*user_command_callback) (Message & response, const ArgList & Args),
-				  void (*user_interrupt_callback) ())
+				  void (*user_interrupt_callback) (Message & response))
 {
   user_command = user_command_callback;
 
-  set_user_interrupt (user_interrupt_callback);
-  set_user_command (s_command);
+  Command * C = Command::command ();
+
+  C->set_user_interrupt (user_interrupt_callback);
+  C->set_user_command (s_command);
 }
 
 void PinManager::update (void (*notification_handler) (int pin_no, bool bDigital)) {

@@ -14,13 +14,6 @@
  */
 extern void echo (bool bOn);
 
-/* I/O handling & nput parsing
- */
-extern void io_setup (); // call from main setup() function
-extern void io_check (); // check for input, and handle as necessary; update output streams also
-
-extern void input_reset (); // reset the input buffer
-
 enum CommandStatus {
   cs_Okay = 0,
   cs_UnknownCommand,
@@ -64,14 +57,13 @@ inline bool operator== (const Arg & lhs, const char * rhs) {
 
 class ArgList {
 private:
-  char m_buffer[MESSAGE_MAXSIZE+1]; // i.e., 251
-
+  char * m_buffer;
   char * m_args[INPUT_MAXARGS]; // i.e., 32
 
   uint8_t m_count;
 
 public:
-  ArgList (const char * buffer, uint8_t size);
+  ArgList (Message & message);
 
   ~ArgList () {
     // ...
@@ -86,10 +78,41 @@ public:
   }
 };
 
-/* Set callback functions for user command & interrupt
- */
-extern void set_user_interrupt (void (*user_interrupt) ());
-extern void set_user_command (CommandStatus (*user_command) (Message & response, const ArgList & Args));
+class Command : public MessageHandler {
+private:
+  Message m_response;
+
+  CommandStatus (*m_user_command) (Message & response, const ArgList & Args);
+
+  void (*m_user_interrupt) (Message & response);
+
+public:
+  Command () :
+    m_response(0,0,Message::Text_Response), // to fix later
+    m_user_command(0),
+    m_user_interrupt(0)
+  {
+    // ...
+  }
+
+  ~Command () {
+    // ...
+  }
+
+  /* Set callback functions for user command & interrupt
+   */
+  inline void set_user_command (CommandStatus (*user_command) (Message & response, const ArgList & Args)) {
+    m_user_command = user_command;
+  }
+  inline void set_user_interrupt (void (*user_interrupt) (Message & response)) {
+    m_user_interrupt = user_interrupt;
+  }
+
+  virtual void message_received (Message & message);
+  virtual void interrupt (Message & message);
+
+  static Command * command ();
+};
 
 #endif /* !ArduinoHello_util_hh */
 

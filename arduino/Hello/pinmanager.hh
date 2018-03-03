@@ -24,7 +24,7 @@ public:
 
   /* Allow PinManager to intercept and handle user's commands, and then forward any that are not recognised
    */  
-  void input_callbacks (CommandStatus (*user_command_callback) (Message & response, const ArgList & Args), void (*user_interrupt_callback) ());
+  void input_callbacks (CommandStatus (*user_command_callback) (Message & response, const ArgList & Args), void (*user_interrupt_callback) (Message & response));
 
   /* call at the start of each loop iteration
    */

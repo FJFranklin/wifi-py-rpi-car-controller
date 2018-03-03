@@ -6,7 +6,7 @@
 #include "pinmanager.hh"
 
 CommandStatus  user_command (Message & response, const ArgList & Args);
-void           user_interrupt ();
+void           user_interrupt (Message & response);
 void           notification (int pin_no, bool bDigital);
 
 void           time_check ();
@@ -58,7 +58,7 @@ CommandStatus user_command (Message & response, const ArgList & Args) {
   return cs;
 }
 
-void user_interrupt () {
+void user_interrupt (Message & /* response */) {
   // ...
 }
 
@@ -103,18 +103,16 @@ void time_check () {
 }
 
 void setup () {
-  io_setup ();
+  Channel::init_all ();
 
   /* Instantiate PinManager and set the input callbacks 
    */
   PM = PinManager::manager ();
   PM->input_callbacks (user_command, user_interrupt);
 
-  Message response(local_address, input_default);
-  response.pgm (s_hello);
-  response.send ();
-
-  input_reset ();
+  // Message response(local_address, input_default);
+  // response.pgm (s_hello);
+  // response.send ();
 
   time_flags = 0;
   time_1ms = 0;
@@ -169,5 +167,5 @@ void loop () { // approximately 178 loops per millisecond on the Uno when idling
     return;
   }
 
-  io_check (); // check & handle any input/output
+  Channel::update_all ();
 }
