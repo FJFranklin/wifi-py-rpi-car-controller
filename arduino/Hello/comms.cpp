@@ -382,3 +382,28 @@ bool MessageTask::update (Writer & W) { // returns true when task complete
 
   return bComplete;
 }
+
+bool PGMListTask::update (Writer & W) { // returns true when task complete
+  if (!pgm_str_ptr) return true;
+  if (!*pgm_str_ptr) return true;
+
+  message.clear ();
+  message.pgm (*pgm_str_ptr++);
+
+  Message::MessageType type = message.get_type ();
+
+  if (W.console ()) {
+    message += "\r\n";
+  }
+
+  uint8_t * data_buffer = message.get_buffer ();
+
+  int length = (int) message.get_length ();
+
+  if (W.encoded ()) {
+    message.encode (data_buffer, length); // this provides values for data_buffer and length
+  }
+  W.add (new MessageTask(address_src, address_dest, type, data_buffer, length, false /* don't copy data */));
+
+  return false;
+}

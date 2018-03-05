@@ -109,8 +109,10 @@ public:
   Message & append_int (int i);          // change number to string, and append
   Message & append_hex (uint8_t i);      // change number to string, and append
 
-#ifndef COBS_USER // Not for the Arduino
+#ifndef COBS_USER // For the Arduino
   Message & pgm (const char * str);      // append string stored in PROGMEM
+
+  void pgm_list (const char ** list);    // send list of text messages stored in PROGMEM
 #endif
 
   void send ();

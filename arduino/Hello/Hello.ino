@@ -28,6 +28,8 @@ unsigned char time_10ms;
 unsigned char time_100ms;
 unsigned long time_1s;
 
+static bool bHeartbeat = true;
+
 /* input_check() feeds any input back to user_command() via PinManager as an array of strings
  */
 CommandStatus user_command (Message & response, const ArgList & Args) {
@@ -41,6 +43,14 @@ CommandStatus user_command (Message & response, const ArgList & Args) {
   } else if (first.equals ("help", false)) { // false => ignore case
     response.pgm (s_hello);
     response.send ();
+  } else if (first == "heartbeat") {
+    if (Args.count () > 1) {
+       if (Args[1] == "on") {
+         bHeartbeat = true;
+       } else {
+         bHeartbeat = false;
+       }
+    }
   } else { // mainly for debugging purposes, write out the arguments
     response.set_type (Message::Text_Error);
     for (int arg = 0; arg < Args.count (); arg++) {
@@ -152,10 +162,12 @@ void loop () { // approximately 178 loops per millisecond on the Uno when idling
   }
 
   if (time_flags & LOOPTIME_100ms) { // things to do roughly every 100 milliseconds
-    if ((time_100ms == 0) || (time_100ms == 3))
-      PM->cmd_led (true);
-    else
-      PM->cmd_led (false);
+    if (bHeartbeat) {
+      if ((time_100ms == 0) || (time_100ms == 3))
+        PM->cmd_led (true);
+      else
+        PM->cmd_led (false);
+    }
     // ...
     time_flags &= ~LOOPTIME_100ms;
     return;

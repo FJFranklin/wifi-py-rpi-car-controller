@@ -6,23 +6,9 @@
 #include "util.hh"
 #include "pinservo.hh"
 
-static const char s_usage_minmax[] PROGMEM = "servo <pin#2-13> minmax <min.us [544]> <max.us [2400]>";
-static const char s_usage_angle[] PROGMEM  = "servo <pin#2-13> angle <0-180 [90]>";
-static const char s_usage_us[] PROGMEM     = "servo <pin#2-13> microseconds <microseconds>";
-static const char s_usage_on[] PROGMEM     = "servo <pin#2-13> on";
-static const char s_usage_off[] PROGMEM    = "servo <pin#2-13> off";
-
 static const char s_servo_re_minmax[] PROGMEM = "servo: minmax values out of range (500 <= min < max <= 2500)";
 static const char s_servo_re_angle[] PROGMEM  = "servo: angle value out of range (0 <= value <= 180)";
 static const char s_servo_re_us[] PROGMEM     = "servo: microseconds value out of range (10 <= value < 10000)";
-
-void PinServo::help (Message & response) {
-  response.pgm(s_usage_minmax).send ();
-  response.pgm(s_usage_angle).send ();
-  response.pgm(s_usage_us).send ();
-  response.pgm(s_usage_on).send ();
-  response.pgm(s_usage_off).send ();
-}
 
 PinServo::PinServo (int pin_no) :
   m_pin_no(pin_no),
@@ -100,8 +86,6 @@ CommandStatus PinServo::command (Message & response, const ArgList & Args) {
 	cs = cs_IncorrectUsage;
       }
     } else {
-      response.set_type (Message::Text_Error);
-      response.pgm(s_usage_minmax).send (); // "usage 1: servo <pin#2-13> minmax <min.us [544]> <max.us [2400]>";
       cs = cs_IncorrectUsage;
     }
   } else if (third == "angle") { // must be 0-180
@@ -117,8 +101,6 @@ CommandStatus PinServo::command (Message & response, const ArgList & Args) {
 	cs = cs_IncorrectUsage;
       }
     } else {
-      response.set_type (Message::Text_Error);
-      response.pgm(s_usage_angle).send (); // "usage 2: servo <pin#2-13> angle <0-180 [90]>";
       cs = cs_IncorrectUsage;
     }
   } else if (third == "microseconds") { // add some limits for safety & sanity
@@ -134,8 +116,6 @@ CommandStatus PinServo::command (Message & response, const ArgList & Args) {
 	cs = cs_IncorrectUsage;
       }
     } else {
-      response.set_type (Message::Text_Error);
-      response.pgm(s_usage_us).send (); // "usage 3: servo <pin#2-13> microseconds <microseconds>";
       cs = cs_IncorrectUsage;
     }
   } else if (third == "on") {

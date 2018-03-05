@@ -20,8 +20,6 @@ private:
   bool m_bAngle; // true if set by angle; false if set exactly
 
 public:
-  static void help (Message & response);
-
   PinServo (int pin_no);
 
   ~PinServo ();

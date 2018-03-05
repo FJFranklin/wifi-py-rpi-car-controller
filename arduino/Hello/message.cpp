@@ -7,11 +7,11 @@
 #include <cstdio>
 typedef unsigned char uint8_t;
 extern void cobs_user_send (uint8_t * data_buffer, int length);
+#include "message.hh"
 #else
 #include <Arduino.h>
+#include "comms.hh"
 #endif
-
-#include "message.hh"
 
 Message & Message::append_lu (unsigned long i) { // change number to string, and append
   static char buffer[12];
@@ -34,7 +34,8 @@ Message & Message::append_hex (uint8_t i) { // change number to string, and appe
   return *this;
 }
 
-#ifndef COBS_USER // Not for the Arduino
+#ifndef COBS_USER // For the Arduino
+
 Message & Message::pgm (const char * str) { // append string stored in PROGMEM
   if (str) {
     while (true) {
@@ -45,6 +46,18 @@ Message & Message::pgm (const char * str) { // append string stored in PROGMEM
   }
   return *this;
 }
+
+void Message::pgm_list (const char ** list) { // send list of text messages stored in PROGMEM
+  uint8_t address_src  = get_address_src ();
+  uint8_t address_dest = get_address_dest ();
+
+  Writer * W = Writer::lookup (address_dest);
+
+  if (W) {
+    W->add (new PGMListTask(address_src, address_dest, list));
+  }
+}
+
 #endif
 
 void Message::send () {

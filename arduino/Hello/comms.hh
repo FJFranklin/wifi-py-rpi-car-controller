@@ -220,6 +220,27 @@ public:
   virtual bool update (Writer & W);
 };
 
+class PGMListTask : public Task {
+public:
+  Message message;
+
+  const char ** pgm_str_ptr;
+
+  PGMListTask (uint8_t address_src, uint8_t address_dest, const char ** list) :
+    Task(Task::p_Low, address_src, address_dest),
+    message(address_src, address_dest, Message::Text_Response),
+    pgm_str_ptr(list)
+  {
+    // ...
+  }
+
+  ~PGMListTask () {
+    // ...
+  }
+
+  virtual bool update (Writer & W);
+};
+
 class Network : public MessageHandler {
 private:
   uint8_t m_ports[63];

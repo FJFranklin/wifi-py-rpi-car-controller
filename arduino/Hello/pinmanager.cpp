@@ -15,16 +15,63 @@ static const char s_usage_help[] PROGMEM = "help [all|servo]";
 static const char s_usage_echo[] PROGMEM = "echo on|off";
 static const char s_usage_addr[] PROGMEM = "address [<address>]";
 static const char s_usage_list[] PROGMEM = "list [digital|analog]";
+static const char s_usage_led[] PROGMEM  = "led on|off";
+
 static const char s_usage_dclr[] PROGMEM = "dclr [<pin#2-13>]*";
 static const char s_usage_dout[] PROGMEM = "dout [[~]<pin#2-13>]*";
 static const char s_usage_din[] PROGMEM  = "din [<pin#2-12>]*";
 static const char s_usage_dup[] PROGMEM  = "dup [[~]<pin#2-12>]*";
-static const char s_usage_led[] PROGMEM  = "led on|off";
+
+static const char s_usage_minmax[] PROGMEM = "servo <pin#2-13> minmax <min.us [544]> <max.us [2400]>";
+static const char s_usage_angle[] PROGMEM  = "servo <pin#2-13> angle <0-180 [90]>";
+static const char s_usage_us[] PROGMEM     = "servo <pin#2-13> microseconds <microseconds>";
+static const char s_usage_on[] PROGMEM     = "servo <pin#2-13> on";
+static const char s_usage_off[] PROGMEM    = "servo <pin#2-13> off";
 
 static const char s_usage_pwm_on_off[] PROGMEM = "pwm <pin#3,5-6,9-11> on|off";
 static const char s_usage_pwm_duty[] PROGMEM   = "pwm <pin#3,5-6,9-11> duty <0-255>";
 
 static const char s_err_help[] PROGMEM   = "help: expected one of: \"all\", \"digital\", \"servo\", \"pwm\"";
+
+static const char * s_help_all[] = {
+  s_usage_help,
+  s_usage_echo,
+  s_usage_addr,
+  s_usage_list,
+  s_usage_led,
+  s_usage_dclr,
+  s_usage_dout,
+  s_usage_din,
+  s_usage_dup,
+  s_usage_minmax,
+  s_usage_angle,
+  s_usage_us,
+  s_usage_on,
+  s_usage_off,
+  s_usage_pwm_on_off,
+  s_usage_pwm_duty,
+  0
+};
+static const char * s_help_digital[] = {
+  s_usage_dclr,
+  s_usage_dout,
+  s_usage_din,
+  s_usage_dup,
+  0
+};
+static const char * s_help_servo[] = {
+  s_usage_minmax,
+  s_usage_angle,
+  s_usage_us,
+  s_usage_on,
+  s_usage_off,
+  0
+};
+static const char * s_help_pwm[] = {
+  s_usage_pwm_on_off,
+  s_usage_pwm_duty,
+  0
+};
 
 static PinManager * s_PM = 0;
 
@@ -128,31 +175,21 @@ CommandStatus PinManager::command (Message & response, const ArgList & Args) {
 
     if (argc > 1) {
       Arg second = Args[1];
-      bool bAll = false;
 
       if (second == "all") {
-	response.pgm(s_usage_help).send ();
-	response.pgm(s_usage_echo).send ();
-	response.pgm(s_usage_addr).send ();
-	response.pgm(s_usage_list).send ();
-	response.pgm(s_usage_led).send ();
-	bAll = true;
+	response.pgm_list (s_help_all);
 	cs = cs_Okay;
       }
-      if (bAll || (second == "digital")) {
-	response.pgm(s_usage_dclr).send ();
-	response.pgm(s_usage_dout).send ();
-	response.pgm(s_usage_din).send ();
-	response.pgm(s_usage_dup).send ();
+      if (second == "digital") {
+	response.pgm_list (s_help_digital);
 	cs = cs_Okay;
       }
-      if (bAll || (second == "servo")) {
-	PinServo::help (response);
+      if (second == "servo") {
+	response.pgm_list (s_help_servo);
 	cs = cs_Okay;
       }
-      if (bAll || (second == "pwm")) {
-	response.pgm(s_usage_pwm_on_off).send ();
-	response.pgm(s_usage_pwm_duty).send ();
+      if (second == "pwm") {
+	response.pgm_list (s_help_pwm);
 	cs = cs_Okay;
       }
     }
