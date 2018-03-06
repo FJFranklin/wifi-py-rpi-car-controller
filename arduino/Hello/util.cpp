@@ -58,46 +58,54 @@ static Command * s_command_ptr = 0;
 Command * Command::command () {
   if (!s_command_ptr) {
     s_command_ptr = &s_command;
-    channels[CHANNEL_CONSOLE]->reader->set_handler (s_command_ptr);
+    Network::network().set_handler (s_command_ptr);
   }
   return s_command_ptr;
 }
 
 void Command::message_received (Message & message) {
-  if (m_user_command && (message.get_type () == Message::Text_Command) && message.get_length ()) {
-    m_response.clear ();
-    m_response.set_address_src (message.get_address_dest ());
-    m_response.set_address_dest (message.get_address_src ());
-    m_response.set_type (Message::Text_Response);
+  m_response.clear ();
+  m_response.set_address_src (message.get_address_dest ());
+  m_response.set_address_dest (message.get_address_src ());
 
-    ArgList Args(message);
+  switch (message.get_type ()) {
 
-    if (Args.count () && m_user_command) {
-      CommandStatus cs = m_user_command (m_response, Args);
+  case Message::Text_Command:
 
-      if (cs != cs_Okay) {
-	m_response.clear ();
-	m_response.set_type (Message::Text_Error);
+    if (m_user_command && message.get_length ()) {
+      m_response.set_type (Message::Text_Response);
 
-	if (cs == cs_InvalidPin) {
-	  m_response.pgm (s_err_pin_no);
-	} else if (cs == cs_IncorrectUsage) {
-	  m_response.pgm (s_err_usage);
-	} else {
-	  m_response.pgm (s_err_command);
+      ArgList Args(message);
+
+      if (Args.count () && m_user_command) {
+	CommandStatus cs = m_user_command (m_response, Args);
+
+	if (cs != cs_Okay) {
+	  m_response.clear ();
+	  m_response.set_type (Message::Text_Error);
+
+	  if (cs == cs_InvalidPin) {
+	    m_response.pgm (s_err_pin_no);
+	  } else if (cs == cs_IncorrectUsage) {
+	    m_response.pgm (s_err_usage);
+	  } else {
+	    m_response.pgm (s_err_command);
+	  }
+	  m_response.send ();
 	}
-	m_response.send ();
       }
     }
-  }
-}
+    break;
 
-void Command::interrupt (Message & message) {
-  if (m_user_interrupt) {
-    m_response.clear ();
-    m_response.set_address_src (message.get_address_dest ());
-    m_response.set_address_dest (message.get_address_src ());
-    m_response.set_type (message.get_type ());
-    m_user_interrupt (m_response);
+  case Message::User_Interrupt:
+
+    if (m_user_interrupt) {
+      m_response.set_type (Message::Text_Response);
+      m_user_interrupt (m_response);
+    }
+    break;
+
+  default:
+    break;
   }
 }

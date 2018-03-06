@@ -78,7 +78,7 @@ void Message::send () {
   if (W) {
     MessageType type = get_type ();
 
-    if (W->console ()) {
+    if (W->console () && !W->encoded ()) {
       *this += "\r\n";
     }
 
@@ -172,7 +172,9 @@ Message::COBS_State Message::decode (uint8_t c) {
     buffer[offset++] = c;
   } else {
     cobsin = c - 1;
-    buffer[offset++] = 0;
+    if (offset) {
+      buffer[offset++] = 0;
+    }
   }
   return cobs_InProgress;
 }
@@ -194,6 +196,7 @@ void Message::encode (uint8_t *& bytes, int & size) {
       ++count;
     }
     if (ptr1 == buffer) {
+      *--ptr2 = ++count;
       break;
     }
     --ptr1;

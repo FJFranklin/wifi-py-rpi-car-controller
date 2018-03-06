@@ -109,10 +109,8 @@ public:
   }
 
   virtual void message_received (Message & message);
-  virtual void interrupt (Message & message);
 
   static Command * command ();
 };
 
 #endif /* !ArduinoHello_util_hh */
-

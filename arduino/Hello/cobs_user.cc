@@ -10,6 +10,7 @@
 
 #include <fcntl.h>
 #include <unistd.h>
+#include <errno.h>
 #include <sys/types.h>
 
 typedef unsigned char uint8_t;
@@ -17,7 +18,8 @@ typedef unsigned char uint8_t;
 #include "message.hh"
 
 uint8_t address_src  = 0x7f;
-uint8_t address_dest = 0;
+uint8_t address_dest = 0x7f;
+uint8_t broadcast    = 0x80;
 
 int device_fd = -1;
 
@@ -74,8 +76,12 @@ int main (int argc, char ** argv) {
   while (true) { // TODO: implement a timeout
     int count = read (device_fd, buffer, 1);
     if (count < 0) {
-      fprintf (stderr, "Failed to read from device \"%s\" - exiting.\n", device);
-      break;
+      if (errno == EAGAIN) {
+	continue;
+      } else {
+	fprintf (stderr, "Failed to read from device \"%s\" - exiting.\n", device);
+	break;
+      }
     } else if (count == 0) {
       continue;
     }
@@ -91,12 +97,13 @@ int main (int argc, char ** argv) {
 	fprintf (stderr, "Broadcasting address.\n");
 
 	to_send.set_address_src (address_src);
-	to_send.set_address_dest (address_dest);
+	to_send.set_address_dest (broadcast);
 	to_send.set_type (Message::Broadcast_Address);
 	to_send.send ();
 
 	fprintf (stderr, "Sending ping...");
 
+	to_send.set_address_dest (address_dest);
 	to_send.set_type (Message::Ping);
 	to_send.send ();
       }

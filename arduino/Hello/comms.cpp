@@ -10,29 +10,39 @@
 
 Channel * channels[CHANNEL_COUNT];
 
-uint8_t local_address;     // Get from EEPROM; shuold be unique & in range 0x01-0x7f
+uint8_t local_address;     // Get from EEPROM; shuold be unique & in range 0x01-0x7e
 uint8_t input_default = 0; // default address for normal responses is 0, which is just Serial
 
 static uint8_t s_pkt_default;                        // default address for packet responses is (local_address | 0x80)
 static uint8_t s_broadcast = (input_default | 0x80); // broadcast address, i.e., 0x80
+static uint8_t s_unknown   = 0x7f;                   // temporary address for external connections
 
 Network s_net;
 
-Network::Network () {
-  for (uint8_t p = 0; p < 63; p++) {
+Network & Network::network () {
+  return s_net;
+}
+
+Network::Network () :
+  m_handler(0)
+{
+  for (uint8_t p = 0; p < 64; p++) {
     m_ports[p] = 0xff;
   }
 }
 
 int Network::get_channel (uint8_t address) const { // returns channel number (0-6), or -1 if none set, for address (1-126)
+  if (address == s_broadcast) { // error - handle broadcast elsewhere
+    return -1;
+  }
   address &= 0x7f; // ignore the 8th bit
 
-  uint8_t index = (address - 1) >> 1;
-  bool bLowNibble = address & 1;
+  uint8_t index = address >> 1;
+  bool bHighNibble = address & 1;
 
   uint8_t channel = m_ports[index];
 
-  if (bLowNibble) {
+  if (!bHighNibble) {
     channel &= 0x0f;
   } else {
     channel = (channel & 0xf0) >> 4;
@@ -41,13 +51,17 @@ int Network::get_channel (uint8_t address) const { // returns channel number (0-
 }
 
 void Network::set_channel (uint8_t address, uint8_t channel) { // returns channel number (0-6) for address (1-126)
+  if (address == s_broadcast) { // ignore
+    return;
+  }
+
   if (channel < CHANNEL_COUNT) {
     address &= 0x7f; // ignore the 8th bit
 
-    uint8_t index = (address - 1) >> 1;
-    bool bLowNibble = address & 1;
+    uint8_t index = address >> 1;
+    bool bHighNibble = address & 1;
 
-    if (bLowNibble) {
+    if (!bHighNibble) {
       m_ports[index] = (m_ports[index] & 0xf0) | channel;
     } else {
       m_ports[index] = (m_ports[index] & 0x0f) | (channel << 4);
@@ -55,12 +69,58 @@ void Network::set_channel (uint8_t address, uint8_t channel) { // returns channe
   }
 }
 
-void Network::message_received (Message & message) {
-  // TODO
-}
+void Network::message_received (uint8_t channel_number, Message & message) {
+  uint8_t address_src  = message.get_address_src ();
+  uint8_t address_dest = message.get_address_dest ();
 
-void Network::interrupt (Message & message) {
-  // TODO
+  if (address_src != s_unknown) {
+    set_channel (address_src, channel_number);
+  }
+
+  if (address_dest == local_address) {
+    switch (message.get_type ()) { // handle special cases, or pass along
+
+    case Message::Raw_Data:
+    case Message::Request_Address:
+    case Message::Supply_Address:
+    case Message::Broadcast_Address:
+    case Message::Text_Response:
+    case Message::Text_Error:
+      // shouldn't be here
+      break;
+
+    case Message::Ping:
+      message.clear ();
+      message.set_address_src (address_dest);
+      message.set_address_dest (address_src);
+      message.set_type (Message::Pong);
+      message.send ();
+      break;
+
+    case Message::No_Route:
+      // TODO: remove from ports list + ??
+    default:
+      if (m_handler) {
+	m_handler->message_received (message);
+      }
+      break;
+    }
+  } else if (address_dest == s_broadcast) {
+    if (message.get_type () == Message::Broadcast_Address) {
+      // TODO: propagate
+    } // else { // do nothing }
+  } else if (address_dest == s_unknown) {
+    if (message.get_type () == Message::Request_Address) { // an external connection requesting an address
+      set_channel (local_address | 0x80, channel_number);
+      message.clear ();
+      message.set_address_src (local_address);
+      message.set_address_dest (local_address | 0x80);
+      message.set_type (Message::Supply_Address);
+      message.send ();
+    } // else { // do nothing }
+  } else { // this message is just passing through; send it on its way...
+    message.send ();
+  }
 }
 
 void Writer::update () {
@@ -104,7 +164,8 @@ private:
   Stream & m_serial;
 
 public:
-  SerialWriter (Stream & serial) :
+  SerialWriter (Stream & serial, uint8_t channel_number) :
+    Writer(channel_number),
     m_serial(serial)
   {
     // ...
@@ -137,7 +198,8 @@ private:
   Stream & m_serial;
 
 public:
-  SerialReader (Stream & serial) :
+  SerialReader (Stream & serial, uint8_t channel_number) :
+    Reader(channel_number),
     m_input(0,0,Message::Text_Command), // Message addresses & type to be fixed later
     m_serial(serial)
   {
@@ -149,20 +211,28 @@ public:
   }
 private:
   void push_encoded (uint8_t c) {
-    // TODO
+    if (m_input.decode (c) == Message::cobs_HavePacket) { // we have a valid response
+      s_net.message_received (m_channel_number, m_input);
+
+      m_input.clear ();
+    }
   }
   void push_console (uint8_t c) {
-    if ((c == 10) || (c == 13)) { // newline || carriage return
+    if (c == 0) { // looks like an encoded stream
+      channels[m_channel_number]->set_encoded (true);
+      m_input.clear ();
+    } else if ((c == 10) || (c == 13)) { // newline || carriage return
       m_serial.write (c);
 
-      m_input.set_address_src (input_default);
-      m_input.set_address_dest (local_address);
-      m_input.set_type (Message::Text_Command);
+      if (m_input.get_length ()) {
+	m_input.set_address_src (input_default);
+	m_input.set_address_dest (local_address);
+	m_input.set_type (Message::Text_Command);
 
-      if (m_handler) {
-	m_handler->message_received (m_input);
+	s_net.message_received (m_channel_number, m_input);
+
+	m_input.clear ();
       }
-      m_input.clear ();
     } else if (c == 3) { // ^C
       m_input.clear ();
 
@@ -170,9 +240,8 @@ private:
       m_input.set_address_dest (local_address);
       m_input.set_type (Message::User_Interrupt);
 
-      if (m_handler) {
-	m_handler->interrupt (m_input);
-      }
+      s_net.message_received (m_channel_number, m_input);
+
       m_serial.print ("\r\n");
     } else if (c == 127) { // delete
       if (m_input.get_length () > 0) { // otherwise just ignore
@@ -225,38 +294,38 @@ public:
 };
 
 #ifdef ENABLE_CHANNEL_0
-static SerialWriter SW_0(Serial);
-static SerialReader SR_0(Serial);
+static SerialWriter SW_0(Serial,0);
+static SerialReader SR_0(Serial,0);
 static Channel s_channel_0(&SW_0, &SR_0);
 #endif
 #ifdef ENABLE_CHANNEL_1
-static SerialWriter SW_1(Serial1);
-static SerialReader SR_1(Serial1);
+static SerialWriter SW_1(Serial1,1);
+static SerialReader SR_1(Serial1,1);
 static Channel s_channel_1(&SW_1, &SR_1);
 #endif
 #ifdef ENABLE_CHANNEL_2
-static SerialWriter SW_2(Serial2);
-static SerialReader SR_2(Serial2);
+static SerialWriter SW_2(Serial2,2);
+static SerialReader SR_2(Serial2,2);
 static Channel s_channel_2(&SW_2, &SR_2);
 #endif
 #ifdef ENABLE_CHANNEL_3
-static SerialWriter SW_3(Serial3);
-static SerialReader SR_3(Serial3);
+static SerialWriter SW_3(Serial3,3);
+static SerialReader SR_3(Serial3,3);
 static Channel s_channel_3(&SW_3, &SR_3);
 #endif
 #ifdef ENABLE_CHANNEL_4
-static SerialWriter SW_4(Serial4);
-static SerialReader SR_4(Serial4);
+static SerialWriter SW_4(Serial4,4);
+static SerialReader SR_4(Serial4,4);
 static Channel s_channel_4(&SW_4, &SR_4);
 #endif
 #ifdef ENABLE_CHANNEL_5
-static SerialWriter SW_5(Serial5);
-static SerialReader SR_5(Serial5);
+static SerialWriter SW_5(Serial5,5);
+static SerialReader SR_5(Serial5,5);
 static Channel s_channel_5(&SW_5, &SR_5);
 #endif
 #ifdef ENABLE_CHANNEL_6
-static SerialWriter SW_6(Serial6);
-static SerialReader SR_6(Serial6);
+static SerialWriter SW_6(Serial6,6);
+static SerialReader SR_6(Serial6,6);
 static Channel s_channel_6(&SW_6, &SR_6);
 #endif
 
@@ -324,10 +393,6 @@ Writer * Writer::lookup (uint8_t address) {
   }
   if (address == s_broadcast) {   // handle broadcast messages elsewhere
     return 0;
-  }
-
-  if (address == input_default) { // default address for normal responses
-    return channels[CHANNEL_CONSOLE]->writer;
   }
 
   /* Otherwise, need to work out which channel to send the messages to... // TODO // FIXME

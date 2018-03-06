@@ -20,7 +20,6 @@
 // #define ENABLE_CHANNEL_6
 #endif /* CORE_TEENSY */
 
-#define CHANNEL_CONSOLE 0 // Default channel for console I/O
 #define CHANNEL_COUNT   7 // Number of serial channels
 
 #define CHANNEL_0_BAUD  115200 // (although may differ in practice if it's a USB connection)
@@ -50,7 +49,6 @@ public:
   }
 
   virtual void message_received (Message & message) = 0;
-  virtual void interrupt (Message & message) = 0;
 };
 
 class Task {
@@ -89,13 +87,16 @@ public:
 class Writer {
 private:
   Task * next;
-
+protected:
+  uint8_t m_channel_number;
+private:
   bool m_bEncoded;
   bool m_bConsole;
 
 public:
-  Writer () :
+  Writer (uint8_t channel_number) :
     next(0),
+    m_channel_number(channel_number),
     m_bEncoded(false),
     m_bConsole(true)
   {
@@ -129,17 +130,20 @@ public:
 };
 
 class Reader {
-private:
-  bool m_bEncoded;
-  bool m_bConsole;
 protected:
   MessageHandler * m_handler;
 
+  uint8_t m_channel_number;
+private:
+  bool m_bEncoded;
+  bool m_bConsole;
+
 public:
-  Reader () :
+  Reader (uint8_t channel_number) :
+    m_handler(0),
+    m_channel_number(channel_number),
     m_bEncoded(false),
-    m_bConsole(true),
-    m_handler(0)
+    m_bConsole(true)
   {
     // ...
   }
@@ -161,7 +165,7 @@ public:
     m_bConsole = bConsole;
   }
 
-  inline void set_handler (MessageHandler * handler) {
+  inline void set_handler (MessageHandler * handler) { // for raw data only; if console or encoded, this handler is ignored
     m_handler = handler;
   }
 
@@ -241,9 +245,11 @@ public:
   virtual bool update (Writer & W);
 };
 
-class Network : public MessageHandler {
+class Network {
 private:
-  uint8_t m_ports[63];
+  MessageHandler * m_handler;
+
+  uint8_t m_ports[64];
 
 public:
   Network ();
@@ -252,12 +258,17 @@ public:
     // 
   }
 
+  inline void set_handler (MessageHandler * handler) {
+    m_handler = handler;
+  }
+
   int get_channel (uint8_t address) const; // returns channel number (0-6), or -1 if none set, for address (1-126)
 
   void set_channel (uint8_t address, uint8_t channel); // returns channel number (0-6) for address (1-126)
 
-  virtual void message_received (Message & message);
-  virtual void interrupt (Message & message);
+  void message_received (uint8_t channel_number, Message & message);
+
+  static Network & network ();
 };
 
 #endif /* !ArduinoHello_comms_hh */
