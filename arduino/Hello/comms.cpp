@@ -21,6 +21,25 @@ Network & Network::network () {
   return s_net;
 }
 
+void Network::broadcast () {
+  uint8_t * data_buffer = 0;
+
+  int length = 0;
+
+  Message message(local_address, ADDRESS_BROADCAST, Message::Broadcast_Address);
+  message.encode (data_buffer, length); // this provides values for data_buffer and length
+
+  for (int ch = 0; ch < CHANNEL_COUNT; ch++) {
+    if (channels[ch]) {
+      Writer * W = channels[ch]->writer;
+
+      if (W->encoded ()) {
+	W->add (new MessageTask(local_address, ADDRESS_BROADCAST, Message::Broadcast_Address, data_buffer, length, true /* copy data */));
+      }
+    }
+  }
+}
+
 Network::Network () :
   m_handler(0)
 {
@@ -105,7 +124,24 @@ void Network::message_received (uint8_t channel_number, Message & message) {
     }
   } else if (address_dest == ADDRESS_BROADCAST) {
     if (message.get_type () == Message::Broadcast_Address) {
-      // TODO: propagate
+      uint8_t * data_buffer = 0;
+
+      int length = 0;
+
+      message.encode (data_buffer, length); // this provides values for data_buffer and length
+
+      for (int ch = 0; ch < CHANNEL_COUNT; ch++) {
+	if (ch == channel_number) {
+	  continue; // don't send it back the way it came
+	}
+	if (channels[ch]) {
+	  Writer * W = channels[ch]->writer;
+
+	  if (W->encoded ()) {
+	    W->add (new MessageTask(address_src, ADDRESS_BROADCAST, Message::Broadcast_Address, data_buffer, length, true /* copy data */));
+	  }
+	}
+      }
     } // else { // do nothing }
   } else if (address_dest == ADDRESS_UNKNOWN) {
     if (message.get_type () == Message::Request_Address) { // an external connection requesting an address
@@ -209,6 +245,7 @@ public:
   }
 private:
   void push_encoded (uint8_t c) {
+    //    Serial.write (c);
     if (m_input.decode (c) == Message::cobs_HavePacket) { // we have a valid response
       s_net.message_received (m_channel_number, m_input);
 
@@ -455,7 +492,7 @@ bool PGMListTask::update (Writer & W) { // returns true when task complete
 
   Message::MessageType type = message.get_type ();
 
-  if (W.console ()) {
+  if (W.console () && !W.encoded ()) {
     message += "\r\n";
   }
 
