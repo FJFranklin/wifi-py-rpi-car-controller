@@ -131,6 +131,11 @@ void setup () {
   time_1s = 0;
 
   last_millis = millis ();
+
+  if (channels[1]) channels[1]->set_encoded (true); // Add serials 1-4 to the network
+  if (channels[2]) channels[2]->set_encoded (true);
+  if (channels[3]) channels[3]->set_encoded (true);
+  if (channels[4]) channels[4]->set_encoded (true);
 }
 
 void notification (int pin_no, bool bDigital) { // passes pin no. & clears notification
@@ -174,6 +179,7 @@ void loop () { // approximately 178 loops per millisecond on the Uno when idling
   }
 
   if (time_flags & LOOPTIME_1s) { // things to do roughly every second
+    Network::network().broadcast ();
     // ...
     time_flags &= ~LOOPTIME_1s;
     return;

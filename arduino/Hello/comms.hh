@@ -268,6 +268,8 @@ public:
 
   void message_received (uint8_t channel_number, Message & message);
 
+  static void broadcast ();
+
   static Network & network ();
 };
 

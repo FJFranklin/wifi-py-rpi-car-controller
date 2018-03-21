@@ -6,6 +6,9 @@
 #ifndef ArduinoHello_message_hh
 #define ArduinoHello_message_hh
 
+#define ADDRESS_UNKNOWN    0x7f
+#define ADDRESS_BROADCAST  0x80
+
 #define MESSAGE_BUFSIZE  256
 #define MESSAGE_MAXSIZE  (MESSAGE_BUFSIZE-6) // maximum message data length is therefore 250 characters
                                              // which must therefore be the maximum allowable path length
@@ -84,7 +87,7 @@ public:
     buffer[4] = 0;
   }
 
-  Message (uint8_t address_src = 0, uint8_t address_dest = 0, MessageType type = Text_Response) : 
+  Message (uint8_t address_src = ADDRESS_UNKNOWN, uint8_t address_dest = ADDRESS_UNKNOWN, MessageType type = Text_Response) : 
     offset(0),
     cobsin(0)
   {

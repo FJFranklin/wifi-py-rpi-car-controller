@@ -13,14 +13,31 @@ Channel * channels[CHANNEL_COUNT];
 uint8_t local_address;     // Get from EEPROM; shuold be unique & in range 0x01-0x7e
 uint8_t input_default = 0; // default address for normal responses is 0, which is just Serial
 
-static uint8_t s_pkt_default;                        // default address for packet responses is (local_address | 0x80)
-static uint8_t s_broadcast = (input_default | 0x80); // broadcast address, i.e., 0x80
-static uint8_t s_unknown   = 0x7f;                   // temporary address for external connections
+static uint8_t s_pkt_default; // default address for packet responses is (local_address | 0x80)
 
 Network s_net;
 
 Network & Network::network () {
   return s_net;
+}
+
+void Network::broadcast () {
+  uint8_t * data_buffer = 0;
+
+  int length = 0;
+
+  Message message(local_address, ADDRESS_BROADCAST, Message::Broadcast_Address);
+  message.encode (data_buffer, length); // this provides values for data_buffer and length
+
+  for (int ch = 0; ch < CHANNEL_COUNT; ch++) {
+    if (channels[ch]) {
+      Writer * W = channels[ch]->writer;
+
+      if (W->encoded ()) {
+	W->add (new MessageTask(local_address, ADDRESS_BROADCAST, Message::Broadcast_Address, data_buffer, length, true /* copy data */));
+      }
+    }
+  }
 }
 
 Network::Network () :
@@ -32,7 +49,7 @@ Network::Network () :
 }
 
 int Network::get_channel (uint8_t address) const { // returns channel number (0-6), or -1 if none set, for address (1-126)
-  if (address == s_broadcast) { // error - handle broadcast elsewhere
+  if (address == ADDRESS_BROADCAST) { // error - handle broadcast elsewhere
     return -1;
   }
   address &= 0x7f; // ignore the 8th bit
@@ -51,7 +68,7 @@ int Network::get_channel (uint8_t address) const { // returns channel number (0-
 }
 
 void Network::set_channel (uint8_t address, uint8_t channel) { // returns channel number (0-6) for address (1-126)
-  if (address == s_broadcast) { // ignore
+  if (address == ADDRESS_BROADCAST) { // ignore
     return;
   }
 
@@ -73,7 +90,7 @@ void Network::message_received (uint8_t channel_number, Message & message) {
   uint8_t address_src  = message.get_address_src ();
   uint8_t address_dest = message.get_address_dest ();
 
-  if (address_src != s_unknown) {
+  if (address_src != ADDRESS_UNKNOWN) {
     set_channel (address_src, channel_number);
   }
 
@@ -105,16 +122,33 @@ void Network::message_received (uint8_t channel_number, Message & message) {
       }
       break;
     }
-  } else if (address_dest == s_broadcast) {
+  } else if (address_dest == ADDRESS_BROADCAST) {
     if (message.get_type () == Message::Broadcast_Address) {
-      // TODO: propagate
+      uint8_t * data_buffer = 0;
+
+      int length = 0;
+
+      message.encode (data_buffer, length); // this provides values for data_buffer and length
+
+      for (int ch = 0; ch < CHANNEL_COUNT; ch++) {
+	if (ch == channel_number) {
+	  continue; // don't send it back the way it came
+	}
+	if (channels[ch]) {
+	  Writer * W = channels[ch]->writer;
+
+	  if (W->encoded ()) {
+	    W->add (new MessageTask(address_src, ADDRESS_BROADCAST, Message::Broadcast_Address, data_buffer, length, true /* copy data */));
+	  }
+	}
+      }
     } // else { // do nothing }
-  } else if (address_dest == s_unknown) {
+  } else if (address_dest == ADDRESS_UNKNOWN) {
     if (message.get_type () == Message::Request_Address) { // an external connection requesting an address
-      set_channel (local_address | 0x80, channel_number);
+      set_channel (s_pkt_default, channel_number);
       message.clear ();
       message.set_address_src (local_address);
-      message.set_address_dest (local_address | 0x80);
+      message.set_address_dest (s_pkt_default);
       message.set_type (Message::Supply_Address);
       message.send ();
     } // else { // do nothing }
@@ -211,6 +245,7 @@ public:
   }
 private:
   void push_encoded (uint8_t c) {
+    //    Serial.write (c);
     if (m_input.decode (c) == Message::cobs_HavePacket) { // we have a valid response
       s_net.message_received (m_channel_number, m_input);
 
@@ -391,7 +426,7 @@ Writer * Writer::lookup (uint8_t address) {
   if (address == local_address) { // don't send anything to ourselves!
     return 0;
   }
-  if (address == s_broadcast) {   // handle broadcast messages elsewhere
+  if (address == ADDRESS_BROADCAST) {   // handle broadcast messages elsewhere
     return 0;
   }
 
@@ -457,7 +492,7 @@ bool PGMListTask::update (Writer & W) { // returns true when task complete
 
   Message::MessageType type = message.get_type ();
 
-  if (W.console ()) {
+  if (W.console () && !W.encoded ()) {
     message += "\r\n";
   }
 

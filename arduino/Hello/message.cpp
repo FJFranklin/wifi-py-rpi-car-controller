@@ -162,6 +162,7 @@ Message::COBS_State Message::decode (uint8_t c) {
       clear ();   // reset
       return cobs_InvalidPacket;
     }
+    buffer[offset] = 0;
     return cobs_HavePacket;
   }
   if (offset >= (MESSAGE_MAXSIZE + 4)) { // packet too long

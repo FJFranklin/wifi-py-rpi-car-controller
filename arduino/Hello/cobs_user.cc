@@ -11,17 +11,55 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+#include <signal.h>
+#include <time.h>
 #include <sys/types.h>
 
 typedef unsigned char uint8_t;
 
 #include "message.hh"
 
-uint8_t address_src  = 0x7f;
-uint8_t address_dest = 0x7f;
-uint8_t broadcast    = 0x80;
+uint8_t addr_self = ADDRESS_UNKNOWN; // our address
+uint8_t addr_host = ADDRESS_UNKNOWN; // address of our host device
 
 int device_fd = -1;
+int verbosity = 0;
+
+const char * text_command = 0;
+
+bool packet (Message & received);
+
+static volatile bool bExit = false;
+
+void interrupt (int /* dummy */) {
+  bExit = true;
+}
+
+bool bTimeout = false;
+
+struct timespec time_zero;
+
+void reset_timeout () {
+  if (bTimeout) {
+    clock_gettime (CLOCK_MONOTONIC, &time_zero);
+  }
+}
+
+bool times_up () {
+  if (!bTimeout) return false;
+
+  struct timespec time_now;
+
+  clock_gettime (CLOCK_MONOTONIC, &time_now);
+
+  if (time_now.tv_sec == time_zero.tv_sec) {
+    return (time_now.tv_nsec - time_zero.tv_nsec) > 200000000L; // 0.2 ms
+  }
+  if (time_now.tv_sec - time_zero.tv_sec == 1) {
+    return (1000000000L + time_now.tv_nsec - time_zero.tv_nsec) > 200000000L; // 0.2 ms
+  }
+  return true;
+}
 
 void cobs_user_send (uint8_t * data_buffer, int length) { // called by Message::send ()
   if (device_fd >= 0) {
@@ -39,22 +77,31 @@ int main (int argc, char ** argv) {
 
   for (int arg = 1; arg < argc; arg++) {
     if (strcmp (argv[arg], "--help") == 0) {
-      fprintf (stderr, "\nstick [--help] [/dev/<ID>]\n\n");
+      fprintf (stderr, "\ncobs_user [--help] [-v] [/dev/<ID>] [--text=<command>]\n\n");
       fprintf (stderr, "  --help     Display this help.\n");
+      fprintf (stderr, "  -v         Increase verbosity of reporting.\n");
       fprintf (stderr, "  /dev/<ID>  Connect to /dev/<ID> instead of default [/dev/ttyACM0].\n\n");
       return 0;
     }
-    if (strncmp (argv[arg], "/dev/", 5) == 0) {
+    if (strcmp (argv[arg], "-v") == 0) {
+      ++verbosity;
+    } else if (strncmp (argv[arg], "--text=", 7) == 0) {
+      text_command = argv[arg] + 7;
+      bTimeout = true;
+    } else if (strncmp (argv[arg], "/dev/", 5) == 0) {
       device = argv[arg];
     } else {
-      fprintf (stderr, "stick [--help] [/dev/<ID>]\n");
+      fprintf (stderr, "cobs_user [--help] [-v] [/dev/<ID>] [--text=<command>]\n");
       return -1;
     }
   }
 
+  signal (SIGINT, interrupt);
+
   /* set up serial
    */
-  fprintf (stderr, "Opening \"%s\"...\n", device);
+  if (verbosity)
+    fprintf (stderr, "Opening \"%s\"...\n", device);
 
   device_fd = open (device, O_RDWR | O_NOCTTY | O_NONBLOCK /* O_NDELAY */);
   if (device_fd == -1) {
@@ -68,12 +115,20 @@ int main (int argc, char ** argv) {
 
   while (read (device_fd, buffer, 1) == 1); // empty the input buffer
 
-  Message to_send(address_src, address_dest, Message::Request_Address);
-  to_send.send ();
+  if (verbosity)
+    fprintf (stderr, "Requesting address...\n");
+
+  Message(addr_self, addr_host, Message::Request_Address).send ();
 
   Message received;
 
-  while (true) { // TODO: implement a timeout
+  reset_timeout ();
+
+  while (!bExit) { // TODO: implement a timeout
+    if (times_up ()) {
+      break;
+    }
+
     int count = read (device_fd, buffer, 1);
     if (count < 0) {
       if (errno == EAGAIN) {
@@ -86,37 +141,83 @@ int main (int argc, char ** argv) {
       continue;
     }
 
-    Message::COBS_State state = received.decode (buffer[0]);
+    if (verbosity > 2) {
+      if ((buffer[0] >= 32) && (buffer[0] < 127))
+	fputc (buffer[0], stderr);
+      else
+	fprintf (stderr, ".%02x.", (unsigned int) buffer[0]);
+    }
 
-    if (state == Message::cobs_HavePacket) { // we have a valid response
-      if (received.get_type () == Message::Supply_Address) {
-	address_src  = received.get_address_dest ();
-	address_dest = received.get_address_src ();
-
-	fprintf (stderr, "Address updated to %02x, supplied by device %02x.\n", (int) address_src, (int) address_dest);
-	fprintf (stderr, "Broadcasting address.\n");
-
-	to_send.set_address_src (address_src);
-	to_send.set_address_dest (broadcast);
-	to_send.set_type (Message::Broadcast_Address);
-	to_send.send ();
-
-	fprintf (stderr, "Sending ping...");
-
-	to_send.set_address_dest (address_dest);
-	to_send.set_type (Message::Ping);
-	to_send.send ();
-      }
-      if (received.get_type () == Message::Pong) {
-	fprintf (stderr, "acknowledged.\n");
+    if (received.decode (buffer[0]) == Message::cobs_HavePacket) { // we have a valid response
+      if (!packet (received)) {
 	break;
-	// Okay, the network is responding to us. Time to do something interesting... // TODO
       }
-
       received.clear ();
     }
   }
+  if (verbosity)
+    fprintf (stderr, "bye bye!\n");
 
   close (device_fd);
   return 0;
+}
+
+bool packet (Message & received) {
+  bool bOkay = true;
+
+  uint8_t address_src  = received.get_address_src ();
+  uint8_t address_dest = received.get_address_dest ();
+
+  Message::MessageType type = received.get_type ();
+
+  if (type == Message::Supply_Address) {
+    addr_self = address_dest; // our new address
+    addr_host = address_src;  // address of our host device
+
+    if (verbosity)
+      fprintf (stderr, "Address updated to %02x, supplied by host device %02x.\n", (unsigned int) addr_self, (unsigned int) addr_host);
+
+    if (verbosity)
+      fprintf (stderr, "Broadcasting address.\n");
+
+    Message(addr_self, ADDRESS_BROADCAST, Message::Broadcast_Address).send ();
+
+    if (verbosity)
+      fprintf (stderr, "Sending ping to host.\n");
+
+    Message(addr_self, addr_host, Message::Ping).send ();
+  } else if (address_dest != addr_self) {
+    if (address_dest == ADDRESS_BROADCAST) {
+      if (verbosity > 1)
+	fprintf (stderr, "[%02x] Broadcast event.\n", (unsigned int) address_src);
+    } // else { // do nothing }
+  } else if (type == Message::Ping) {
+    if (verbosity)
+      fprintf (stderr, "[%02x] Ping received; sending response.\n", (unsigned int) address_src);
+
+    Message(addr_self, address_src, Message::Pong).send ();
+  } else if (type == Message::Pong) {
+    if (verbosity)
+      fprintf (stderr, "[%02x] Ping acknowledged. Network established & ready for use.\n", (unsigned int) address_src);
+
+    /* Make command here.
+     */
+    if (text_command) {
+      Message to_send(addr_self, addr_host, Message::Text_Command);
+      to_send = text_command;
+      to_send.send ();
+      reset_timeout ();
+    }
+    // ...
+  } else if (type == Message::Text_Response) {
+    fprintf (stderr, "[%02x] - %s\n", (unsigned int) address_src, received.c_str ());
+    reset_timeout ();
+  } else if (type == Message::Text_Error) {
+    fprintf (stderr, "[%02x] ! %s\n", (unsigned int) address_src, received.c_str ());
+    reset_timeout ();
+  } else {
+    if (verbosity)
+      fprintf (stderr, "Message received of type=%02x.\n", (unsigned int) type);
+  }
+  return bOkay;
 }
