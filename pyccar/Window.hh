@@ -53,10 +53,22 @@ private:
   unsigned m_id;
 
   bool m_bDirty;
+  bool m_bVisible;
 protected:
   bool m_bTouchable;
 private:
   void add_child (Window * child) {
+    if (m_child_top) {
+      child->m_sibling_lower = m_child_top;
+      child->m_sibling_upper = 0;
+      m_child_top->m_sibling_upper = child;
+      m_child_top    = child;
+    } else {
+      child->m_sibling_lower = 0;
+      child->m_sibling_upper = 0;
+      m_child_bottom = child;
+      m_child_top    = child;
+    }
   }
 
   Window (unsigned width, unsigned height) :
@@ -73,6 +85,7 @@ private:
     m_H(height),
     m_id(0),
     m_bDirty(true),
+    m_bVisible(true),
     m_bTouchable(true)
   {
     // TODO: set root window properties
@@ -94,6 +107,7 @@ protected:
     m_H(height),
     m_id(s_id_next ()),
     m_bDirty(true),
+    m_bVisible(false),
     m_bTouchable(false)
   {
     parent->add_child (this);
@@ -131,6 +145,14 @@ public:
     return m_bDirty;
   }
 
+  inline void set_visible (bool bVisible) {
+    if (m_id)
+      m_bVisible = bVisible;
+  }
+  inline bool visible () const {
+    return m_bVisible;
+  }
+
   bool touch_in_bounds (int x, int y) {
     if ((x < m_abs_x) || (y < m_abs_y)) {
       return false;
@@ -141,22 +163,52 @@ public:
     return true;
   }
 protected:
-  virtual void handle_touch (TouchInput::TouchEvent te, int rel_x, int rel_y) {
-    // catch & ignore...
+  virtual bool handle_touch (TouchInput::TouchEvent te, int rel_x, int rel_y) {
+    return true; // catch & ignore...
   }
 public:
-  void touch_event (TouchInput::TouchEvent te, int x, int y) {
-    if (m_bTouchable) {
-      handle_touch (te, x - m_abs_x, y - m_abs_y);
-    } else {
-      m_parent->touch_event (te, x, y); // propagate event to parent
+  bool touch_event (TouchInput::TouchEvent te, int x, int y) {
+    bool bHandled = false;
+
+    /* Check children first, top to bottom
+     */
+    Window * child = m_child_top;
+
+    while (child && !bHandled) {
+      if (child->visible ()) {
+	if (child->touch_in_bounds (x, y)) {
+	  bHandled = child->touch_event (te, x, y);
+	}
+      }
+      child = child->m_sibling_lower;
     }
+
+    /* If not handled by a child, handle it ourselves
+     */
+    if (!bHandled && m_bTouchable) {
+      bHandled = handle_touch (te, x - m_abs_x, y - m_abs_y);
+    }
+
+    return bHandled;
   }
 
   virtual void redraw () {
+    /* Draw self first
+     */
     // TODO: request redraw by window ID
     // ui_window_redraw (m_id);
     set_dirty (false);
+
+    /* Draw children, bottom to top
+     */
+    Window * child = m_child_bottom;
+
+    while (child) {
+      if (child->visible ()) {
+	child->redraw ();
+      }
+      child = child->m_sibling_upper;
+    }
   }
 };
 
