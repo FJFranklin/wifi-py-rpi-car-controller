@@ -1,6 +1,9 @@
-#include <Python.h>
-
 #include "pyccar.hh"
+
+#include "TouchInput.hh"
+#include "Window.hh"
+
+using namespace PyCCar;
 
 static const char * application_name = "PyCCar";
 static const char * script_filename  = "pyccarui"; // without extension
@@ -132,10 +135,10 @@ static PyMethodDef PyCCarMethods[] = {
 };
 
 int main (int /* argc */, char ** /* argv */) {
-  TouchInput touch(touch_device, true);
+  TouchInput touch(true);
   TI = &touch;
 
-  if (!TI->init ()) {
+  if (!TI->init (touch_device)) {
     fprintf (stderr, "%s: unable to open event device \"%s\" for reading!\n", application_name, touch_device);
     return -1;
   }
@@ -147,7 +150,11 @@ int main (int /* argc */, char ** /* argv */) {
 
   if (s_load_ui ()) {
     if (s_init_video (video_driver, video_device, 800, 480)) {
-      TouchTimer(TI, 30).run ();
+      if (Window::init (800, 480)) {
+	TI->run (Window::root (), 15);
+      } else {
+	fputs ("Failed to initialise window manager!\n", stderr);
+      }
     }
   }
   s_free_ui ();

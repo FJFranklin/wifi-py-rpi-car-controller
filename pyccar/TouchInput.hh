@@ -21,214 +21,105 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/*! \file InputTouch.hh
+/*! \file TouchInput.hh
     \brief Manage a Linux event stream for a touchscreen
     
-    Intended for use with a HyperPixel 4.0 touchscreen used in console mode.
+    Developed for use with a HyperPixel 4.0 touchscreen used in console mode.
 */
 
 #ifndef __TouchInput_hh__
 #define __TouchInput_hh__
 
-#include <fcntl.h>
-#include <unistd.h>
+#include "pyccar.hh"
 
-#include <linux/input.h>
+#define TouchInput_BUFSIZE 1024
 
-class TouchInput {
-public:
-  enum TouchEvent {
-    te_None = 0,
-    te_Begin,
-    te_Change,
-    te_End
-  } m_te;
+struct input_event;
 
-private:
-  const char * m_device_name;
+namespace PyCCar {
 
-  int m_devfd;
+  class TouchInput {
+  public:
+    enum TouchEvent {
+      te_None = 0,
+      te_Begin,
+      te_Change,
+      te_End
+    } m_te;
 
-  int m_touch_x1;
-  int m_touch_y1;
-  int m_touch_x2;
-  int m_touch_y2;
+    struct touch_event_data {
+      struct {
+	int x, y;
+      } t1, t2;
+    } m_touch;
 
-  bool m_rescale;
+    class Handler {
+    public:
+      virtual bool touch_event (TouchEvent te, const struct touch_event_data & event_data) = 0;
+      virtual ~Handler () { }
+    };
 
-  bool m_touch_new;
-  bool m_touch_end;
-  bool m_touch_yes;
+  private:
+    int m_devfd;
 
-  unsigned long ev_length;
-  unsigned long ev_count;
+    bool m_rescale;
 
-  struct input_event ev[64];
+    bool m_touch_new;
+    bool m_touch_end;
+    bool m_touch_yes;
 
-public:
-  TouchInput (const char * device, bool rescale = false) :
-    m_te(te_None),
-    m_device_name(device),
-    m_devfd(-1),
-    m_touch_x1(0),
-    m_touch_y1(0),
-    m_touch_x2(0),
-    m_touch_y2(0),
-    m_rescale(rescale),
-    m_touch_new(false),
-    m_touch_end(false),
-    m_touch_yes(false),
-    ev_length(sizeof(ev)),
-    ev_count(0)
-  {
-    // ...
-  }
+    bool m_timer_active;
 
-  ~TouchInput () {
-    if (m_devfd >= 0) {
-      close (m_devfd);
+    unsigned long ev_count;
+    unsigned char ev_buffer[TouchInput_BUFSIZE];
+
+  public:
+    TouchInput (bool rescale = false);
+
+    ~TouchInput ();
+
+    bool init (const char * device);
+
+  private:
+    inline void touch_event_begin () {
+      m_te = (m_te == te_End)   ? te_Change : te_Begin;
     }
-  }
-
-  bool init () {
-    if (m_devfd < 0) {
-      m_devfd = open (m_device_name, O_RDONLY | O_NONBLOCK /* O_NDELAY */);
-      if (m_devfd == -1) {
-	fprintf (stderr, "Failed to open \"%s\" - exiting.\n", m_device_name);
-	return false;
-      }
-
-      unsigned char byte;
-
-      while (read (m_devfd, &byte, 1) > 0) {
-	// empty the input buffer
-      }
+    inline void touch_event_end () {
+      m_te = (m_te == te_Begin) ? te_None   : te_End;
     }
-    return (m_devfd >= 0);
-  }
-
-private:
-  void touch_event_begin () {
-    if (m_te == te_End)
-      m_te = te_Change;
-    else
-      m_te = te_Begin;
-  }
-
-  void touch_event_end () {
-    if (m_te == te_End)
-      m_te = te_Change;
-    else
-      m_te = te_End;
-  }
-
-  void touch_event_change () {
-    if (m_te == te_None)
-      m_te = te_Change;
-  }
-
-  void handle (const struct input_event * event) {
-    if (event->type == EV_SYN) {
-      if (m_touch_new) {
-	m_touch_new = false;
-	m_touch_yes = true;
-	touch_event_begin ();
-      } else if (m_touch_end) {
-	m_touch_end = false;
-	m_touch_yes = false;
-	touch_event_end ();
-      } else if (m_touch_yes) {
-	touch_event_change ();
-      }
+    inline void touch_event_change () {
+      m_te = (m_te == te_None)  ? te_Change : m_te;
     }
-    if (event->type == EV_ABS) {
-      switch (event->code) {
-      case 0:
-	{
-	  if (m_rescale)
-	    m_touch_x1 = event->value * 5 / 3;
-	  else
-	    m_touch_x1 = event->value;
-	  break;
-	}
-      case 1:
-	{
-	  if (m_rescale)
-	    m_touch_y1 = event->value * 3 / 5;
-	  else
-	    m_touch_y1 = event->value;
-	  break;
-	}
-      case 53:
-	{
-	  if (m_rescale)
-	    m_touch_x2 = event->value * 5 / 3;
-	  else
-	    m_touch_x2 = event->value;
-	  break;
-	}
-      case 54:
-	{
-	  if (m_rescale)
-	    m_touch_y2 = event->value * 3 / 5;
-	  else
-	    m_touch_y2 = event->value;
-	  break;
-	}
-      case 57:
-	{
-	  if (event->value == -1) {
-	    if (m_touch_yes)
-	      m_touch_end = true;
-	  } else {
-	    if (!m_touch_yes)
-	      m_touch_new = true;
-	  }
-	  break;
-	}
-      default:
-	break;
-      }
+
+    void handle (const struct input_event * event);
+
+  public:
+    inline bool event_pending () const {
+      return m_te;
     }
-  }
-
-public:
-  TouchEvent next (int & x, int & y) {
-    TouchEvent te = m_te;
-    m_te = te_None;
-
-    x = m_touch_x1;
-    y = m_touch_y1;
-
-    return te;
-  }
-
-  void touch2 (int & x, int & y) const {
-    x = m_touch_x2;
-    y = m_touch_y2;
-  }
-
-  void tick () {
-    if (m_devfd < 0) {
-      return;
-    }
-    unsigned char * ptr = reinterpret_cast<unsigned char *>(ev);
-
-    int bytes_read = read (m_devfd, ptr + ev_count, ev_length - ev_count);
-    if (bytes_read > 0) {
-      ev_count += bytes_read;
-
-      int count = ev_count / sizeof (struct input_event);
-
-      for (int c = 0; c < count; c++) {
-	handle (ev + c);
-	ev_count -= sizeof (struct input_event);
+    inline void event_process (Handler & handler) {
+      if (m_te) {
+	handler.touch_event (m_te, m_touch);
       }
-      if (ev_count) {
-	ev[0] = ev[count];
-      }
+      m_te = te_None;
     }
-  }
-};
+
+    /* start a simple event loop to check for touch events and process them
+     * 
+     * calls tick() every millisecond, and event_process() every <interval>
+     * (interval specified in milliseconds; must be non-zero)
+     */
+    void run (Handler & handler, unsigned long interval);
+
+    /* stop the event loop
+     */
+    inline void stop () {
+      m_timer_active = false;
+    }
+
+    void tick (); // to be called more frequently than the screen refresh rate
+  };
+
+} // namespace PyCCar
 
 #endif /* ! __TouchInput_hh__ */

@@ -24,192 +24,80 @@
 #ifndef __Window_hh__
 #define __Window_hh__
 
-class Window;
+#include "pyccar.hh"
+#include "TouchInput.hh"
 
-static unsigned s_id_counter = 0;
-static unsigned s_id_next () {
-  return ++s_id_counter;
-}
+namespace PyCCar {
 
-static Window * s_root = 0;
+  class Window : public TouchInput::Handler {
+  private:
+    Window * m_parent;
 
-class Window {
-private:
-  Window * m_parent;
+    Window * m_child_bottom;
+    Window * m_child_top;
+    Window * m_sibling_lower;
+    Window * m_sibling_upper;
 
-  Window * m_child_bottom;
-  Window * m_child_top;
-  Window * m_sibling_lower;
-  Window * m_sibling_upper;
+    int m_abs_x;
+    int m_abs_y;
+    int m_rel_x;
+    int m_rel_y;
 
-  int m_abs_x;
-  int m_abs_y;
-  int m_rel_x;
-  int m_rel_y;
+    unsigned m_W;
+    unsigned m_H;
 
-  unsigned m_W;
-  unsigned m_H;
+    unsigned m_id;
 
-  unsigned m_id;
+    bool m_bDirty;
+    bool m_bVisible;
+  protected:
+    bool m_bTouchable;
 
-  bool m_bDirty;
-  bool m_bVisible;
-protected:
-  bool m_bTouchable;
-private:
-  void add_child (Window * child) {
-    if (m_child_top) {
-      child->m_sibling_lower = m_child_top;
-      child->m_sibling_upper = 0;
-      m_child_top->m_sibling_upper = child;
-      m_child_top    = child;
-    } else {
-      child->m_sibling_lower = 0;
-      child->m_sibling_upper = 0;
-      m_child_bottom = child;
-      m_child_top    = child;
-    }
-  }
+  private:
+    Window (unsigned width, unsigned height);
 
-  Window (unsigned width, unsigned height) :
-    m_parent(0),
-    m_child_bottom(0),
-    m_child_top(0),
-    m_sibling_lower(0),
-    m_sibling_upper(0),
-    m_abs_x(0),
-    m_abs_y(0),
-    m_rel_x(0),
-    m_rel_y(0),
-    m_W(width),
-    m_H(height),
-    m_id(0),
-    m_bDirty(true),
-    m_bVisible(true),
-    m_bTouchable(true)
-  {
-    // TODO: set root window properties
-    // ui_window_bbox (m_id, m_abs_x, m_abs_y, m_W, m_H);
-  }
+  protected:
+    Window (Window & parent, int rel_x, int rel_y, unsigned width, unsigned height);
 
-protected:
-  Window (Window & parent, int rel_x, int rel_y, unsigned width, unsigned height) :
-    m_parent(&parent),
-    m_child_bottom(0),
-    m_child_top(0),
-    m_sibling_lower(0),
-    m_sibling_upper(0),
-    m_abs_x(parent.abs_x + rel_x),
-    m_abs_y(parent.abs_y + rel_y),
-    m_rel_x(rel_x),
-    m_rel_y(rel_y),
-    m_W(width),
-    m_H(height),
-    m_id(s_id_next ()),
-    m_bDirty(true),
-    m_bVisible(false),
-    m_bTouchable(false)
-  {
-    parent->add_child (this);
-    // TODO: set default window properties
-    // ui_window_bbox (m_id, m_abs_x, m_abs_y, m_W, m_H);
-  }
+  public:
+    virtual ~Window ();
 
-public:
-  ~Window () {
-    // ...
-  }
+    static Window & root ();
 
-  static Window & root () {
-    return *s_root;
-  }
-  static Window * root (unsigned width, unsigned height) {
-    if (!s_root && width && height) {
-      try {
-	s_root = new Window(width, height);
-      } catch (...) {
-	s_root = 0;
-      }
-    }
-    return s_root;
-  }
+    static bool init (unsigned width, unsigned height);
 
-  inline unsigned id () const {
-    return m_id;
-  }
-
-  inline void set_dirty (bool bDirty) {
-    m_bDirty = bDirty;
-  }
-  inline bool dirty () const {
-    return m_bDirty;
-  }
-
-  inline void set_visible (bool bVisible) {
-    if (m_id)
-      m_bVisible = bVisible;
-  }
-  inline bool visible () const {
-    return m_bVisible;
-  }
-
-  bool touch_in_bounds (int x, int y) {
-    if ((x < m_abs_x) || (y < m_abs_y)) {
-      return false;
-    }
-    if ((x >= m_abs_x + m_W) || (y >= m_abs_y + m_H)) {
-      return false;
-    }
-    return true;
-  }
-protected:
-  virtual bool handle_touch (TouchInput::TouchEvent te, int rel_x, int rel_y) {
-    return true; // catch & ignore...
-  }
-public:
-  bool touch_event (TouchInput::TouchEvent te, int x, int y) {
-    bool bHandled = false;
-
-    /* Check children first, top to bottom
-     */
-    Window * child = m_child_top;
-
-    while (child && !bHandled) {
-      if (child->visible ()) {
-	if (child->touch_in_bounds (x, y)) {
-	  bHandled = child->touch_event (te, x, y);
-	}
-      }
-      child = child->m_sibling_lower;
+    inline unsigned id () const {
+      return m_id;
     }
 
-    /* If not handled by a child, handle it ourselves
-     */
-    if (!bHandled && m_bTouchable) {
-      bHandled = handle_touch (te, x - m_abs_x, y - m_abs_y);
+    inline void set_dirty (bool bDirty) {
+      m_bDirty = bDirty;
+    }
+    inline bool dirty () const {
+      return m_bDirty;
     }
 
-    return bHandled;
-  }
-
-  virtual void redraw () {
-    /* Draw self first
-     */
-    // TODO: request redraw by window ID
-    // ui_window_redraw (m_id);
-    set_dirty (false);
-
-    /* Draw children, bottom to top
-     */
-    Window * child = m_child_bottom;
-
-    while (child) {
-      if (child->visible ()) {
-	child->redraw ();
-      }
-      child = child->m_sibling_upper;
+    inline void set_visible (bool bVisible) {
+      if (m_id)
+	m_bVisible = bVisible;
     }
-  }
-};
+    inline bool visible () const {
+      return m_bVisible;
+    }
+
+    bool coord_in_bounds (int x, int y);
+
+  protected:
+    virtual bool handle_touch (TouchInput::TouchEvent te, int rel_x, int rel_y);
+  public:
+    virtual bool touch_event (TouchInput::TouchEvent te, const struct TouchInput::touch_event_data & event_data);
+
+    virtual void redraw ();
+
+  private:
+    void add_child (Window * child);
+  };
+
+} // namespace PyCCar
 
 #endif /* ! __Window_hh__ */
