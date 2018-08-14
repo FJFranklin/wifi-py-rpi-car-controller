@@ -1,3 +1,26 @@
+/* Copyright (c) 2018 Francis James Franklin
+ * 
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification, are permitted provided
+ * that the following conditions are met:
+ * 
+ * 1. Redistributions of source code must retain the above copyright notice, this list of conditions and
+ *    the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and
+ *    the following disclaimer in the documentation and/or other materials provided with the distribution.
+ * 3. The name of the author may not be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT
+ * NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 #include "pyccar.hh"
 
 #include "TouchInput.hh"
@@ -14,127 +37,12 @@ static const char * video_driver = "fbcon";
 
 static TouchInput * TI = 0;
 
-static PyObject * PyCCarUI = 0;
-
-/* Module functions
- */
-static PyObject * ui_init    = 0;
-static PyObject * ui_redraw  = 0;
-static PyObject * ui_refresh = 0;
-
-static bool s_load_ui () {
-  if (!PyCCarUI) {
-    PyObject * pystr = PyString_FromString (script_filename);
-    if (pystr) {
-      // fputs ("module loading...\n", stderr);
-      PyCCarUI = PyImport_Import (pystr);
-      Py_DECREF (pystr);
-
-      if (PyCCarUI) {
-	ui_init    = PyObject_GetAttrString (PyCCarUI, "ui_init");
-	ui_redraw  = PyObject_GetAttrString (PyCCarUI, "ui_redraw");
-	ui_refresh = PyObject_GetAttrString (PyCCarUI, "ui_refresh");
-	// fputs ("module loaded:\n", stderr);
-      }
-      if (ui_init) {
-	// fputs ("init:", stderr);
-	if (!PyCallable_Check (ui_init)) {
-	  Py_XDECREF (ui_init);
-	  ui_init = 0;
-	  // fputs (" x", stderr);
-	}
-	// fputs ("\n", stderr);
-      }
-      if (ui_redraw) {
-	// fputs ("redraw:", stderr);
-	if (!PyCallable_Check (ui_redraw)) {
-	  Py_XDECREF (ui_redraw);
-	  ui_redraw = 0;
-	  // fputs (" x", stderr);
-	}
-	// fputs ("\n", stderr);
-      }
-      if (ui_refresh) {
-	// fputs ("refresh:", stderr);
-	if (!PyCallable_Check (ui_refresh)) {
-	  Py_XDECREF (ui_refresh);
-	  ui_refresh = 0;
-	  // fputs (" x", stderr);
-	}
-	// fputs ("\n", stderr);
-      }
-    }
-  }
-  if (!ui_refresh || !ui_redraw || !ui_init) {
-    fputs ("PyCCar: UI load error!\n", stderr);
-  }
-  return ui_refresh;
-}
-
-static void s_free_ui () {
-  if (ui_refresh) {
-    Py_XDECREF (ui_refresh);
-    ui_refresh = 0;
-  }
-  if (ui_redraw) {
-    Py_XDECREF (ui_redraw);
-    ui_redraw = 0;
-  }
-  if (ui_init) {
-    Py_XDECREF (ui_init);
-    ui_init = 0;
-  }
-  if (PyCCarUI) {
-    Py_DECREF (PyCCarUI);
-    PyCCarUI = 0;
-  }
-}
-
-static bool s_init_video (const char * driver, const char * device, unsigned screen_width, unsigned screen_height) {
-  PyObject * args = Py_BuildValue ("ssII", driver, device, screen_width, screen_height);
-
-  if (args) {
-    PyObject * result = PyObject_CallObject (ui_init, args);
-    Py_DECREF(args);
-
-    if (result) {
-      Py_DECREF (result);
-      return true;
-    }
-  }
-  return false;
-}
-
-static void s_redraw (PyObject * args) {
-  PyObject * result = PyObject_CallObject (ui_redraw, args);
-  if (result) {
-    Py_DECREF (result);
-  }
-}
-
-static void s_refresh () {
-  PyObject * result = PyObject_CallObject (ui_refresh, 0);
-  if (result) {
-    Py_DECREF (result);
-  }
-}
-
-static PyObject * pyccar_info (PyObject * self, PyObject * args) {
-  if (!PyArg_ParseTuple (args, ":info")) { // FIXME
-    return 0; // set run-time exception?
-  }
-
-  // ...
-
-  return Py_BuildValue ("i", 0);
-}
-
-static PyMethodDef PyCCarMethods[] = {
-  { "info", pyccar_info, METH_VARARGS, "Return details of requested element to refresh." },
-  { 0, 0, 0, 0 }
-};
-
 int main (int /* argc */, char ** /* argv */) {
+  unsigned screen_width  = 800;
+  unsigned screen_height = 480;
+
+  unsigned refresh_interval = 15;
+
   TouchInput touch(true);
   TI = &touch;
 
@@ -146,18 +54,16 @@ int main (int /* argc */, char ** /* argv */) {
   Py_SetProgramName (const_cast<char *>(application_name));
   Py_Initialize ();
 
-  Py_InitModule (application_name, PyCCarMethods);
-
-  if (s_load_ui ()) {
-    if (s_init_video (video_driver, video_device, 800, 480)) {
-      if (Window::init (800, 480)) {
-	TI->run (Window::root (), 15);
+  if (PyCCarUI::ui_load (script_filename)) {
+    if (PyCCarUI::init (video_driver, video_device, screen_width, screen_height)) {
+      if (Window::init (screen_width, screen_height)) {
+	TI->run (Window::root (), refresh_interval);
       } else {
 	fputs ("Failed to initialise window manager!\n", stderr);
       }
     }
   }
-  s_free_ui ();
+  PyCCarUI::ui_free ();
 
   Py_Finalize ();
   return 0;

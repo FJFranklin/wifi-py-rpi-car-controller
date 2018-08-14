@@ -21,5 +21,47 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef __PyCCar_hh__
+#define __PyCCar_hh__
+
 #include <Python.h>
 
+/* interface flags
+ */
+#define PyCCar_VISIBLE 0x01 - whether the window/button is visible
+#define PyCCar_BORDER  0x02 - whether the window/button has a border
+#define PyCCar_ENABLED 0x04 - whether the window/button is enabled
+#define PyCCar_ACTIVE  0x08 - whether the window/button is active
+#define PyCCar_SUBMENU 0x10 - whether the window/button has a submenu
+#define PyCCar_BLANK   0x20 - whether the window/button is blank (if visible, but regardless of type)
+
+class PyCCarUI {
+private:
+  unsigned m_id;
+public:
+  PyCCarUI (unsigned win_id) :
+    m_id(win_id)
+  {
+    // ...
+  }
+
+  ~PyCCarUI () {
+    // ...
+  }
+
+  static bool ui_load (const char * script_filename);
+  static void ui_free ();
+
+  static bool init (const char * driver, const char * device, unsigned screen_width, unsigned screen_height);
+  static bool refresh ();
+
+  bool set_property (const char * property, PyObject * value);
+  bool draw ();
+
+  /* Set properties
+   */
+  bool set_bbox (int x, int y, unsigned width, unsigned height);
+  bool set_flags (unsigned flags);
+};
+
+#endif /* ! __PyCCar_hh__ */

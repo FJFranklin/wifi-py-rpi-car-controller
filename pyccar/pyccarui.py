@@ -2,28 +2,32 @@ import os
 import pygame
 
 # Colors
-black = (0,0,0)
+black = (  0,  0,  0)
 white = (255,255,255)
-red   = (255,0,0)
-green = (0,255,0)
-blue  = (0,0,255)
+red   = (255,  0,  0)
+green = (  0,255,  0)
+blue  = (  0,  0,255)
 grey  = (127,127,127)
 
 windows = {}
 deffont = {}
 defprop = {}
 
-defprop['type']    = 'blank'  # window type
 defprop['BG']      = black    # background color
 defprop['FG']      = white    # foreground color
-defprop['dis_FG']  = grey     # foreground color if disabled
-defprop['inset']   = 10       # border-inset, if any
-defprop['a-thick'] = 9        # border thickness, if active
-defprop['n-thin']  = 3        # border thickness, if not
-defprop['line']    = 5        # general line thickness
-defprop['size']    = 24       # font size
 defprop['Label']   = '(none)' # label, if any
-defprop['flags']   = 0        # flags, as follows:
+#defprop['Scroll'] = (10,90)        # scroll percentages
+defprop['a-thick'] = 9        # border thickness, if active
+#defprop['bbox']   = (0,0,800,480)  # bounding box
+defprop['dis_FG']  = grey     # foreground color if disabled
+defprop['flags']   = 0
+defprop['inset']   = 10       # border-inset, if any
+defprop['line']    = 5        # general line thickness
+defprop['n-thin']  = 3        # border thickness, if not
+defprop['size']    = 24       # font size
+defprop['type']    = 'blank'  # window type
+
+# flags, as follows:
 # 0x01 - whether the window/button is visible
 # 0x02 - whether the window/button has a border
 # 0x04 - whether the window/button is enabled
@@ -67,23 +71,72 @@ def draw_border(win_id, bbox, flags):
     pygame.draw.rect(screen, FG, (x+d, y+d, w-2*d, h-2*d), thickness)
 
 def draw_back(win_id, bbox, flags):
+    if flags & 0x04: # enabled
+        FG = get_property(win_id, 'FG')
+    else: # disabled
+        FG = get_property(win_id, 'dis_FG')
     thickness = get_property(win_id, 'line')
-    FG = get_property(win_id, 'FG')
+    d         = get_property(win_id, 'inset')
+    (x, y, w, h) = bbox
+    bboxi = (x+3*d, y+3*d, w-6*d, h-6*d)
+    pygame.draw.arc(screen, FG, bboxi, 0,    3.14, thickness)
+    pygame.draw.arc(screen, FG, bboxi, 4.71, 6.28, thickness)
+    xarr = x+3*d
+    yarr = y+h/2
+    pygame.draw.lines(screen, FG, True, [(xarr-d,yarr), (xarr+d,yarr), (xarr,yarr+d)], thickness)
 
 def draw_exit(win_id, bbox, flags):
+    if flags & 0x04: # enabled
+        FG = get_property(win_id, 'FG')
+    else: # disabled
+        FG = get_property(win_id, 'dis_FG')
     thickness = get_property(win_id, 'line')
-    FG = get_property(win_id, 'FG')
+    d         = get_property(win_id, 'inset')
+    (x, y, w, h) = bbox
+    bboxi = (x+3*d, y+3*d, w-6*d, h-6*d)
+    pygame.draw.arc(screen, FG, bboxi, 0,    1.22, thickness)
+    pygame.draw.arc(screen, FG, bboxi, 1.92, 6.28, thickness)
+    pygame.draw.lines(screen, FG, False, [(x+w/2,y+h/2), (x+w/2,y+2*d)], thickness)
 
 def draw_up(win_id, bbox, flags):
+    if flags & 0x04: # enabled
+        FG = get_property(win_id, 'FG')
+    else: # disabled
+        FG = get_property(win_id, 'dis_FG')
     thickness = get_property(win_id, 'line')
-    FG = get_property(win_id, 'FG')
+    d         = get_property(win_id, 'inset')
+    (x, y, w, h) = bbox
+    xl = x + 3*d
+    yt = y + 3*d
+    x0 = x + w/2
+    xr = x + w - 6*d
+    yb = y + h - 6*d
+    pygame.draw.lines(screen, FG, True, [(xl,yb), (x0,yt), (xr,yb)], thickness)
 
 def draw_down(win_id, bbox, flags):
+    if flags & 0x04: # enabled
+        FG = get_property(win_id, 'FG')
+    else: # disabled
+        FG = get_property(win_id, 'dis_FG')
     thickness = get_property(win_id, 'line')
-    FG = get_property(win_id, 'FG')
+    d         = get_property(win_id, 'inset')
+    (x, y, w, h) = bbox
+    xl = x + 3*d
+    yt = y + 3*d
+    x0 = x + w/2
+    xr = x + w - 6*d
+    yb = y + h - 6*d
+    pygame.draw.lines(screen, FG, True, [(xl,yt), (x0,yb), (xr,yt)], thickness)
 
 def draw_scroll(win_id, bbox, flags):
-    None
+    d      = get_property(win_id, 'inset')
+    scroll = get_property(win_id, 'Scroll')
+    (x, y, w, h) = bbox
+    pygame.draw.rect(screen, grey, (x+d, y, w-2*d, h), 0)
+    if scroll:
+        (s_min, s_max) = scroll
+        bboxi = (x+2*d, y+(h*s_min)/100, w-4*d, (h*(s_max-s_min))/100)
+        pygame.draw.rect(screen, blue, bboxi, 0)
 
 def draw_menu_item(win_id, bbox, flags):
     d    = get_property(win_id, 'inset')
@@ -103,7 +156,7 @@ def draw_menu_item(win_id, bbox, flags):
         yb = y + h - 2*d
         pygame.draw.lines(screen, FG, True, [(xl,yt), (xl,yb), (xr,y0)], thickness)
 
-def ui_win_draw(win_id):
+def ui_draw(win_id):
     flags = get_property(win_id, 'flags')
     if flags & 0x01: # visible
         bbox = get_property(win_id, 'bbox')
@@ -125,87 +178,6 @@ def ui_win_draw(win_id):
             draw_scroll(win_id, bbox, flags)
         elif type == 'Menu Item':
             draw_menu_item(win_id, bbox, flags)
-
-# Element Types
-# 0 - blank
-# 1 - Back
-# 2 - Exit
-# 3 - Up
-# 4 - Down
-# 5 - Scroll
-# 6 - Menu Item
-
-def ui_redraw(bbox, element_type, flags, opt_arg):
-    bBorders = flags &  1
-    bActive  = flags &  2
-    bEnabled = flags &  4
-    bSubMenu = flags &  8
-    bVisible = flags & 16
-    pygame.draw.rect(screen, black, bbox, 0) # 0-thickness = fill
-    if bVisible:
-        (x, y, w, h) = bbox
-        d = h / 10
-        if w < h:
-            d = w / 10
-        if d < 5:
-            d = 5
-        if bBorders:
-            color = grey
-            if bEnabled:
-                color = white
-            thickness = 3
-            if bActive:
-                thickness = 9
-            pygame.draw.rect(screen, color, (x+d, y+d, w-2*d, h-2*d), thickness)
-        thickness = 5
-        if element_type == 1:
-            bboxi = (x+3*d, y+3*d, w-6*d, h-6*d)
-            pygame.draw.arc(screen, color, bboxi, 0,    3.14, thickness)
-            pygame.draw.arc(screen, color, bboxi, 4.71, 6.28, thickness)
-            xarr = x+3*d
-            yarr = y+h/2
-            pygame.draw.lines(screen, color, True, [(xarr-d,yarr), (xarr+d,yarr), (xarr,yarr+d)], thickness)
-        elif element_type == 2:
-            bboxi = (x+3*d, y+3*d, w-6*d, h-6*d)
-            pygame.draw.arc(screen, color, bboxi, 0,    1.22, thickness)
-            pygame.draw.arc(screen, color, bboxi, 1.92, 6.28, thickness)
-            pygame.draw.lines(screen, color, False, [(x+w/2,y+h/2), (x+w/2,y+2*d)], thickness)
-        elif element_type == 3:
-            xl = x + 3*d
-            yt = y + 3*d
-            x0 = x + w/2
-            xr = x + w - 6*d
-            yb = y + h - 6*d
-            pygame.draw.lines(screen, color, True, [(xl,yb), (x0,yt), (xr,yb)], thickness)
-        elif element_type == 4:
-            xl = x + 3*d
-            yt = y + 3*d
-            x0 = x + w/2
-            xr = x + w - 6*d
-            yb = y + h - 6*d
-            pygame.draw.lines(screen, color, True, [(xl,yt), (x0,yb), (xr,yt)], thickness)
-        elif element_type == 5:
-            bboxi = (x+d, y, w-2*d, h)
-            pygame.draw.rect(screen, grey, bboxi, 0)
-            if opt_arg:
-                (s_min, s_max) = opt_arg
-                bboxi = (x+2*d, y+(h*s_min)/100, w-4*d, (h*(s_max-s_min))/100)
-                pygame.draw.rect(screen, blue, bboxi, 0)
-        elif element_type == 6:
-            if opt_arg:
-                font  = pygame.font.Font(None, h-3*d)
-                label = font.render(str(opt_arg), 1, (color))
-                screen.blit(label, (x+2*d,y+2*d))
-            if bSubMenu:
-                xl = x + w - 6*d
-                yt = y + 2*d
-                y0 = y + h/2
-                xr = x + w - 2*d
-                yb = y + h - 2*d
-                pygame.draw.lines(screen, color, True, [(xl,yt), (xl,yb), (xr,y0)], thickness)
-        else:
-            None
-
 
 def ui_refresh():
     pygame.display.update()

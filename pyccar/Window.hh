@@ -85,6 +85,8 @@ namespace PyCCar {
       return m_bVisible;
     }
 
+    bool set_flags (unsigned flags);
+
     bool coord_in_bounds (int x, int y);
 
   protected:

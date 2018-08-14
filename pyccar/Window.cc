@@ -32,10 +32,36 @@ static inline unsigned s_id_next () {
   return ++s_id_counter;
 }
 
+static bool s_set_bbox (unsigned win_id, int x, int y, unsigned width, unsigned height) {
+  bool bOkay = false;
+
+  PyObject * value = Py_BuildValue ("iiII", x, y, width, height);
+  if (value) {
+    bOkay = ui_win_set_property (win_id, "bbox", value);
+    Py_DECREF (value);
+  }
+  return bOkay;
+}
+
+static bool s_set_flags (unsigned win_id, unsigned flags) {
+  bool bOkay = false;
+
+  PyObject * value = Py_BuildValue ("I", flags);
+  if (value) {
+    bOkay = ui_win_set_property (win_id, "flags", value);
+    Py_DECREF (value);
+  }
+  return bOkay;
+}
+
 static Window * s_root = 0;
 
 Window & Window::root () {
   return *s_root;
+}
+
+bool Window::set_flags (unsigned flags) {
+  s_set_flags (m_id, flags);
 }
 
 Window::Window (unsigned width, unsigned height) :
@@ -55,8 +81,11 @@ Window::Window (unsigned width, unsigned height) :
   m_bVisible(true),
   m_bTouchable(true)
 {
-  // TODO: set root window properties
-  // ui_window_bbox (m_id, m_abs_x, m_abs_y, m_W, m_H);
+  PyCCarUI(m_id).set_bbox (m_id, m_abs_x, m_abs_y, m_W, m_H);
+
+  /* Settings for root window
+   */
+  PyCCarUI(m_id).set_flags (PyCCar_VISIBLE | PyCCar_BLANK);
 }
 
 Window::Window (Window & parent, int rel_x, int rel_y, unsigned width, unsigned height) :
@@ -77,8 +106,8 @@ Window::Window (Window & parent, int rel_x, int rel_y, unsigned width, unsigned 
   m_bTouchable(false)
 {
   parent.add_child (this);
-  // TODO: set default window properties
-  // ui_window_bbox (m_id, m_abs_x, m_abs_y, m_W, m_H);
+
+  PyCCarUI(m_id).set_bbox (m_id, m_abs_x, m_abs_y, m_W, m_H);
 }
 
 Window::~Window () {
@@ -176,8 +205,7 @@ bool Window::touch_event (TouchInput::TouchEvent te, const struct TouchInput::to
 void Window::redraw () {
   /* Draw self first
    */
-  // TODO: request redraw by window ID
-  // ui_window_redraw (m_id);
+  ui_win_draw (m_id);
   set_dirty (false);
 
   /* Draw children, bottom to top

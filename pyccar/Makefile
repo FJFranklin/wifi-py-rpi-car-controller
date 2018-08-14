@@ -1,16 +1,22 @@
 all:	pyccar
 
-pyccar:	pyccar.cc pyccar.hh TouchInput.o Window.o
-	c++ -o pyccar pyccar.cc TouchInput.o Window.o `python-config --cflags --ldflags`
-
-TouchInput.o:	TouchInput.hh TouchInput.cc
-		c++ -c TouchInput.cc `python-config --cflags`
-
-Window.o:	TouchInput.hh Window.hh Window.cc
-		c++ -c Window.cc `python-config --cflags`
-
-run:
-	PYTHONPATH=/home/pi/wifi-py-rpi ./pyccar
+run:	pyccar
+	PYTHONPATH=`pwd` ./pyccar
 
 clean:
 	rm -f *~ *.o
+
+pyccar:		pyccar.o TouchInput.o Window.o PyCCarUI.o
+		c++ -o pyccar pyccar.o TouchInput.o Window.o PyCCarUI.o `python-config --ldflags`
+
+pyccar.o:	pyccar.hh TouchInput.hh Window.hh pyccar.cc
+		c++ -c pyccar.cc `python-config --cflags`
+
+TouchInput.o:	pyccar.hh TouchInput.hh TouchInput.cc
+		c++ -c TouchInput.cc `python-config --cflags`
+
+Window.o:	pyccar.hh TouchInput.hh Window.hh Window.cc
+		c++ -c Window.cc `python-config --cflags`
+
+PyCCarUI.o:	pyccar.hh PyCCarUI.cc
+		c++ -c PyCCarUI.cc `python-config --cflags`
