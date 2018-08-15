@@ -53,6 +53,7 @@ public:
   static void ui_free ();
 
   static bool init (const char * driver, const char * device, unsigned screen_width, unsigned screen_height);
+  static bool init (unsigned screen_width, unsigned screen_height);
   static bool refresh ();
 
   bool draw ();

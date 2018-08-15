@@ -27,7 +27,7 @@ static PyObject * s_PyCCarUI = 0;
 
 /* Module functions:
    def ui_set_property(win_id, property, value):
-   def ui_init(driver, device, screen_w, screen_h):
+   def ui_init((driver, device), (screen_w, screen_h)):
    def ui_draw(win_id):
    def ui_refresh():
  */
@@ -40,7 +40,9 @@ bool PyCCarUI::ui_load (const char * script_filename) {
   if (!s_PyCCarUI) {
     PyObject * pystr = PyString_FromString (script_filename);
     if (pystr) {
-      // fputs ("module loading...\n", stderr);
+      fputs ("module loading... ", stderr);
+      // PyRun_SimpleString("import sys\nsys.path.append('.')");
+      // PyRun_SimpleString("import pyccarui");
       s_PyCCarUI = PyImport_Import (pystr);
       Py_DECREF (pystr);
 
@@ -49,7 +51,9 @@ bool PyCCarUI::ui_load (const char * script_filename) {
 	s_init    = PyObject_GetAttrString (s_PyCCarUI, "ui_init");
 	s_draw    = PyObject_GetAttrString (s_PyCCarUI, "ui_draw");
 	s_refresh = PyObject_GetAttrString (s_PyCCarUI, "ui_refresh");
-	// fputs ("module loaded:\n", stderr);
+	fputs ("okay:\n", stderr);
+      } else {
+	fputs ("failed!\n", stderr);
       }
       if (s_set_p) {
 	// fputs ("set_property:", stderr);
@@ -120,7 +124,22 @@ void PyCCarUI::ui_free () {
 }
 
 bool PyCCarUI::init (const char * driver, const char * device, unsigned screen_width, unsigned screen_height) {
-  PyObject * args = Py_BuildValue ("ssII", driver, device, screen_width, screen_height);
+  PyObject * args = Py_BuildValue ("(ss)(II)", driver, device, screen_width, screen_height);
+
+  if (args) {
+    PyObject * result = PyObject_CallObject (s_init, args);
+    Py_DECREF(args);
+
+    if (result) {
+      Py_DECREF (result);
+      return true;
+    }
+  }
+  return false;
+}
+
+bool PyCCarUI::init (unsigned screen_width, unsigned screen_height) {
+  PyObject * args = Py_BuildValue ("O(II)", Py_None, screen_width, screen_height);
 
   if (args) {
     PyObject * result = PyObject_CallObject (s_init, args);

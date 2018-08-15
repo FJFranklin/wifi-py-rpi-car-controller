@@ -23,6 +23,8 @@
 
 #include "pyccar.hh"
 
+#include <cstring>
+
 #include "TouchInput.hh"
 #include "Window.hh"
 
@@ -37,13 +39,25 @@ static const char * video_driver = "fbcon";
 
 static TouchInput * TI = 0;
 
-int main (int /* argc */, char ** /* argv */) {
+int main (int argc, char ** argv) {
+  bool bFrameBuffer = false;
+  bool bRescaleAxes = false;
+
   unsigned screen_width  = 800;
   unsigned screen_height = 480;
 
   unsigned refresh_interval = 15;
 
-  TouchInput touch(true);
+  for (int arg = 1; arg < argc; arg++) {
+    if (strcmp (argv[arg], "--frame-buffer")) {
+      bFrameBuffer = true;
+    }
+    if (strcmp (argv[arg], "--rescale-axes")) {
+      bRescaleAxes = true;
+    }
+  }
+
+  TouchInput touch(bRescaleAxes);
   TI = &touch;
 
   if (!TI->init (touch_device)) {
@@ -53,9 +67,17 @@ int main (int /* argc */, char ** /* argv */) {
 
   Py_SetProgramName (const_cast<char *>(application_name));
   Py_Initialize ();
+  PySys_SetArgv (argc, argv);
 
   if (PyCCarUI::ui_load (script_filename)) {
-    if (PyCCarUI::init (video_driver, video_device, screen_width, screen_height)) {
+    bool bUI = false;
+
+    if (bFrameBuffer)
+      bUI = PyCCarUI::init (video_driver, video_device, screen_width, screen_height);
+    else
+      bUI = PyCCarUI::init (screen_width, screen_height);
+
+    if (bUI) {
       if (Window::init (screen_width, screen_height)) {
 	TI->run (refresh_interval);
       } else {

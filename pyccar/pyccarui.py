@@ -182,14 +182,19 @@ def ui_draw(win_id):
 def ui_refresh():
     pygame.display.update()
 
-def ui_init(driver, device, screen_w, screen_h):
-    os.environ["SDL_VIDEODRIVER"] = driver
-    os.environ["SDL_FBDEV"] = device
+def ui_init(DD, screen_wh):
+    if DD:
+        (driver, device) = DD
+        os.environ["SDL_VIDEODRIVER"] = driver
+        os.environ["SDL_FBDEV"] = device
     pygame.init()
     pygame.display.init()
-    pygame.mouse.set_visible(0)
     pygame.font.init()
     global screen
-    screen = pygame.display.set_mode((screen_w, screen_h), pygame.FULLSCREEN)
+    if DD:
+        pygame.mouse.set_visible(0)
+        screen = pygame.display.set_mode(screen_wh, pygame.FULLSCREEN)
+    else:
+        screen = pygame.display.set_mode(screen_wh)
     screen.fill(red)
     pygame.display.update()
