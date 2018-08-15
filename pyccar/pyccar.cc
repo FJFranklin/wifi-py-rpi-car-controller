@@ -79,6 +79,8 @@ int main (int argc, char ** argv) {
 
     if (bUI) {
       if (Window::init (screen_width, screen_height)) {
+	// TODO: create UI
+	Window::root().redraw ();
 	TI->run (refresh_interval);
       } else {
 	fputs ("Failed to initialise window manager!\n", stderr);

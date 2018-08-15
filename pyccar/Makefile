@@ -1,7 +1,7 @@
 all:	pyccar
 
 run:	pyccar
-	PYTHONPATH=`pwd` ./pyccar
+	PYTHONPATH=`pwd` ./pyccar --frame-buffer --rescale-axes
 
 clean:
 	rm -f *~ *.o

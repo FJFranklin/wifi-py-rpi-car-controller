@@ -164,7 +164,7 @@ bool PyCCarUI::refresh () {
 }
 
 bool PyCCarUI::draw () {
-  PyObject * args = Py_BuildValue ("I", m_id);
+  PyObject * args = Py_BuildValue ("(I)", m_id);
 
   if (args) {
     PyObject * result = PyObject_CallObject (s_draw, args);
