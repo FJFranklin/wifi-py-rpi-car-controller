@@ -72,8 +72,8 @@ static unsigned long timer_millis () {
 using namespace PyCCar;
 
 TouchInput::TouchInput (bool rescale) :
-  m_handler(0),
   m_te(te_None),
+  m_handler(0),
   m_devfd(-1),
   m_rescale(rescale),
   m_touch_new(false),
@@ -218,7 +218,7 @@ void TouchInput::event_process () {
 	m_handler->touch_enter ();
     }
     if (m_handler)
-      m_handler.touch_event (m_te, m_touch);
+      m_handler->touch_event (m_te, m_touch);
   }
   m_te = te_None;
 

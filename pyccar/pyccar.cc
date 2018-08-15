@@ -57,7 +57,7 @@ int main (int /* argc */, char ** /* argv */) {
   if (PyCCarUI::ui_load (script_filename)) {
     if (PyCCarUI::init (video_driver, video_device, screen_width, screen_height)) {
       if (Window::init (screen_width, screen_height)) {
-	TI->run (Window::root (), refresh_interval);
+	TI->run (refresh_interval);
       } else {
 	fputs ("Failed to initialise window manager!\n", stderr);
       }

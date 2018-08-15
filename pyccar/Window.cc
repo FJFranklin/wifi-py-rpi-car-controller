@@ -118,7 +118,7 @@ bool Window::coord_in_bounds (int x, int y) {
   if ((x < m_abs_x) || (y < m_abs_y)) {
     return false;
   }
-  if ((x >= m_abs_x + m_W) || (y >= m_abs_y + m_H)) {
+  if ((x >= m_abs_x + static_cast<int>(m_W)) || (y >= m_abs_y + static_cast<int>(m_H))) {
     return false;
   }
   return true;

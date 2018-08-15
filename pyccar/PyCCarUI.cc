@@ -37,7 +37,7 @@ PyObject * s_draw    = 0;
 PyObject * s_refresh = 0;
 
 bool PyCCarUI::ui_load (const char * script_filename) {
-  if (!PyCCarUI) {
+  if (!s_PyCCarUI) {
     PyObject * pystr = PyString_FromString (script_filename);
     if (pystr) {
       // fputs ("module loading...\n", stderr);
@@ -91,8 +91,9 @@ bool PyCCarUI::ui_load (const char * script_filename) {
   }
   if (!s_refresh || !s_draw || !s_init || !s_set_p) {
     fputs ("PyCCar: UI load error!\n", stderr);
+    return false;
   }
-  return s_refresh;
+  return true;
 }
 
 void PyCCarUI::ui_free () {
