@@ -143,8 +143,23 @@ bool PyCCarUI::refresh () {
   return false;
 }
 
-bool PyCCarUI::set_property (const char * property, PyObject * value) {
-  PyObject * args = Py_BuildValue ("IsO", m_id, property, value);
+bool PyCCarUI::draw () {
+  PyObject * args = Py_BuildValue ("I", m_id);
+
+  if (args) {
+    PyObject * result = PyObject_CallObject (s_draw, args);
+    Py_DECREF(args);
+
+    if (result) {
+      Py_DECREF (result);
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool s_set_property_unsigned (unsigned win_id, const char * property, unsigned value) {
+  PyObject * args = Py_BuildValue ("IsI", win_id, property, value);
 
   if (args) {
     PyObject * result = PyObject_CallObject (s_set_p, args);
@@ -158,11 +173,41 @@ bool PyCCarUI::set_property (const char * property, PyObject * value) {
   return false;
 }
 
-bool PyCCarUI::draw () {
-  PyObject * args = Py_BuildValue ("I", m_id);
+static bool s_set_property_str (unsigned win_id, const char * property, const char * str) {
+  PyObject * args = Py_BuildValue ("Iss", win_id, property, str);
 
   if (args) {
-    PyObject * result = PyObject_CallObject (s_draw, args);
+    PyObject * result = PyObject_CallObject (s_set_p, args);
+    Py_DECREF(args);
+
+    if (result) {
+      Py_DECREF (result);
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool s_set_property_color (unsigned win_id, const char * property, unsigned r, unsigned g, unsigned b) {
+  PyObject * args = Py_BuildValue ("Is(III)", win_id, property, r, g, b);
+
+  if (args) {
+    PyObject * result = PyObject_CallObject (s_set_p, args);
+    Py_DECREF(args);
+
+    if (result) {
+      Py_DECREF (result);
+      return true;
+    }
+  }
+  return false;
+}
+
+bool PyCCarUI::set_property (const char * property, PyObject * value) {
+  PyObject * args = Py_BuildValue ("IsO", m_id, property, value);
+
+  if (args) {
+    PyObject * result = PyObject_CallObject (s_set_p, args);
     Py_DECREF(args);
 
     if (result) {
@@ -185,11 +230,55 @@ bool PyCCarUI::set_bbox (int x, int y, unsigned width, unsigned height) {
 }
 
 bool PyCCarUI::set_flags (unsigned flags) {
+  return s_set_property_unsigned (m_id, "flags", flags);
+}
+
+bool PyCCarUI::set_type (const char * window_type) {
+  return s_set_property_str (m_id, "type", window_type);
+}
+
+bool PyCCarUI::set_bg_color (unsigned char r, unsigned char g, unsigned char b) {
+  return s_set_property_color (m_id, "BG", r, g, b);
+}
+
+bool PyCCarUI::set_fg_color (unsigned char r, unsigned char g, unsigned char b) {
+  return s_set_property_color (m_id, "FG", r, g, b);
+}
+
+bool PyCCarUI::set_fg_disabled (unsigned char r, unsigned char g, unsigned char b) {
+  return s_set_property_color (m_id, "dis_FG", r, g, b);
+}
+
+bool PyCCarUI::set_font_size (unsigned size) {
+  return s_set_property_unsigned (m_id, "size", size);
+}
+
+bool PyCCarUI::set_label (const char * text) {
+  return s_set_property_str (m_id, "Label", text);
+}
+
+bool PyCCarUI::set_spacing (unsigned inset) {
+  return s_set_property_unsigned (m_id, "inset", inset);
+}
+
+bool PyCCarUI::set_border_active (unsigned thickness) {
+  return s_set_property_unsigned (m_id, "a-thick", thickness);
+}
+
+bool PyCCarUI::set_border_inactive (unsigned thickness) {
+  return s_set_property_unsigned (m_id, "n-thin", thickness);
+}
+
+bool PyCCarUI::set_thickness (unsigned thickness) {
+  return s_set_property_unsigned (m_id, "line", thickness);
+}
+
+bool PyCCarUI::set_scroll (unsigned s_min, unsigned s_max) {
   bool bOkay = false;
 
-  PyObject * value = Py_BuildValue ("I", flags);
+  PyObject * value = Py_BuildValue ("II", s_min, s_max);
   if (value) {
-    bOkay = set_property ("flags", value);
+    bOkay = set_property ("bbox", value);
     Py_DECREF (value);
   }
   return bOkay;

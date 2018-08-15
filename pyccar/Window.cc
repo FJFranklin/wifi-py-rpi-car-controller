@@ -38,10 +38,6 @@ Window & Window::root () {
   return *s_root;
 }
 
-bool Window::set_flags (unsigned flags) {
-  s_set_flags (m_id, flags);
-}
-
 Window::Window (unsigned width, unsigned height) :
   m_parent(0),
   m_child_bottom(0),
@@ -59,11 +55,12 @@ Window::Window (unsigned width, unsigned height) :
   m_bVisible(true),
   m_bTouchable(true)
 {
-  PyCCarUI(m_id).set_bbox (m_abs_x, m_abs_y, m_W, m_H);
+  PyCCarUI(id ()).set_bbox (m_abs_x, m_abs_y, m_W, m_H);
 
   /* Settings for root window
    */
-  PyCCarUI(m_id).set_flags (PyCCar_VISIBLE | PyCCar_BLANK);
+  PyCCarUI(id ()).set_flags (PyCCar_VISIBLE | PyCCar_BLANK);
+  PyCCarUI(id ()).set_type ("root");
 }
 
 Window::Window (Window & parent, int rel_x, int rel_y, unsigned width, unsigned height) :
@@ -85,7 +82,7 @@ Window::Window (Window & parent, int rel_x, int rel_y, unsigned width, unsigned 
 {
   parent.add_child (this);
 
-  PyCCarUI(m_id).set_bbox (m_abs_x, m_abs_y, m_W, m_H);
+  PyCCarUI(id ()).set_bbox (m_abs_x, m_abs_y, m_W, m_H);
 }
 
 Window::~Window () {
@@ -127,14 +124,47 @@ bool Window::coord_in_bounds (int x, int y) {
   return true;
 }
 
-bool Window::handle_touch (TouchInput::TouchEvent te, int rel_x, int rel_y) {
-  return true; // catch & ignore...
+TouchInput::Handler * Window::touch_handler (const struct TouchInput::touch_event_data & event_data) {
+  TouchInput::Handler * handler = 0;
+
+  /* Check children first, top to bottom
+   */
+  Window * child = m_child_top;
+
+  while (child && !handler) {
+    if (child->visible ()) {
+      if (child->coord_in_bounds (event_data.t1.x, event_data.t1.y)) {
+	handler = child->touch_handler (event_data);
+      }
+    }
+    child = child->m_sibling_lower;
+  }
+
+  /* If not handled by a child, maybe we can handle it ourselves
+   */
+  if (!handler && m_bTouchable) {
+    handler = this;
+  }
+  return handler;
 }
 
-bool Window::touch_event (TouchInput::TouchEvent te, const struct TouchInput::touch_event_data & event_data) {
+void Window::touch_enter () {
+#if 1
+  fputs ("<enter>\n", stderr);
+#endif
+}
+
+void Window::touch_leave () {
+#if 1
+  fputs ("<leave>\n", stderr);
+#endif
+}
+
+void Window::touch_event (TouchInput::TouchEvent te, const struct TouchInput::touch_event_data & event_data) {
 #if 1
   switch (te) {
   case TouchInput::te_None:
+    fputs ("(none)\n", stderr);
     break;
   case TouchInput::te_Begin:
     {
@@ -153,37 +183,12 @@ bool Window::touch_event (TouchInput::TouchEvent te, const struct TouchInput::to
     }
   }
 #endif
-  bool bHandled = false;
-
-  int x = event_data.t1.x;
-  int y = event_data.t1.y;
-
-  /* Check children first, top to bottom
-   */
-  Window * child = m_child_top;
-
-  while (child && !bHandled) {
-    if (child->visible ()) {
-      if (child->coord_in_bounds (x, y)) {
-	bHandled = child->touch_event (te, event_data);
-      }
-    }
-    child = child->m_sibling_lower;
-  }
-
-  /* If not handled by a child, handle it ourselves
-   */
-  if (!bHandled && m_bTouchable) {
-    bHandled = handle_touch (te, x - m_abs_x, y - m_abs_y);
-  }
-
-  return bHandled;
 }
 
 void Window::redraw () {
   /* Draw self first
    */
-  PyCCarUI(m_id).draw ();
+  PyCCarUI(id ()).draw ();
 
   set_dirty (false);
 

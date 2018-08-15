@@ -55,13 +55,24 @@ public:
   static bool init (const char * driver, const char * device, unsigned screen_width, unsigned screen_height);
   static bool refresh ();
 
-  bool set_property (const char * property, PyObject * value);
   bool draw ();
+  bool set_property (const char * property, PyObject * value);
 
   /* Set properties
    */
   bool set_bbox (int x, int y, unsigned width, unsigned height);
   bool set_flags (unsigned flags);
+  bool set_type (const char * window_type);
+  bool set_bg_color (unsigned char r, unsigned char g, unsigned char b);
+  bool set_fg_color (unsigned char r, unsigned char g, unsigned char b);
+  bool set_fg_disabled (unsigned char r, unsigned char g, unsigned char b);
+  bool set_font_size (unsigned size);
+  bool set_label (const char * text);
+  bool set_spacing (unsigned inset);
+  bool set_border_active (unsigned thickness);
+  bool set_border_inactive (unsigned thickness);
+  bool set_thickness (unsigned thickness);
+  bool set_scroll (unsigned s_min, unsigned s_max);
 };
 
 #endif /* ! __PyCCar_hh__ */

@@ -55,11 +55,19 @@ namespace PyCCar {
 
     class Handler {
     public:
-      virtual bool touch_event (TouchEvent te, const struct touch_event_data & event_data) = 0;
+      virtual Handler * touch_handler (const struct touch_event_data & event_data) = 0;
+
+      virtual void touch_enter () = 0;
+      virtual void touch_leave () = 0;
+
+      virtual void touch_event (TouchEvent te, const struct touch_event_data & event_data) = 0;
+
       virtual ~Handler () { }
     };
 
   private:
+    Handler * m_handler;
+
     int m_devfd;
 
     bool m_rescale;
@@ -97,19 +105,14 @@ namespace PyCCar {
     inline bool event_pending () const {
       return m_te;
     }
-    inline void event_process (Handler & handler) {
-      if (m_te) {
-	handler.touch_event (m_te, m_touch);
-      }
-      m_te = te_None;
-    }
+    void event_process ();
 
     /* start a simple event loop to check for touch events and process them
      * 
      * calls tick() every millisecond, and event_process() every <interval>
      * (interval specified in milliseconds; must be non-zero)
      */
-    void run (Handler & handler, unsigned long interval);
+    void run (unsigned long interval);
 
     /* stop the event loop
      */

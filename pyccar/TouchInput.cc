@@ -38,6 +38,7 @@
 #include <linux/input.h>
 
 #include "TouchInput.hh"
+#include "Window.hh"
 
 static unsigned long bInit = false;
 
@@ -70,34 +71,8 @@ static unsigned long timer_millis () {
 
 using namespace PyCCar;
 
-void TouchInput::run (Handler & handler, unsigned long interval) {
-  if (m_timer_active) { // already active; just return
-    return;
-  }
-
-  unsigned long last_milli = timer_millis ();
-  unsigned long last_event = last_milli;
-
-  m_timer_active = true;
-
-  while (m_timer_active) {
-    unsigned long time = timer_millis ();  // just call this the once
-
-    if (last_milli < time) { // time is in milliseconds
-      last_milli = time;     // note current time
-      tick ();
-    }
-    if (interval) {
-      if (last_event + interval <= time) {
-	last_event += interval;
-	event_process (handler);
-      }
-    }
-    usleep (1);
-  }
-}
-
 TouchInput::TouchInput (bool rescale) :
+  m_handler(0),
   m_te(te_None),
   m_devfd(-1),
   m_rescale(rescale),
@@ -220,5 +195,59 @@ void TouchInput::tick () {
     if (ev_count) {
       ev[0] = ev[count];
     }
+  }
+}
+
+void TouchInput::event_process () {
+  if (m_te) {
+#if 1
+    if ((m_touch.t1.x != m_touch.t2.x) || (m_touch.t1.y != m_touch.t2.y)) {
+      stop (); // Exit on multi-touch
+      return;
+    }
+#endif
+    Handler * handler = Window::root().touch_handler (m_touch);
+
+    if (m_handler != handler) {
+      if (m_handler)
+	m_handler->touch_leave ();
+
+      m_handler = handler;
+
+      if (m_handler)
+	m_handler->touch_enter ();
+    }
+    if (m_handler)
+      m_handler.touch_event (m_te, m_touch);
+  }
+  m_te = te_None;
+
+  PyCCarUI::refresh ();
+}
+
+void TouchInput::run (unsigned long interval) {
+  if (m_timer_active) { // already active; just return
+    return;
+  }
+
+  unsigned long last_milli = timer_millis ();
+  unsigned long last_event = last_milli;
+
+  m_timer_active = true;
+
+  while (m_timer_active) {
+    unsigned long time = timer_millis ();  // just call this the once
+
+    if (last_milli < time) { // time is in milliseconds
+      last_milli = time;     // note current time
+      tick ();
+    }
+    if (interval) {
+      if (last_event + interval <= time) {
+	last_event += interval;
+	event_process ();
+      }
+    }
+    usleep (1);
   }
 }

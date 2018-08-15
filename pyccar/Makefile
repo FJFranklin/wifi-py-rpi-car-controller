@@ -12,7 +12,7 @@ pyccar:		pyccar.o TouchInput.o Window.o PyCCarUI.o
 pyccar.o:	pyccar.hh TouchInput.hh Window.hh pyccar.cc
 		c++ -c pyccar.cc `python-config --cflags`
 
-TouchInput.o:	pyccar.hh TouchInput.hh TouchInput.cc
+TouchInput.o:	pyccar.hh TouchInput.hh Window.hh TouchInput.cc
 		c++ -c TouchInput.cc `python-config --cflags`
 
 Window.o:	pyccar.hh TouchInput.hh Window.hh Window.cc

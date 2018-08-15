@@ -78,26 +78,40 @@ namespace PyCCar {
     }
 
     inline void set_visible (bool bVisible) {
-      if (m_id)
+      if (id ())
 	m_bVisible = bVisible;
     }
     inline bool visible () const {
       return m_bVisible;
     }
 
-    bool set_flags (unsigned flags);
-
     bool coord_in_bounds (int x, int y);
 
-  protected:
-    virtual bool handle_touch (TouchInput::TouchEvent te, int rel_x, int rel_y);
-  public:
-    virtual bool touch_event (TouchInput::TouchEvent te, const struct TouchInput::touch_event_data & event_data);
+    virtual TouchInput::Handler * touch_handler (const struct TouchInput::touch_event_data & event_data);
+
+    virtual void touch_enter ();
+    virtual void touch_leave ();
+    virtual void touch_event (TouchInput::TouchEvent te, const struct TouchInput::touch_event_data & event_data);
 
     virtual void redraw ();
 
   private:
     void add_child (Window * child);
+  };
+
+  class Button : public Window {
+  private:
+    bool m_bEnabled;
+    bool m_bActive;
+
+  public:
+    Button (Window & parent, int rel_x, int rel_y, unsigned width, unsigned height);
+
+    virtual ~Button ();
+
+    virtual void touch_enter ();
+    virtual void touch_leave ();
+    virtual void touch_event (TouchInput::TouchEvent te, const struct TouchInput::touch_event_data & event_data);
   };
 
 } // namespace PyCCar
