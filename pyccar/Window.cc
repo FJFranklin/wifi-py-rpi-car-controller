@@ -51,6 +51,7 @@ Window::Window (unsigned width, unsigned height) :
   m_W(width),
   m_H(height),
   m_id(0),
+  m_flags(0),
   m_bDirty(true),
   m_bVisible(true),
   m_bTouchable(true)
@@ -59,8 +60,8 @@ Window::Window (unsigned width, unsigned height) :
 
   /* Settings for root window
    */
-  PyCCarUI(id ()).set_flags (PyCCar_VISIBLE | PyCCar_BLANK);
-  PyCCarUI(id ()).set_type ("root");
+  m_flags = PyCCar_VISIBLE | PyCCar_BLANK;
+  PyCCarUI(id ()).set_flags (m_flags);
 }
 
 Window::Window (Window & parent, int rel_x, int rel_y, unsigned width, unsigned height) :
@@ -76,6 +77,7 @@ Window::Window (Window & parent, int rel_x, int rel_y, unsigned width, unsigned 
   m_W(width),
   m_H(height),
   m_id(s_id_next ()),
+  m_flags(0),
   m_bDirty(true),
   m_bVisible(false),
   m_bTouchable(false)
@@ -111,6 +113,23 @@ void Window::add_child (Window * child) {
     child->m_sibling_upper = 0;
     m_child_bottom = child;
     m_child_top    = child;
+  }
+}
+
+void Window::set_visible (bool bVisible) {
+  if (m_parent && (bVisible != visible ())) { // the root window is always visible
+    if (bVisible) {
+      m_flags |=  PyCCar_VISIBLE;
+    } else {
+      m_flags &= ~PyCCar_VISIBLE;
+    }
+    PyCCarUI(id ()).set_flags (m_flags);
+
+    if (bVisible) {
+      redraw ();
+    } else {
+      m_parent->redraw ();
+    }
   }
 }
 
@@ -186,6 +205,9 @@ void Window::touch_event (TouchInput::TouchEvent te, const struct TouchInput::to
 }
 
 void Window::redraw () {
+  if (!visible ())
+    return;
+
   /* Draw self first
    */
   PyCCarUI(id ()).draw ();
@@ -197,9 +219,74 @@ void Window::redraw () {
   Window * child = m_child_bottom;
 
   while (child) {
-    if (child->visible ()) {
-      child->redraw ();
-    }
+    child->redraw ();
     child = child->m_sibling_upper;
+  }
+}
+
+Button::Button (Window & parent, int rel_x, int rel_y, unsigned width, unsigned height) :
+  Window(parent, rel_x, rel_y, width, height),
+  m_handler(0),
+  m_button_id(0)
+{
+  m_flags = PyCCar_BORDER;
+  set_enabled (true);
+}
+
+Button::~Button () {
+  // ...
+}
+
+void Button::set_enabled (bool bEnabled) {
+  if (bEnabled != enabled ()) {
+    if (bEnabled)
+      m_flags |=  PyCCar_ENABLED;
+    else
+      m_flags &= ~PyCCar_ENABLED;
+
+    PyCCarUI(id ()).set_flags (m_flags);
+
+    if (!enabled () && active ()) {
+      set_active (false);
+    } else {
+      redraw ();
+    }
+    m_bTouchable = enabled ();
+  }
+}
+
+void Button::set_active (bool bActive) {
+  if (bActive != active ()) {
+    if (bActive)
+      m_flags |=  PyCCar_ACTIVE;
+    else
+      m_flags &= ~PyCCar_ACTIVE;
+
+    PyCCarUI(id ()).set_flags (m_flags);
+    redraw ();
+  }
+}
+
+void Button::touch_enter () {
+  // ...
+}
+
+void Button::touch_leave () {
+  set_active (false);
+}
+
+void Button::touch_event (TouchInput::TouchEvent te, const struct TouchInput::touch_event_data & event_data) {
+  if (te == TouchInput::te_End) {
+    if (active ()) { // a touch-end event in a highlighted button - the button has been pressed
+      set_active (false);
+
+      if (m_handler) {
+	m_handler->button_press (m_button_id);
+      }
+    } else {         // not currently highlighted - uncertain selection? => ditch the event
+      // ...
+    }
+  } else {
+    set_active (true);
   }
 }

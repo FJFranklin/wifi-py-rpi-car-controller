@@ -47,9 +47,11 @@ namespace PyCCar {
     unsigned m_H;
 
     unsigned m_id;
+  protected:
+    unsigned m_flags;
 
+  private:
     bool m_bDirty;
-    bool m_bVisible;
   protected:
     bool m_bTouchable;
 
@@ -70,20 +72,17 @@ namespace PyCCar {
       return m_id;
     }
 
-    inline void set_dirty (bool bDirty) {
+    inline void set_dirty (bool bDirty) { // FIXME: what to do about this?
       m_bDirty = bDirty;
     }
     inline bool dirty () const {
       return m_bDirty;
     }
 
-    inline void set_visible (bool bVisible) {
-      if (id ())
-	m_bVisible = bVisible;
-    }
     inline bool visible () const {
-      return m_bVisible;
+      return m_flags & PyCCar_VISIBLE;
     }
+    void set_visible (bool bVisible);
 
     bool coord_in_bounds (int x, int y);
 
@@ -100,15 +99,37 @@ namespace PyCCar {
   };
 
   class Button : public Window {
+  public:
+    class Handler {
+    public:
+      virtual void button_press (unsigned button_id) = 0;
+      virtual ~Handler () { }
+    };
+
   private:
-    bool m_bEnabled;
-    bool m_bActive;
+    Handler * m_handler;
+    unsigned  m_button_id;
 
   public:
     Button (Window & parent, int rel_x, int rel_y, unsigned width, unsigned height);
 
     virtual ~Button ();
 
+    inline void set_callback (Handler * handler, unsigned button_id) {
+      m_handler   = handler;
+      m_button_id = button_id;
+    }
+
+    inline bool enabled () const {
+      return m_flags & PyCCar_ENABLED;
+    }
+    void set_enabled (bool bEnabled);
+  private:
+    inline bool active () const {
+      return m_flags & PyCCar_ACTIVE;
+    }
+    void set_active (bool bActive);
+  public:
     virtual void touch_enter ();
     virtual void touch_leave ();
     virtual void touch_event (TouchInput::TouchEvent te, const struct TouchInput::touch_event_data & event_data);
