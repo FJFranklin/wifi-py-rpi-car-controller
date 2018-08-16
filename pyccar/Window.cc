@@ -53,7 +53,6 @@ Window::Window (unsigned width, unsigned height) :
   m_id(0),
   m_flags(0),
   m_bDirty(true),
-  m_bVisible(true),
   m_bTouchable(true)
 {
   PyCCarUI(id ()).set_bbox (m_abs_x, m_abs_y, m_W, m_H);
@@ -79,7 +78,6 @@ Window::Window (Window & parent, int rel_x, int rel_y, unsigned width, unsigned 
   m_id(s_id_next ()),
   m_flags(0),
   m_bDirty(true),
-  m_bVisible(false),
   m_bTouchable(false)
 {
   parent.add_child (this);

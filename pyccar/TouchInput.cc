@@ -124,13 +124,16 @@ void TouchInput::handle (const struct input_event * event) {
     } else if (m_touch_yes) {
       touch_event_change ();
     }
-  }
-  if (event->type == EV_ABS) {
+  } else if (event->type == EV_ABS) {
     switch (event->code) {
     case 0:
       {
 	if (m_rescale)
+#if 0
 	  m_touch.t1.x = event->value * 5 / 3;
+#else
+	  m_touch.t1.y = (event->value - 220) * 320 / (3560);
+#endif
 	else
 	  m_touch.t1.x = event->value;
 	break;
@@ -138,9 +141,24 @@ void TouchInput::handle (const struct input_event * event) {
     case 1:
       {
 	if (m_rescale)
+#if 0
 	  m_touch.t1.y = event->value * 3 / 5;
+#else
+	  m_touch.t1.x = 480 - (event->value - 150) * 480 / (3770);
+#endif
 	else
 	  m_touch.t1.y = event->value;
+	break;
+      }
+    case 24: // pressure
+      {
+	if (event->value == 0) {
+	  if (m_touch_yes)
+	    m_touch_end = true;
+	} else {
+	  if (!m_touch_yes)
+	    m_touch_new = true;
+	}
 	break;
       }
     case 53:
@@ -200,7 +218,7 @@ void TouchInput::tick () {
 
 void TouchInput::event_process () {
   if (m_te) {
-#if 1
+#if 0
     if ((m_touch.t1.x != m_touch.t2.x) || (m_touch.t1.y != m_touch.t2.y)) {
       stop (); // Exit on multi-touch
       return;
@@ -232,12 +250,16 @@ void TouchInput::run (unsigned long interval) {
 
   unsigned long last_milli = timer_millis ();
   unsigned long last_event = last_milli;
+  unsigned long time_start = last_milli;
 
   m_timer_active = true;
 
   while (m_timer_active) {
     unsigned long time = timer_millis ();  // just call this the once
-
+#if 1
+    if (time - time_start > 10000)
+      break;
+#endif
     if (last_milli < time) { // time is in milliseconds
       last_milli = time;     // note current time
       tick ();

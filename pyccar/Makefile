@@ -3,6 +3,9 @@ all:	pyccar
 run:	pyccar
 	PYTHONPATH=`pwd` ./pyccar --frame-buffer --rescale-axes
 
+tft:	pyccar
+	PYTHONPATH=`pwd` ./pyccar --frame-buffer
+
 clean:
 	rm -f *~ *.o
 

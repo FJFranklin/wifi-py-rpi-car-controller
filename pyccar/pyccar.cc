@@ -33,8 +33,8 @@ using namespace PyCCar;
 static const char * application_name = "PyCCar";
 static const char * script_filename  = "pyccarui"; // without extension
 
-static const char * touch_device = "/dev/input/event0";
-static const char * video_device = "/dev/fb0";
+static const char * touch_device = "/dev/input/event3";
+static const char * video_device = "/dev/fb1";
 static const char * video_driver = "fbcon";
 
 static TouchInput * TI = 0;
@@ -43,8 +43,8 @@ int main (int argc, char ** argv) {
   bool bFrameBuffer = false;
   bool bRescaleAxes = false;
 
-  unsigned screen_width  = 800;
-  unsigned screen_height = 480;
+  unsigned screen_width  = 480; // 800;
+  unsigned screen_height = 320; // 480;
 
   unsigned refresh_interval = 15;
 
