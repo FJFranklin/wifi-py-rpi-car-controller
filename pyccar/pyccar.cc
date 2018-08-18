@@ -33,15 +33,15 @@ using namespace PyCCar;
 static const char * application_name = "PyCCar";
 static const char * script_filename  = "pyccarui"; // without extension
 
-static const char * touch_device = "/dev/input/event3";
-static const char * video_device = "/dev/fb1";
+static const char * touch_device = "/dev/input/event0";
+static const char * video_device = "/dev/fb0";
 static const char * video_driver = "fbcon";
 
 static TouchInput * TI = 0;
 
 int main (int argc, char ** argv) {
   bool bFrameBuffer = false;
-  bool bRescaleAxes = false;
+  bool bHyperPixel  = false;
 
   unsigned screen_width  = 480; // 800;
   unsigned screen_height = 320; // 480;
@@ -52,13 +52,44 @@ int main (int argc, char ** argv) {
     if (strcmp (argv[arg], "--frame-buffer")) {
       bFrameBuffer = true;
     }
-    if (strcmp (argv[arg], "--rescale-axes")) {
-      bRescaleAxes = true;
+    if (strcmp (argv[arg], "--hyperpixel")) {
+      screen_width  = 800;
+      screen_height = 480;
+      bHyperPixel = true;
+    }
+    if (strncmp (argv[arg], "--fb-device=", 12)) {
+      video_device = argv[arg] + 12;
+    }
+    if (strncmp (argv[arg], "--touch-device=", 15)) {
+      touch_device = argv[arg] + 15;
+    }
+    if (strcmp (argv[arg], "--help")) {
+      fprintf (stdout, "%s [--frame-buffer] [--hyperpixel] [--fb-device=<dev>] [--touch-device=]\n\n"
+	       "  --frame-buffer       Use the framebuffer as the display.\n"
+	       "  --hyperpixel         This has an 800x480 display; touch coordinates need rescaling.\n"
+	       "  --fb-device=<dev>    Framebuffer device [default: /dev/fb0].\n"
+	       "  --touch-device=<dev> Touch event input device [default: /dev/input/event0].\n"
+	       "\n"
+	       , argv[0]);
+      return 0;
     }
   }
 
-  TouchInput touch(bRescaleAxes);
+  TouchInput touch(screen_width, screen_height);
   TI = &touch;
+
+  /* Q. Is there a better way to do this calibration? // FIXME
+   */
+  if (bHyperPixel) {
+    TI->m_range_max_x = 480;
+    TI->m_range_max_y = 800;
+  } else {
+    TI->m_range_min_x = 3920;
+    TI->m_range_max_x = 150;
+    TI->m_range_min_y = 220;
+    TI->m_range_max_y = 3780;
+    TI->m_bFlip = true;
+  }
 
   if (!TI->init (touch_device)) {
     fprintf (stderr, "%s: unable to open event device \"%s\" for reading!\n", application_name, touch_device);

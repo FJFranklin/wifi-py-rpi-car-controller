@@ -1,10 +1,13 @@
 all:	pyccar
 
-run:	pyccar
-	PYTHONPATH=`pwd` ./pyccar --frame-buffer --rescale-axes
+runX:	pyccar
+	PYTHONPATH=`pwd` ./pyccar
 
-tft:	pyccar
-	PYTHONPATH=`pwd` ./pyccar --frame-buffer
+runhp:	pyccar
+	PYTHONPATH=`pwd` ./pyccar --frame-buffer --hyperpixel
+
+runtft:	pyccar
+	PYTHONPATH=`pwd` ./pyccar --frame-buffer --fb-device=/dev/fb1 --touch-device=/dev/input/event3
 
 clean:
 	rm -f *~ *.o

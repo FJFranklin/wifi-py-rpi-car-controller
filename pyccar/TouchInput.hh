@@ -70,8 +70,6 @@ namespace PyCCar {
 
     int m_devfd;
 
-    bool m_rescale;
-
     bool m_touch_new;
     bool m_touch_end;
     bool m_touch_yes;
@@ -81,8 +79,16 @@ namespace PyCCar {
     unsigned long ev_count;
     unsigned char ev_buffer[TouchInput_BUFSIZE];
 
+    int  m_width;
+    int  m_height;
   public:
-    TouchInput (bool rescale = false);
+    int  m_range_min_x;
+    int  m_range_max_x;
+    int  m_range_min_y;
+    int  m_range_max_y;
+    bool m_bFlip;
+
+    TouchInput (unsigned width, unsigned height);
 
     ~TouchInput ();
 

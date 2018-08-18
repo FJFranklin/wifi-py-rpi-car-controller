@@ -71,7 +71,7 @@ static unsigned long timer_millis () {
 
 using namespace PyCCar;
 
-TouchInput::TouchInput (bool rescale) :
+TouchInput::TouchInput (int width, int height) :
   m_te(te_None),
   m_handler(0),
   m_devfd(-1),
@@ -80,7 +80,14 @@ TouchInput::TouchInput (bool rescale) :
   m_touch_end(false),
   m_touch_yes(false),
   m_timer_active(false),
-  ev_count(0)
+  ev_count(0),
+  m_width(width),
+  m_height(height),
+  m_range_min_x(0),
+  m_range_max_x(width),
+  m_range_min_y(0),
+  m_range_max_y(height),
+  m_bFlip(false)
 {
   m_touch.t1.x = 0;
   m_touch.t1.y = 0;
@@ -100,6 +107,16 @@ bool TouchInput::init (const char * device) {
     if (m_devfd == -1) {
       fprintf (stderr, "Failed to open \"%s\" - exiting.\n", device);
       return false;
+    }
+
+    struct input_id iid;
+    if (ioctl (m_devfd, EVIOCGID, &iid)) {
+      fprintf(stdout, "vendor %04hx product %04hx version %04hx\n", iid.vendor, iid.product, iid.version);
+    }
+
+    char name[256];
+    if (ioctl(m_devfd, EVIOCGNAME (sizeof (name)), name)) {
+      fprintf (stdout, "Touch device is '%s'.\n", name);
     }
 
     unsigned char byte;
@@ -128,29 +145,21 @@ void TouchInput::handle (const struct input_event * event) {
     switch (event->code) {
     case 0:
       {
-	if (m_rescale)
-#if 0
-	  m_touch.t1.x = event->value * 5 / 3;
-#else
-	  m_touch.t1.y = (event->value - 220) * 320 / (3560);
-#endif
+	if (m_bFlip) // this is a y-axis event
+	  m_touch.t1.y = (event->value - m_range_min_y) * m_height / (m_range_max_y - m_range_min_y);
 	else
-	  m_touch.t1.x = event->value;
+	  m_touch.t1.x = (event->value - m_range_min_x) * m_width  / (m_range_max_x - m_range_min_x);
 	break;
       }
     case 1:
       {
-	if (m_rescale)
-#if 0
-	  m_touch.t1.y = event->value * 3 / 5;
-#else
-	  m_touch.t1.x = 480 - (event->value - 150) * 480 / (3770);
-#endif
+	if (m_bFlip) // this is a x-axis event
+	  m_touch.t1.x = (event->value - m_range_min_x) * m_width  / (m_range_max_x - m_range_min_x);
 	else
-	  m_touch.t1.y = event->value;
+	  m_touch.t1.y = (event->value - m_range_min_y) * m_height / (m_range_max_y - m_range_min_y);
 	break;
       }
-    case 24: // pressure
+    case 24: // touch event with zero-pressure marks end of sequence
       {
 	if (event->value == 0) {
 	  if (m_touch_yes)
@@ -163,21 +172,21 @@ void TouchInput::handle (const struct input_event * event) {
       }
     case 53:
       {
-	if (m_rescale)
-	  m_touch.t2.x = event->value * 5 / 3;
+	if (m_bFlip) // this is a y-axis event
+	  m_touch.t2.y = (event->value - m_range_min_y) * m_height / (m_range_max_y - m_range_min_y);
 	else
-	  m_touch.t2.x = event->value;
+	  m_touch.t2.x = (event->value - m_range_min_x) * m_width  / (m_range_max_x - m_range_min_x);
 	break;
       }
     case 54:
       {
-	if (m_rescale)
-	  m_touch.t2.y = event->value * 3 / 5;
+	if (m_bFlip) // this is a x-axis event
+	  m_touch.t2.x = (event->value - m_range_min_x) * m_width  / (m_range_max_x - m_range_min_x);
 	else
-	  m_touch.t2.y = event->value;
+	  m_touch.t2.y = (event->value - m_range_min_y) * m_height / (m_range_max_y - m_range_min_y);
 	break;
       }
-    case 57:
+    case 57: // touch-sequence identifier
       {
 	if (event->value == -1) {
 	  if (m_touch_yes)
