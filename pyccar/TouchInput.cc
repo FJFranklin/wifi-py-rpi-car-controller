@@ -71,11 +71,10 @@ static unsigned long timer_millis () {
 
 using namespace PyCCar;
 
-TouchInput::TouchInput (int width, int height) :
+TouchInput::TouchInput (unsigned width, unsigned height) :
   m_te(te_None),
   m_handler(0),
   m_devfd(-1),
-  m_rescale(rescale),
   m_touch_new(false),
   m_touch_end(false),
   m_touch_yes(false),
@@ -117,6 +116,16 @@ bool TouchInput::init (const char * device) {
     char name[256];
     if (ioctl(m_devfd, EVIOCGNAME (sizeof (name)), name)) {
       fprintf (stdout, "Touch device is '%s'.\n", name);
+
+      if (strcmp (name, "ADS7846 Touchscreen") == 0) {
+	m_width  = 480;
+	m_height = 320;
+	m_range_min_x = 3920;
+	m_range_max_x = 150;
+	m_range_min_y = 220;
+	m_range_max_y = 3780;
+	m_bFlip = true;
+      }
     }
 
     unsigned char byte;

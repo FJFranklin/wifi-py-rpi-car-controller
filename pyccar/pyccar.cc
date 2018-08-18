@@ -49,21 +49,21 @@ int main (int argc, char ** argv) {
   unsigned refresh_interval = 15;
 
   for (int arg = 1; arg < argc; arg++) {
-    if (strcmp (argv[arg], "--frame-buffer")) {
+    if (strcmp (argv[arg], "--frame-buffer") == 0) {
       bFrameBuffer = true;
     }
-    if (strcmp (argv[arg], "--hyperpixel")) {
+    if (strcmp (argv[arg], "--hyperpixel") == 0) {
       screen_width  = 800;
       screen_height = 480;
       bHyperPixel = true;
     }
-    if (strncmp (argv[arg], "--fb-device=", 12)) {
+    if (strncmp (argv[arg], "--fb-device=", 12) == 0) {
       video_device = argv[arg] + 12;
     }
-    if (strncmp (argv[arg], "--touch-device=", 15)) {
+    if (strncmp (argv[arg], "--touch-device=", 15) == 0) {
       touch_device = argv[arg] + 15;
     }
-    if (strcmp (argv[arg], "--help")) {
+    if (strcmp (argv[arg], "--help") == 0) {
       fprintf (stdout, "%s [--frame-buffer] [--hyperpixel] [--fb-device=<dev>] [--touch-device=]\n\n"
 	       "  --frame-buffer       Use the framebuffer as the display.\n"
 	       "  --hyperpixel         This has an 800x480 display; touch coordinates need rescaling.\n"
@@ -83,12 +83,6 @@ int main (int argc, char ** argv) {
   if (bHyperPixel) {
     TI->m_range_max_x = 480;
     TI->m_range_max_y = 800;
-  } else {
-    TI->m_range_min_x = 3920;
-    TI->m_range_max_x = 150;
-    TI->m_range_min_y = 220;
-    TI->m_range_max_y = 3780;
-    TI->m_bFlip = true;
   }
 
   if (!TI->init (touch_device)) {
