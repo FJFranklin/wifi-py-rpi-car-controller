@@ -101,23 +101,39 @@ TouchInput::~TouchInput () {
 }
 
 bool TouchInput::init (const char * device) {
-  if (m_devfd < 0) {
-    m_devfd = open (device, O_RDONLY | O_NONBLOCK /* O_NDELAY */);
-    if (m_devfd == -1) {
-      fprintf (stderr, "Failed to open \"%s\" - exiting.\n", device);
-      return false;
-    }
+  if (m_devfd >= 0) {
+    return false;
+  }
 
-    struct input_id iid;
-    if (ioctl (m_devfd, EVIOCGID, &iid)) {
-      fprintf(stdout, "vendor %04hx product %04hx version %04hx\n", iid.vendor, iid.product, iid.version);
-    }
+  m_devfd = open (device, O_RDONLY | O_NONBLOCK /* O_NDELAY */);
+  if (m_devfd == -1) {
+    fprintf (stderr, "Failed to open \"%s\" - exiting.\n", device);
+    return false;
+  }
 
+  bool bDeviceRecognised = false;
+
+  struct input_id iid;
+  if (ioctl (m_devfd, EVIOCGID, &iid)) {
+    fprintf (stderr, "Failed to get device info about \"%s\" - exiting.\n", device);
+  } else if ((iid.vendor == 0x416) && (iid.product == 0x38f)) { // HyperPixel 800x480 a.k.a. "Goodix Capacitive TouchScreen"
+    bDeviceRecognised = true;
+    m_width  = 800;
+    m_height = 480;
+    m_range_min_x = 0;
+    m_range_max_x = 480;
+    m_range_min_y = 0;
+    m_range_max_y = 800;
+    m_bFlip = false;
+//} else if (...) {
+  } else {
     char name[256];
     if (ioctl(m_devfd, EVIOCGNAME (sizeof (name)), name)) {
-      fprintf (stdout, "Touch device is '%s'.\n", name);
-
+#if 1
+      fprintf (stderr, "-> info: vendor %04hx product %04hx version %04hx\n", iid.vendor, iid.product, iid.version);
+#endif
       if (strcmp (name, "ADS7846 Touchscreen") == 0) {
+	bDeviceRecognised = true;
 	m_width  = 480;
 	m_height = 320;
 	m_range_min_x = 3920;
@@ -125,16 +141,27 @@ bool TouchInput::init (const char * device) {
 	m_range_min_y = 220;
 	m_range_max_y = 3780;
 	m_bFlip = true;
+//    } else if (...) {
+      } else {
+	fprintf (stderr, "Touch device (%s) not recognised:\n", device);
+	fprintf (stderr, "-> info: vendor %04hx product %04hx version %04hx\n", iid.vendor, iid.product, iid.version);
+	fprintf (stderr, "-> name: '%s'.\n", name);
       }
     }
-
-    unsigned char byte;
-
-    while (read (m_devfd, &byte, 1) > 0) {
-      // empty the input buffer
-    }
   }
-  return (m_devfd >= 0);
+
+  if (!bDeviceRecognised) {
+    close (m_devfd);
+    m_devfd = -1;
+    return false;
+  }
+
+  unsigned char byte;
+
+  while (read (m_devfd, &byte, 1) > 0) {
+    // empty the input buffer
+  }
+  return true;
 }
 
 void TouchInput::handle (const struct input_event * event) {
@@ -236,12 +263,6 @@ void TouchInput::tick () {
 
 void TouchInput::event_process () {
   if (m_te) {
-#if 0
-    if ((m_touch.t1.x != m_touch.t2.x) || (m_touch.t1.y != m_touch.t2.y)) {
-      stop (); // Exit on multi-touch
-      return;
-    }
-#endif
     Handler * handler = Window::root().touch_handler (m_touch);
 
     if (m_handler != handler) {
@@ -275,7 +296,7 @@ void TouchInput::run (unsigned long interval) {
   while (m_timer_active) {
     unsigned long time = timer_millis ();  // just call this the once
 #if 1
-    if (time - time_start > 10000)
+    if (time - time_start > 10000) // stop after 10 seconds
       break;
 #endif
     if (last_milli < time) { // time is in milliseconds

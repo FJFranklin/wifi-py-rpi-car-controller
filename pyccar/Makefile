@@ -4,10 +4,10 @@ runX:	pyccar
 	PYTHONPATH=`pwd` ./pyccar
 
 runhp:	pyccar
-	PYTHONPATH=`pwd` ./pyccar --frame-buffer --hyperpixel
+	PYTHONPATH=`pwd` ./pyccar --fb-touch
 
 runtft:	pyccar
-	PYTHONPATH=`pwd` ./pyccar --frame-buffer --fb-device=/dev/fb1 --touch-device=/dev/input/event3
+	PYTHONPATH=`pwd` ./pyccar --fb-touch --fb-device=/dev/fb1 --touch-device=/dev/input/event3
 
 clean:
 	rm -f *~ *.o

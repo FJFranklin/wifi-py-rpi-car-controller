@@ -40,33 +40,27 @@ static const char * video_driver = "fbcon";
 static TouchInput * TI = 0;
 
 int main (int argc, char ** argv) {
-  bool bFrameBuffer = false;
-  bool bHyperPixel  = false;
+  bool bTouch = false;
 
-  unsigned screen_width  = 480; // 800;
-  unsigned screen_height = 320; // 480;
+  unsigned screen_width  = 800;
+  unsigned screen_height = 480;
 
   unsigned refresh_interval = 15;
 
   for (int arg = 1; arg < argc; arg++) {
-    if (strcmp (argv[arg], "--frame-buffer") == 0) {
-      bFrameBuffer = true;
-    }
-    if (strcmp (argv[arg], "--hyperpixel") == 0) {
-      screen_width  = 800;
-      screen_height = 480;
-      bHyperPixel = true;
+    if (strcmp (argv[arg], "--fb-touch") == 0) {
+      bTouch = true;
     }
     if (strncmp (argv[arg], "--fb-device=", 12) == 0) {
       video_device = argv[arg] + 12;
     }
     if (strncmp (argv[arg], "--touch-device=", 15) == 0) {
+      bTouch = true;
       touch_device = argv[arg] + 15;
     }
     if (strcmp (argv[arg], "--help") == 0) {
       fprintf (stdout, "%s [--frame-buffer] [--hyperpixel] [--fb-device=<dev>] [--touch-device=]\n\n"
-	       "  --frame-buffer       Use the framebuffer as the display.\n"
-	       "  --hyperpixel         This has an 800x480 display; touch coordinates need rescaling.\n"
+	       "  --fb-touch           Use the touch screen in framebuffer mode as the display.\n"
 	       "  --fb-device=<dev>    Framebuffer device [default: /dev/fb0].\n"
 	       "  --touch-device=<dev> Touch event input device [default: /dev/input/event0].\n"
 	       "\n"
@@ -78,16 +72,12 @@ int main (int argc, char ** argv) {
   TouchInput touch(screen_width, screen_height);
   TI = &touch;
 
-  /* Q. Is there a better way to do this calibration? // FIXME
-   */
-  if (bHyperPixel) {
-    TI->m_range_max_x = 480;
-    TI->m_range_max_y = 800;
-  }
-
-  if (!TI->init (touch_device)) {
-    fprintf (stderr, "%s: unable to open event device \"%s\" for reading!\n", application_name, touch_device);
-    return -1;
+  if (bTouch) {
+    if (!TI->init (touch_device)) {
+      return -1;
+    }
+    screen_width  = TI->width ();
+    screen_height = TI->height ();
   }
 
   Py_SetProgramName (const_cast<char *>(application_name));
@@ -97,7 +87,7 @@ int main (int argc, char ** argv) {
   if (PyCCarUI::ui_load (script_filename)) {
     bool bUI = false;
 
-    if (bFrameBuffer)
+    if (bTouch)
       bUI = PyCCarUI::init (video_driver, video_device, screen_width, screen_height);
     else
       bUI = PyCCarUI::init (screen_width, screen_height);

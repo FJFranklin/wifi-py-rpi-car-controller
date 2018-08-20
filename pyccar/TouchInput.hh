@@ -79,20 +79,28 @@ namespace PyCCar {
     unsigned long ev_count;
     unsigned char ev_buffer[TouchInput_BUFSIZE];
 
-    int  m_width;
-    int  m_height;
-  public:
+    unsigned  m_width;
+    unsigned  m_height;
+
     int  m_range_min_x;
     int  m_range_max_x;
     int  m_range_min_y;
     int  m_range_max_y;
     bool m_bFlip;
 
+  public:
     TouchInput (unsigned width, unsigned height);
 
     ~TouchInput ();
 
     bool init (const char * device);
+
+    inline unsigned width () const {
+      return m_width;
+    }
+    inline unsigned height () const {
+      return m_height;
+    }
 
   private:
     inline void touch_event_begin () {
