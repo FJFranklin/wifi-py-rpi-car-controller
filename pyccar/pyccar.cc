@@ -73,7 +73,25 @@ int main (int argc, char ** argv) {
   TI = &touch;
 
   if (bTouch) {
-    if (!TI->init (touch_device)) {
+    bool bFound = false;
+    if (TI->init (touch_device)) {
+      bFound = true;
+    } else {
+      fprintf (stderr, "Device %s not found, or is not a recognised touch device; scanning...\n", touch_device);
+      char devbuf[32];
+      for (int d = 0; d < 10; d++) {
+	sprintf (devbuf, "/dev/input/event%d", d);
+	if (strcmp (devbuf, touch_device)) {
+	  fprintf (stderr, "Trying %s: ", devbuf);
+	  if (TI->init (devbuf)) {
+	    fprintf (stderr, "okay!\n");
+	    bFound = true;
+	    break;
+	  }
+	}
+      }
+    }
+    if (!bFound) {
       return -1;
     }
     screen_width  = TI->width ();

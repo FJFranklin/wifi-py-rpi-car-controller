@@ -79,8 +79,8 @@ namespace PyCCar {
     unsigned long ev_count;
     unsigned char ev_buffer[TouchInput_BUFSIZE];
 
-    unsigned  m_width;
-    unsigned  m_height;
+    int  m_width;
+    int  m_height;
 
     int  m_range_min_x;
     int  m_range_max_x;

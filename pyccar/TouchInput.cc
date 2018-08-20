@@ -129,9 +129,6 @@ bool TouchInput::init (const char * device) {
   } else {
     char name[256];
     if (ioctl(m_devfd, EVIOCGNAME (sizeof (name)), name)) {
-#if 1
-      fprintf (stderr, "-> info: vendor %04hx product %04hx version %04hx\n", iid.vendor, iid.product, iid.version);
-#endif
       if (strcmp (name, "ADS7846 Touchscreen") == 0) {
 	bDeviceRecognised = true;
 	m_width  = 480;
