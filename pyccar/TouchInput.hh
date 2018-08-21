@@ -69,25 +69,27 @@ namespace PyCCar {
     Handler * m_handler;
 
     int m_devfd;
-
+#if HAVE_LINUX_INPUT_H
     bool m_touch_new;
     bool m_touch_end;
     bool m_touch_yes;
-
+#endif
     bool m_timer_active;
 
+#if HAVE_LINUX_INPUT_H
     unsigned long ev_count;
     unsigned char ev_buffer[TouchInput_BUFSIZE];
-
+#endif
     int  m_width;
     int  m_height;
 
+#if HAVE_LINUX_INPUT_H
     int  m_range_min_x;
     int  m_range_max_x;
     int  m_range_min_y;
     int  m_range_max_y;
     bool m_bFlip;
-
+#endif
   public:
     TouchInput (unsigned width, unsigned height);
 

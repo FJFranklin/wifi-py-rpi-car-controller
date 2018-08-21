@@ -35,7 +35,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#if HAVE_LINUX_INPUT_H
 #include <linux/input.h>
+#endif
 
 #include "TouchInput.hh"
 #include "Window.hh"
@@ -75,18 +77,24 @@ TouchInput::TouchInput (unsigned width, unsigned height) :
   m_te(te_None),
   m_handler(0),
   m_devfd(-1),
+#if HAVE_LINUX_INPUT_H
   m_touch_new(false),
   m_touch_end(false),
   m_touch_yes(false),
+#endif
   m_timer_active(false),
+#if HAVE_LINUX_INPUT_H
   ev_count(0),
+#endif
   m_width(width),
-  m_height(height),
-  m_range_min_x(0),
+  m_height(height)
+#if HAVE_LINUX_INPUT_H
+, m_range_min_x(0),
   m_range_max_x(width),
   m_range_min_y(0),
   m_range_max_y(height),
   m_bFlip(false)
+#endif
 {
   m_touch.t1.x = 0;
   m_touch.t1.y = 0;
@@ -101,6 +109,7 @@ TouchInput::~TouchInput () {
 }
 
 bool TouchInput::init (const char * device) {
+#if HAVE_LINUX_INPUT_H
   if (m_devfd >= 0) {
     return false;
   }
@@ -158,10 +167,12 @@ bool TouchInput::init (const char * device) {
   while (read (m_devfd, &byte, 1) > 0) {
     // empty the input buffer
   }
+#endif
   return true;
 }
 
 void TouchInput::handle (const struct input_event * event) {
+#if HAVE_LINUX_INPUT_H
   if (event->type == EV_SYN) {
     if (m_touch_new) {
       m_touch_new = false;
@@ -234,9 +245,11 @@ void TouchInput::handle (const struct input_event * event) {
       break;
     }
   }
+#endif
 }
 
 void TouchInput::tick () {
+#if HAVE_LINUX_INPUT_H
   if (m_devfd < 0) {
     return;
   }
@@ -256,6 +269,7 @@ void TouchInput::tick () {
       ev[0] = ev[count];
     }
   }
+#endif
 }
 
 void TouchInput::event_process () {
