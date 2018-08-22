@@ -36,6 +36,20 @@
 #define PyCCar_BLANK   0x20u // whether the window/button is blank (if visible, but regardless of type)
 
 class PyCCarUI {
+public:
+  enum EventType {
+    et_None = 0,
+    et_Quit,
+    et_Mouse_Motion,
+    et_Mouse_Up,
+    et_Mouse_Down
+  };
+  struct event_data {
+    EventType type;
+    struct {
+      int x, y;
+    } pos;
+  };
 private:
   unsigned m_id;
 public:
@@ -54,6 +68,9 @@ public:
 
   static bool init (const char * driver, const char * device, unsigned screen_width, unsigned screen_height);
   static bool init (unsigned screen_width, unsigned screen_height);
+
+  static EventType event (struct event_data & data);
+
   static bool refresh ();
 
   bool draw ();
@@ -75,5 +92,40 @@ public:
   bool set_thickness (unsigned thickness);
   bool set_scroll (unsigned s_min, unsigned s_max);
 };
+
+namespace PyCCar {
+  class WString {
+  private:
+    wchar_t * m_str;
+
+  public:
+    inline const wchar_t * str () const {
+      return m_str;
+    }
+
+    WString (const char * c_str);
+
+    ~WString ();
+  };
+
+  class WStrArr {
+  private:
+    int m_argc;
+
+    wchar_t ** m_argv;
+
+  public:
+    inline int argc () const {
+      return m_argc;
+    }
+    inline const wchar_t * const * argv () const {
+      return m_argv;
+    }
+
+    WStrArr (int c_argc, const char * const * c_argv);
+
+    ~WStrArr ();
+  };
+}
 
 #endif /* ! __PyCCar_hh__ */

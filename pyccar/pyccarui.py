@@ -198,3 +198,28 @@ def ui_init(DD, screen_wh):
         screen = pygame.display.set_mode(screen_wh)
     screen.fill(red)
     pygame.display.update()
+
+def ui_event():
+    next = ('-', None)
+    pygame.event.pump()
+    while True:
+        event = pygame.event.poll()
+        if event.type == pygame.NOEVENT:
+            break
+        if event.type == pygame.QUIT:
+            next = ('Q', None)
+            break
+        if event.type == pygame.MOUSEMOTION: #      pos, rel, buttons
+            pos = pygame.mouse.get_pos()
+            next = ('M', pos)
+            break
+        if event.type == pygame.MOUSEBUTTONUP: #    pos, button
+            pos = pygame.mouse.get_pos()
+            next = ('U', pos)
+            break
+        if event.type == pygame.MOUSEBUTTONDOWN: #  pos, button
+            pos = pygame.mouse.get_pos()
+            next = ('D', pos)
+            break
+    return next
+

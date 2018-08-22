@@ -40,8 +40,8 @@ namespace PyCCar {
 
     int m_abs_x;
     int m_abs_y;
-    int m_rel_x;
-    int m_rel_y;
+//  int m_rel_x;
+//  int m_rel_y;
 
     unsigned m_W;
     unsigned m_H;

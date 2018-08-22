@@ -35,10 +35,11 @@ PyObject * s_set_p   = 0;
 PyObject * s_init    = 0;
 PyObject * s_draw    = 0;
 PyObject * s_refresh = 0;
+PyObject * s_event   = 0;
 
 bool PyCCarUI::ui_load (const char * script_filename) {
   if (!s_PyCCarUI) {
-    PyObject * pystr = PyString_FromString (script_filename);
+    PyObject * pystr = PyUnicode_FromString (script_filename);
     if (pystr) {
       fputs ("module loading... ", stderr);
       // PyRun_SimpleString("import sys\nsys.path.append('.')");
@@ -51,6 +52,7 @@ bool PyCCarUI::ui_load (const char * script_filename) {
 	s_init    = PyObject_GetAttrString (s_PyCCarUI, "ui_init");
 	s_draw    = PyObject_GetAttrString (s_PyCCarUI, "ui_draw");
 	s_refresh = PyObject_GetAttrString (s_PyCCarUI, "ui_refresh");
+	s_event   = PyObject_GetAttrString (s_PyCCarUI, "ui_event");
 	fputs ("okay:\n", stderr);
       } else {
 	fputs ("failed!\n", stderr);
@@ -91,9 +93,18 @@ bool PyCCarUI::ui_load (const char * script_filename) {
 	}
 	// fputs ("\n", stderr);
       }
+      if (s_event) {
+	// fputs ("event:", stderr);
+	if (!PyCallable_Check (s_event)) {
+	  Py_XDECREF (s_event);
+	  s_event = 0;
+	  // fputs (" x", stderr);
+	}
+	// fputs ("\n", stderr);
+      }
     }
   }
-  if (!s_refresh || !s_draw || !s_init || !s_set_p) {
+  if (!s_event || !s_refresh || !s_draw || !s_init || !s_set_p) {
     fputs ("PyCCar: UI load error!\n", stderr);
     return false;
   }
@@ -101,6 +112,10 @@ bool PyCCarUI::ui_load (const char * script_filename) {
 }
 
 void PyCCarUI::ui_free () {
+  if (s_event) {
+    Py_XDECREF (s_event);
+    s_event = 0;
+  }
   if (s_refresh) {
     Py_XDECREF (s_refresh);
     s_refresh = 0;
@@ -151,6 +166,65 @@ bool PyCCarUI::init (unsigned screen_width, unsigned screen_height) {
     }
   }
   return false;
+}
+
+PyCCarUI::EventType PyCCarUI::event (struct event_data & data) {
+  data.type = et_None;
+
+  PyObject * result = PyObject_CallObject (s_event, 0);
+
+  if (result) { // returns ('?',(x,y)), where ? is one of { '-', 'Q', 'M', 'U', 'D' }
+    bool bMouseEvent = false;
+
+    PyObject * pos = 0;
+
+    const char * et = 0;
+
+    if (PyArg_ParseTuple (result, "sO", &et, &pos)) {
+      switch (et[0]) {
+      case '-':
+	{
+	  // No event
+	  break;
+	}
+      case 'Q':
+	{
+	  data.type = et_Quit;
+	  break;
+	}
+      case 'M':
+	{
+	  data.type = et_Mouse_Motion;
+	  bMouseEvent = true;
+	  break;
+	}
+      case 'U':
+	{
+	  data.type = et_Mouse_Up;
+	  bMouseEvent = true;
+	  break;
+	}
+      case 'D':
+	{
+	  data.type = et_Mouse_Down;
+	  bMouseEvent = true;
+	  break;
+	}
+      default:
+	{
+	  break;
+	}
+      }
+      if (bMouseEvent) {
+	if (!PyArg_ParseTuple (pos, "ii", &data.pos.x, &data.pos.y)) {
+	  fputs ("Oops! Unable to get position data for mouse event!\n", stderr);
+	  data.type = et_None;
+	}
+      }
+    }
+    Py_DECREF (result);
+  }
+  return data.type;
 }
 
 bool PyCCarUI::refresh () {
@@ -302,4 +376,57 @@ bool PyCCarUI::set_scroll (unsigned s_min, unsigned s_max) {
     Py_DECREF (value);
   }
   return bOkay;
+}
+
+#include <cstring>
+#include <cstdlib>
+
+using namespace PyCCar;
+
+WString::WString (const char * c_str) :
+  m_str(0)
+{
+  if (!c_str) {
+    c_str = "";
+  }
+  size_t length = strlen (c_str) + 1;
+  m_str = new wchar_t[length];
+  if (m_str) {
+    mbstowcs (m_str, c_str, length);
+  }
+}
+
+WString::~WString () {
+  if (m_str) {
+    delete [] m_str;
+  }
+}
+
+WStrArr::WStrArr (int c_argc, const char * const * c_argv) :
+  m_argc(c_argc),
+  m_argv(new wchar_t * [c_argc + 1])
+{
+  for (int arg = 0; arg < m_argc; arg++) {
+    const char * c_str = c_argv[arg];
+
+    if (!c_str) {
+      c_str = "";
+    }
+    size_t length = strlen (c_str) + 1;
+    m_argv[arg] = new wchar_t[length];
+    if (m_argv[arg]) {
+      mbstowcs (m_argv[arg], c_str, length);
+    }
+  }
+  m_argv[m_argc] = 0;
+}
+
+WStrArr::~WStrArr () {
+  if (m_argv) {
+    for (int arg = 0; arg < m_argc; arg++) {
+      if (m_argv[arg])
+	delete [] m_argv[arg];
+    }
+    delete [] m_argv;
+  }
 }

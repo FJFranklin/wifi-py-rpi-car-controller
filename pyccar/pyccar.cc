@@ -40,6 +40,9 @@ static const char * video_driver = "fbcon";
 static TouchInput * TI = 0;
 
 int main (int argc, char ** argv) {
+  WString Name(application_name);
+  WStrArr Args(argc, argv);
+
   bool bTouch = false;
 
   unsigned screen_width  = 800;
@@ -98,9 +101,9 @@ int main (int argc, char ** argv) {
     screen_height = TI->height ();
   }
 
-  Py_SetProgramName (const_cast<char *>(application_name));
+  Py_SetProgramName (const_cast<wchar_t *>(Name.str ()));
   Py_Initialize ();
-  PySys_SetArgv (argc, argv);
+  PySys_SetArgv (Args.argc (), const_cast<wchar_t **>(Args.argv ()));
 
   if (PyCCarUI::ui_load (script_filename)) {
     bool bUI = false;

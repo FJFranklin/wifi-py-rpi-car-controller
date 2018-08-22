@@ -4,7 +4,8 @@ else
 LINUX_INPUT=0
 endif
 
-CFLAGS=$(shell python-config --cflags) -DHAVE_LINUX_INPUT_H=$(LINUX_INPUT)
+CFLAGS=$(shell python3-config --cflags) -DHAVE_LINUX_INPUT_H=$(LINUX_INPUT)
+LDFLAGS=$(shell python3-config --ldflags)
 
 all:	pyccar
 
@@ -20,17 +21,29 @@ runtft:	pyccar
 clean:
 	rm -f *~ *.o
 
-pyccar:		pyccar.o TouchInput.o Window.o PyCCarUI.o
-		c++ -o pyccar pyccar.o TouchInput.o Window.o PyCCarUI.o `python-config --ldflags`
+ALL_OBJECTS=\
+	pyccar.o \
+	TouchInput.o \
+	Window.o \
+	PyCCarUI.o
 
-pyccar.o:	pyccar.hh TouchInput.hh Window.hh pyccar.cc
-		c++ -c pyccar.cc $(CFLAGS)
+ALL_SOURCES=\
+	pyccar.cc \
+	TouchInput.cc \
+	Window.cc \
+	PyCCarUI.cc
 
-TouchInput.o:	pyccar.hh TouchInput.hh Window.hh TouchInput.cc
-		c++ -c TouchInput.cc $(CFLAGS)
+ALL_HEADERS=\
+	TouchInput.hh \
+	Window.hh \
+	pyccar.hh
 
-Window.o:	pyccar.hh TouchInput.hh Window.hh Window.cc
-		c++ -c Window.cc $(CFLAGS)
+OTHER_FILES=\
+	Makefile \
+	pyccarui.py
 
-PyCCarUI.o:	pyccar.hh PyCCarUI.cc
-		c++ -c PyCCarUI.cc $(CFLAGS)
+pyccar:		$(ALL_OBJECTS)
+		c++ -o pyccar $(ALL_OBJECTS) $(LDFLAGS)
+
+%.o:	%.cc $(ALL_HEADERS)
+	c++ -c $< -o $@ $(CFLAGS)

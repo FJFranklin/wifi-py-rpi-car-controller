@@ -136,7 +136,7 @@ namespace PyCCar {
       m_timer_active = false;
     }
 
-    void tick (); // to be called more frequently than the screen refresh rate
+    bool tick (); // to be called more frequently than the screen refresh rate; returns false if program-end is requested
   };
 
 } // namespace PyCCar
