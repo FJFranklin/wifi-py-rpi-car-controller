@@ -384,7 +384,7 @@ Menu::Item * Menu::find_id (unsigned id) { // recursive search for item by id
 }
 
 ScrollableMenu::ScrollableMenu (Window & parent, int rel_x, int rel_y, unsigned width, unsigned height) :
-  Button(parent, rel_x, rel_y, width, height),
+  Window(parent, rel_x, rel_y, width, height),
   m_Up(0),
   m_Down(0),
   m_Scroll(0)
@@ -454,4 +454,8 @@ void ScrollableMenu::set_menu (Menu * menu) {
   // need back() & close() methods to manage submenus & button-clicks
   // menus need parents
   // implement handler here & redirect
+}
+
+void ScrollableMenu::button_press (unsigned /* button_id */) {
+  // ...
 }

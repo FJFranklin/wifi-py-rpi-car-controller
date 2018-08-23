@@ -193,7 +193,7 @@ namespace PyCCar {
     Item * find_id (unsigned id); // recursive search for item by id
   };
 
-  class ScrollableMenu : public Button {
+  class ScrollableMenu : public Window, public Button::Handler {
   public:
   private:
     Button * m_Item[6];
@@ -210,6 +210,8 @@ namespace PyCCar {
     virtual ~ScrollableMenu ();
 
     void set_menu (Menu * menu);
+
+    virtual void button_press (unsigned button_id);
   };
 } // namespace PyCCar
 
