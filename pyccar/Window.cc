@@ -55,12 +55,12 @@ Window::Window (unsigned width, unsigned height) :
   m_bDirty(true),
   m_bTouchable(true)
 {
-  PyCCarUI(id ()).set_bbox (m_abs_x, m_abs_y, m_W, m_H);
+  ui().set_bbox (m_abs_x, m_abs_y, m_W, m_H);
 
   /* Settings for root window
    */
   m_flags = PyCCar_VISIBLE | PyCCar_BLANK;
-  PyCCarUI(id ()).set_flags (m_flags);
+  ui().set_flags (m_flags);
 }
 
 Window::Window (Window & parent, int rel_x, int rel_y, unsigned width, unsigned height) :
@@ -82,7 +82,7 @@ Window::Window (Window & parent, int rel_x, int rel_y, unsigned width, unsigned 
 {
   parent.add_child (this);
 
-  PyCCarUI(id ()).set_bbox (m_abs_x, m_abs_y, m_W, m_H);
+  ui().set_bbox (m_abs_x, m_abs_y, m_W, m_H);
 }
 
 Window::~Window () {
@@ -121,7 +121,7 @@ void Window::set_visible (bool bVisible) {
     } else {
       m_flags &= ~PyCCar_VISIBLE;
     }
-    PyCCarUI(id ()).set_flags (m_flags);
+    ui().set_flags (m_flags);
 
     if (bVisible) {
       redraw ();
@@ -208,7 +208,7 @@ void Window::redraw () {
 
   /* Draw self first
    */
-  PyCCarUI(id ()).draw ();
+  ui().draw ();
 
   set_dirty (false);
 
@@ -242,7 +242,7 @@ void Button::set_enabled (bool bEnabled) {
     else
       m_flags &= ~PyCCar_ENABLED;
 
-    PyCCarUI(id ()).set_flags (m_flags);
+    ui().set_flags (m_flags);
 
     if (!enabled () && active ()) {
       set_active (false);
@@ -260,7 +260,7 @@ void Button::set_active (bool bActive) {
     else
       m_flags &= ~PyCCar_ACTIVE;
 
-    PyCCarUI(id ()).set_flags (m_flags);
+    ui().set_flags (m_flags);
     redraw ();
   }
 }
@@ -287,4 +287,171 @@ void Button::touch_event (TouchInput::TouchEvent te, const struct TouchInput::to
   } else {
     set_active (true);
   }
+}
+
+Menu::Item::Item (unsigned id, const char * str) :
+  m_id(id),
+  m_label(0),
+  m_next(0),
+  m_submenu(0),
+  m_bEnabled(true)
+{
+  set_label (str);
+}
+
+Menu::Item::~Item () {
+  if (m_label) {
+    delete [] m_label;
+  }
+}
+
+void Menu::Item::set_label (const char * str) {
+  if (m_label) {
+    delete [] m_label;
+  }
+  if (!str) {
+    str = "";
+  }
+  m_label = new char[strlen (str) + 1];
+  if (m_label) {
+    strcpy (m_label, str);
+  }
+}
+
+Menu::Menu () :
+  m_item_first(0),
+  m_item_last(0),
+  m_length(0),
+  m_offset(0)
+{
+  // ...
+}
+
+Menu::~Menu () {
+  while (m_item_first) {
+    Item * item = m_item_first;
+    m_item_first = m_item_first->m_next;
+    delete item;
+  }
+}
+
+Menu::Item * Menu::add (unsigned id, const char * label) {
+  Item * I = new Item(id, label);
+  if (I) {
+    if (!m_item_first) {
+      m_item_first = I;
+    } else {
+      m_item_last->m_next = I;
+    }
+    m_item_last = I;
+    ++m_length;
+  }
+  return I;
+}
+
+Menu::Item * Menu::item_no (unsigned no) { // by order in list
+  Item * I = 0;
+
+  if (no < m_length) {
+    I = m_item_first;
+    while (no) {
+      I = I->m_next;
+      --no;
+    }
+  }
+  return I;
+}
+
+Menu::Item * Menu::find_id (unsigned id) { // recursive search for item by id
+  Item * I = 0;
+
+  if (m_length) {
+    Item * item = m_item_first;
+    for (unsigned i = 0; i < m_length; i++) {
+      if (item->id () == id) {
+	I = item;
+	break;
+      }
+      if (item->m_submenu) {
+	I = item->m_submenu->find_id (id);
+	if (I)
+	  break;
+      }
+      item = item->m_next;
+    }
+  }
+  return I;
+}
+
+ScrollableMenu::ScrollableMenu (Window & parent, int rel_x, int rel_y, unsigned width, unsigned height) :
+  Button(parent, rel_x, rel_y, width, height),
+  m_Up(0),
+  m_Down(0),
+  m_Scroll(0)
+{
+  for (int i = 0; i < 6; i++) {
+    m_Item[i] = 0;
+  }
+
+  unsigned scroll_width  = ((width < height) ? width : height) / 5;
+  unsigned scroll_height = height - 2 * scroll_width;
+
+  unsigned item_width  = width - scroll_width;
+  unsigned item_height = height / 6;
+
+  for (int i = 0; i < 6; i++) {
+    m_Item[i] = new Button(*this, 0, i * item_height, item_width, item_height);
+
+    if (m_Item[i]) {
+      m_Item[i]->set_visible (false);
+      m_Item[i]->ui().set_type ("Menu Item");
+      // TODO - font size, ??
+    }
+  }
+
+  m_Up     = new Button(*this, item_width,                            0, scroll_width, scroll_width);
+  m_Down   = new Button(*this, item_width, scroll_width + scroll_height, scroll_width, scroll_width);
+  m_Scroll = new Button(*this, item_width,                 scroll_width, scroll_width, scroll_height);
+
+  if (m_Up) {
+    m_Up->set_enabled (false);
+    m_Up->ui().set_type ("Up");
+    // TODO
+  }
+  if (m_Down) {
+    m_Down->set_enabled (false);
+    m_Down->ui().set_type ("Down");
+    // TODO
+  }
+  if (m_Scroll) {
+    m_Scroll->set_visible (false);
+    m_Scroll->ui().set_type ("Scroll");
+    // TODO - min, max
+  }
+}
+
+ScrollableMenu::~ScrollableMenu () {
+  for (int i = 0; i < 6; i++) {
+    if (m_Item[i]) {
+      delete m_Item[i];
+    }
+  }
+  if (m_Up) {
+    delete m_Up;
+  }
+  if (m_Down) {
+    delete m_Down;
+  }
+  if (m_Scroll) {
+    delete m_Scroll;
+  }
+}
+
+void ScrollableMenu::set_menu (Menu * menu) {
+  m_menu = menu;
+  // TODO
+  // manage visibility, etc.
+  // need back() & close() methods to manage submenus & button-clicks
+  // menus need parents
+  // implement handler here & redirect
 }

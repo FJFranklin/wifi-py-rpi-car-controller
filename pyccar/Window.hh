@@ -71,6 +71,9 @@ namespace PyCCar {
     inline unsigned id () const {
       return m_id;
     }
+    inline PyCCarUI ui () const {
+      return PyCCarUI(m_id);
+    }
 
     inline void set_dirty (bool bDirty) { // FIXME: what to do about this?
       m_bDirty = bDirty;
@@ -135,6 +138,79 @@ namespace PyCCar {
     virtual void touch_event (TouchInput::TouchEvent te, const struct TouchInput::touch_event_data & event_data);
   };
 
+  class Menu {
+  public:
+    class Item {
+    private:
+      friend class Menu;
+
+      unsigned  m_id;
+      char *    m_label;
+      Item *    m_next;
+    public:
+      Menu *    m_submenu;
+      bool      m_bEnabled;
+
+      Item (unsigned id, const char * str);
+
+      ~Item ();
+
+      inline unsigned id () const {
+	return m_id;
+      }
+      inline const char * label () const {
+	return m_label;
+      }
+      void set_label (const char * str);
+    };
+
+  private:
+    Item *   m_item_first;
+    Item *   m_item_last;
+
+    unsigned m_length;
+    unsigned m_offset;
+
+  public:
+    Menu ();
+
+    ~Menu ();
+
+    inline int length () const {
+      return m_length;
+    }
+
+    inline void set_offset (unsigned offset) {
+      m_offset = offset;
+    }
+    inline int offset () const {
+      return m_offset;
+    }
+
+    Item * add (unsigned id, const char * label);
+
+    Item * item_no (unsigned no); // by order in list
+    Item * find_id (unsigned id); // recursive search for item by id
+  };
+
+  class ScrollableMenu : public Button {
+  public:
+  private:
+    Button * m_Item[6];
+
+    Button * m_Up;
+    Button * m_Down;
+    Window * m_Scroll;
+
+    Menu *   m_menu;
+
+  public:
+    ScrollableMenu (Window & parent, int rel_x, int rel_y, unsigned width, unsigned height);
+
+    virtual ~ScrollableMenu ();
+
+    void set_menu (Menu * menu);
+  };
 } // namespace PyCCar
 
 #endif /* ! __Window_hh__ */
