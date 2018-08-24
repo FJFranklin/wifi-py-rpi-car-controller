@@ -165,6 +165,8 @@ namespace PyCCar {
     };
 
   private:
+    Menu *   m_parent;
+
     Item *   m_item_first;
     Item *   m_item_last;
 
@@ -187,6 +189,13 @@ namespace PyCCar {
       return m_offset;
     }
 
+    inline void set_parent (Menu * menu) {
+      m_parent = menu;
+    }
+    inline Menu * parent () {
+      return m_parent;
+    }
+
     Item * add (unsigned id, const char * label);
 
     Item * item_no (unsigned no); // by order in list
@@ -198,6 +207,7 @@ namespace PyCCar {
   private:
     Button * m_Item[6];
 
+    Button * m_Back;
     Button * m_Up;
     Button * m_Down;
     Window * m_Scroll;
@@ -209,9 +219,14 @@ namespace PyCCar {
 
     virtual ~ScrollableMenu ();
 
-    void set_menu (Menu * menu);
+    void manage_menu (Menu * menu, Button * back);
 
     virtual void button_press (unsigned button_id);
+
+  private:
+    void menu_back ();
+    void menu_up ();
+    void menu_down ();
   };
 } // namespace PyCCar
 

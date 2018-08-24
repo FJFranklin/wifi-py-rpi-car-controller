@@ -319,6 +319,7 @@ void Menu::Item::set_label (const char * str) {
 }
 
 Menu::Menu () :
+  m_parent(0),
   m_item_first(0),
   m_item_last(0),
   m_length(0),
@@ -383,8 +384,14 @@ Menu::Item * Menu::find_id (unsigned id) { // recursive search for item by id
   return I;
 }
 
+#define ButtonID_Back  0
+#define ButtonID_Up    1
+#define ButtonID_Down  2
+#define ButtonID_Item0 3
+
 ScrollableMenu::ScrollableMenu (Window & parent, int rel_x, int rel_y, unsigned width, unsigned height) :
   Window(parent, rel_x, rel_y, width, height),
+  m_Back(0),
   m_Up(0),
   m_Down(0),
   m_Scroll(0)
@@ -404,6 +411,7 @@ ScrollableMenu::ScrollableMenu (Window & parent, int rel_x, int rel_y, unsigned 
 
     if (m_Item[i]) {
       m_Item[i]->set_visible (false);
+      m_Item[i]->set_callback (this, ButtonID_Item0 + i);
       m_Item[i]->ui().set_type ("Menu Item");
       // TODO - font size, ??
     }
@@ -415,11 +423,13 @@ ScrollableMenu::ScrollableMenu (Window & parent, int rel_x, int rel_y, unsigned 
 
   if (m_Up) {
     m_Up->set_enabled (false);
+    m_Down->set_callback (this, ButtonID_Up);
     m_Up->ui().set_type ("Up");
     // TODO
   }
   if (m_Down) {
     m_Down->set_enabled (false);
+    m_Down->set_callback (this, ButtonID_Down);
     m_Down->ui().set_type ("Down");
     // TODO
   }
@@ -447,8 +457,9 @@ ScrollableMenu::~ScrollableMenu () {
   }
 }
 
-void ScrollableMenu::set_menu (Menu * menu) {
+void ScrollableMenu::manage_menu (Menu * menu, Button * back) {
   m_menu = menu;
+  m_Back = back;
   // TODO
   // manage visibility, etc.
   // need back() & close() methods to manage submenus & button-clicks
@@ -456,6 +467,40 @@ void ScrollableMenu::set_menu (Menu * menu) {
   // implement handler here & redirect
 }
 
-void ScrollableMenu::button_press (unsigned /* button_id */) {
+void ScrollableMenu::button_press (unsigned button_id) {
+  switch (button_id) {
+  case ButtonID_Back:
+    {
+      menu_back ();
+      break;
+    }
+  case ButtonID_Up:
+    {
+      menu_up ();
+      break;
+    }
+  case ButtonID_Down:
+    {
+      menu_down ();
+      break;
+    }
+  default:
+    {
+      button_id -= ButtonID_Item0;
+      // ...
+      break;
+    }
+  }
+}
+
+void ScrollableMenu::menu_back () {
+  // ...
+}
+
+void ScrollableMenu::menu_up () {
+  // ...
+}
+
+void ScrollableMenu::menu_down () {
   // ...
 }
