@@ -68,6 +68,13 @@ namespace PyCCar {
 
     static bool init (unsigned width, unsigned height);
 
+    inline unsigned window_width () const {
+      return m_W;
+    }
+    inline unsigned window_height () const {
+      return m_H;
+    }
+
     inline unsigned id () const {
       return m_id;
     }
@@ -93,7 +100,7 @@ namespace PyCCar {
 
     virtual void touch_enter ();
     virtual void touch_leave ();
-    virtual void touch_event (TouchInput::TouchEvent te, const struct TouchInput::touch_event_data & event_data);
+    virtual bool touch_event (TouchInput::TouchEvent te, const struct TouchInput::touch_event_data & event_data);
 
     virtual void redraw ();
 
@@ -105,7 +112,7 @@ namespace PyCCar {
   public:
     class Handler {
     public:
-      virtual void button_press (unsigned button_id) = 0;
+      virtual bool button_press (unsigned button_id) = 0;
       virtual ~Handler () { }
     };
 
@@ -118,9 +125,12 @@ namespace PyCCar {
 
     virtual ~Button ();
 
-    inline void set_callback (Handler * handler, unsigned button_id) {
+    inline void set_handler (Handler * handler, unsigned button_id) {
       m_handler   = handler;
       m_button_id = button_id;
+    }
+    inline unsigned button_id () const {
+      return m_button_id;
     }
 
     inline bool enabled () const {
@@ -135,7 +145,7 @@ namespace PyCCar {
   public:
     virtual void touch_enter ();
     virtual void touch_leave ();
-    virtual void touch_event (TouchInput::TouchEvent te, const struct TouchInput::touch_event_data & event_data);
+    virtual bool touch_event (TouchInput::TouchEvent te, const struct TouchInput::touch_event_data & event_data);
   };
 
   class Menu {
@@ -214,19 +224,40 @@ namespace PyCCar {
 
     Menu *   m_menu;
 
+    Button::Handler * m_app;
+
   public:
     ScrollableMenu (Window & parent, int rel_x, int rel_y, unsigned width, unsigned height);
 
     virtual ~ScrollableMenu ();
 
-    void manage_menu (Menu * menu, Button * back);
+    void manage_menu (Menu * menu, Button * back, Button::Handler * app_manager);
 
-    virtual void button_press (unsigned button_id);
+    virtual bool button_press (unsigned button_id);
 
   private:
     void menu_back ();
     void menu_up ();
     void menu_down ();
+  };
+
+  class AppManager : public Button::Handler {
+  public:
+  private:
+    Button * m_Main; // alt. Back
+    Button * m_Exit;
+
+    ScrollableMenu * m_Menu;
+
+    Menu *   m_menu_main;
+    Menu *   m_menu_exit;
+
+  public:
+    AppManager ();
+
+    virtual ~AppManager ();
+
+    virtual bool button_press (unsigned button_id);
   };
 } // namespace PyCCar
 

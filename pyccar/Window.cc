@@ -26,6 +26,14 @@
 
 using namespace PyCCar;
 
+#define ButtonID_None  0
+#define ButtonID_Exit  1
+#define ButtonID_Main  2
+#define ButtonID_Back  ButtonID_Main
+#define ButtonID_Up    3
+#define ButtonID_Down  4
+#define ButtonID_Item0 5
+
 static unsigned s_id_counter = 0;
 
 static inline unsigned s_id_next () {
@@ -177,7 +185,7 @@ void Window::touch_leave () {
 #endif
 }
 
-void Window::touch_event (TouchInput::TouchEvent te, const struct TouchInput::touch_event_data & event_data) {
+bool Window::touch_event (TouchInput::TouchEvent te, const struct TouchInput::touch_event_data & event_data) {
 #if 1
   switch (te) {
   case TouchInput::te_None:
@@ -200,6 +208,7 @@ void Window::touch_event (TouchInput::TouchEvent te, const struct TouchInput::to
     }
   }
 #endif
+  return true; // keep the timer running
 }
 
 void Window::redraw () {
@@ -273,13 +282,15 @@ void Button::touch_leave () {
   set_active (false);
 }
 
-void Button::touch_event (TouchInput::TouchEvent te, const struct TouchInput::touch_event_data & event_data) {
+bool Button::touch_event (TouchInput::TouchEvent te, const struct TouchInput::touch_event_data & event_data) {
+  bool response = true; // keep the timer running
+
   if (te == TouchInput::te_End) {
     if (active ()) { // a touch-end event in a highlighted button - the button has been pressed
       set_active (false);
 
       if (m_handler) {
-	m_handler->button_press (m_button_id);
+	response = m_handler->button_press (m_button_id);
       }
     } else {         // not currently highlighted - uncertain selection? => ditch the event
       // ...
@@ -287,6 +298,8 @@ void Button::touch_event (TouchInput::TouchEvent te, const struct TouchInput::to
   } else {
     set_active (true);
   }
+
+  return response;
 }
 
 Menu::Item::Item (unsigned id, const char * str) :
@@ -384,11 +397,6 @@ Menu::Item * Menu::find_id (unsigned id) { // recursive search for item by id
   return I;
 }
 
-#define ButtonID_Back  0
-#define ButtonID_Up    1
-#define ButtonID_Down  2
-#define ButtonID_Item0 3
-
 ScrollableMenu::ScrollableMenu (Window & parent, int rel_x, int rel_y, unsigned width, unsigned height) :
   Window(parent, rel_x, rel_y, width, height),
   m_Back(0),
@@ -411,7 +419,7 @@ ScrollableMenu::ScrollableMenu (Window & parent, int rel_x, int rel_y, unsigned 
 
     if (m_Item[i]) {
       m_Item[i]->set_visible (false);
-      m_Item[i]->set_callback (this, ButtonID_Item0 + i);
+      m_Item[i]->set_handler (this, ButtonID_Item0 + i);
       m_Item[i]->ui().set_type ("Menu Item");
       // TODO - font size, ??
     }
@@ -423,13 +431,13 @@ ScrollableMenu::ScrollableMenu (Window & parent, int rel_x, int rel_y, unsigned 
 
   if (m_Up) {
     m_Up->set_enabled (false);
-    m_Down->set_callback (this, ButtonID_Up);
+    m_Up->set_handler (this, ButtonID_Up);
     m_Up->ui().set_type ("Up");
     // TODO
   }
   if (m_Down) {
     m_Down->set_enabled (false);
-    m_Down->set_callback (this, ButtonID_Down);
+    m_Down->set_handler (this, ButtonID_Down);
     m_Down->ui().set_type ("Down");
     // TODO
   }
@@ -457,9 +465,10 @@ ScrollableMenu::~ScrollableMenu () {
   }
 }
 
-void ScrollableMenu::manage_menu (Menu * menu, Button * back) {
+void ScrollableMenu::manage_menu (Menu * menu, Button * back, Button::Handler * app_manager) {
   m_menu = menu;
   m_Back = back;
+  m_app = app_manager;
   // TODO
   // manage visibility, etc.
   // need back() & close() methods to manage submenus & button-clicks
@@ -467,7 +476,9 @@ void ScrollableMenu::manage_menu (Menu * menu, Button * back) {
   // implement handler here & redirect
 }
 
-void ScrollableMenu::button_press (unsigned button_id) {
+bool ScrollableMenu::button_press (unsigned button_id) {
+  bool response = true; // keep the timer running
+
   switch (button_id) {
   case ButtonID_Back:
     {
@@ -491,6 +502,8 @@ void ScrollableMenu::button_press (unsigned button_id) {
       break;
     }
   }
+
+  return response;
 }
 
 void ScrollableMenu::menu_back () {
@@ -503,4 +516,61 @@ void ScrollableMenu::menu_up () {
 
 void ScrollableMenu::menu_down () {
   // ...
+}
+
+AppManager::AppManager () :
+  m_Main(0), // alt. Back
+  m_Exit(0),
+  m_menu_main(0),
+  m_menu_exit(0)
+{
+  unsigned width  = Window::root().window_width ();
+  unsigned height = Window::root().window_height ();
+
+  unsigned button_size = ((width < height) ? width : height) / 5;
+
+  m_Main = new Button(Window::root(), 0,                    0, button_size, button_size);
+  m_Exit = new Button(Window::root(), 0, height - button_size, button_size, button_size);
+
+  m_Menu = new ScrollableMenu(Window::root(), button_size, 0, width - button_size, height);
+
+  if (m_Main) {
+    m_Main->set_visible (true);
+    m_Main->set_enabled (true);
+    m_Main->set_handler (this, ButtonID_Back);
+    m_Main->ui().set_type ("Back"); // FIXME
+    // TODO
+  }
+  if (m_Exit) {
+    m_Exit->set_visible (true);
+    m_Exit->set_enabled (true);
+    m_Exit->set_handler (this, ButtonID_Exit);
+    m_Exit->ui().set_type ("Exit");
+    // TODO
+  }
+}
+
+AppManager::~AppManager () {
+  // 
+}
+
+bool AppManager::button_press (unsigned button_id) {
+  bool response = true; // keep the timer running
+
+  if (button_id == ButtonID_Exit) { // setup & start exit menu
+    response = false; // stop the timer // FIXME
+    // 
+  } else if (button_id == ButtonID_Back) { // setup & start main menu
+    m_Exit->set_enabled (false);
+    // 
+  } else {
+    // return from menu sequence - tidy up
+    m_Exit->set_enabled (true);
+
+    if (button_id) { // a button was pressed!
+      // ...
+    }
+  }
+
+  return response;
 }

@@ -321,8 +321,9 @@ void TouchInput::event_process () {
       if (m_handler)
 	m_handler->touch_enter ();
     }
-    if (m_handler)
-      m_handler->touch_event (m_te, m_touch);
+    if (m_handler) {
+      m_timer_active = m_handler->touch_event (m_te, m_touch);
+    }
   }
   m_te = te_None;
 

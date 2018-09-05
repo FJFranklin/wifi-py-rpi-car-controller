@@ -60,7 +60,7 @@ namespace PyCCar {
       virtual void touch_enter () = 0;
       virtual void touch_leave () = 0;
 
-      virtual void touch_event (TouchEvent te, const struct touch_event_data & event_data) = 0;
+      virtual bool touch_event (TouchEvent te, const struct touch_event_data & event_data) = 0; // return false to stop the timer
 
       virtual ~Handler () { }
     };
