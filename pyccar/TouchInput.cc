@@ -270,6 +270,7 @@ bool TouchInput::tick () {
 	m_touch.t1.y = data.pos.y;
 	m_touch.t2 = m_touch.t1;
 	touch_event_end ();
+	break;
       }
     case PyCCarUI::et_Mouse_Down:
       {
@@ -277,6 +278,7 @@ bool TouchInput::tick () {
 	m_touch.t1.y = data.pos.y;
 	m_touch.t2 = m_touch.t1;
 	touch_event_begin ();
+	break;
       }
     default:
       {

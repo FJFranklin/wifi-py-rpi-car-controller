@@ -57,6 +57,7 @@ def ui_set_property(win_id, property, value):
     W[property] = value
 
 def draw_border(win_id, bbox, flags):
+    BG = get_property(win_id, 'BG')
     if flags & 0x04: # enabled
         FG = get_property(win_id, 'FG')
         if flags & 0x08: # active
@@ -67,10 +68,14 @@ def draw_border(win_id, bbox, flags):
         FG = get_property(win_id, 'dis_FG')
         thickness = get_property(win_id, 'n-thin')
     d = get_property(win_id, 'inset')
+    if thickness > d:
+        thickness = d
     (x, y, w, h) = bbox
-    pygame.draw.rect(screen, FG, (x+d, y+d, w-2*d, h-2*d), thickness)
+    pygame.draw.rect(screen, FG, (x+d-thickness, y+d-thickness, w-2*d+2*thickness, h-2*d+2*thickness), 0)
+    pygame.draw.rect(screen, BG, (x+d, y+d, w-2*d, h-2*d), 0)
 
 def draw_back(win_id, bbox, flags):
+    BG = get_property(win_id, 'BG')
     if flags & 0x04: # enabled
         FG = get_property(win_id, 'FG')
     else: # disabled
@@ -78,14 +83,25 @@ def draw_back(win_id, bbox, flags):
     thickness = get_property(win_id, 'line')
     d         = get_property(win_id, 'inset')
     (x, y, w, h) = bbox
-    bboxi = (x+3*d, y+3*d, w-6*d, h-6*d)
-    pygame.draw.arc(screen, FG, bboxi, 0,    3.14, thickness)
-    pygame.draw.arc(screen, FG, bboxi, 4.71, 6.28, thickness)
-    xarr = x+3*d
-    yarr = y+h/2
-    pygame.draw.lines(screen, FG, True, [(xarr-d,yarr), (xarr+d,yarr), (xarr,yarr+d)], thickness)
+    x = x + 3 * d
+    y = y + 3 * d
+    w = w - 6 * d
+    h = h - 6 * d
+    hw = int(round(w/2))
+    hh = int(round(h/2))
+    ht = int(round(thickness/2))
+    centre = (x+hw, y+hh)
+    radius = hw
+    pygame.draw.circle(screen, FG, centre, radius, 0)
+    pygame.draw.circle(screen, BG, centre, radius-thickness, 0)
+    bboxi = (x, y+hh, hw, hh)
+    pygame.draw.rect(screen, BG, bboxi, 0)
+    xarr = x + ht
+    yarr = y + hh
+    pygame.draw.polygon(screen, FG, [(xarr-d,yarr), (xarr+d,yarr), (xarr,yarr+d)], 0)
 
 def draw_exit(win_id, bbox, flags):
+    BG = get_property(win_id, 'BG')
     if flags & 0x04: # enabled
         FG = get_property(win_id, 'FG')
     else: # disabled
@@ -93,10 +109,25 @@ def draw_exit(win_id, bbox, flags):
     thickness = get_property(win_id, 'line')
     d         = get_property(win_id, 'inset')
     (x, y, w, h) = bbox
-    bboxi = (x+3*d, y+3*d, w-6*d, h-6*d)
-    pygame.draw.arc(screen, FG, bboxi, 0,    1.22, thickness)
-    pygame.draw.arc(screen, FG, bboxi, 1.92, 6.28, thickness)
-    pygame.draw.lines(screen, FG, False, [(x+w/2,y+h/2), (x+w/2,y+2*d)], thickness)
+    x = x + 3 * d
+    y = y + 3 * d
+    w = w - 6 * d
+    h = h - 6 * d
+    hw = int(round(w/2))
+    hh = int(round(h/2))
+    ht = int(round(thickness/2))
+    centre = (x+hw, y+hh)
+    radius = hw
+    pygame.draw.circle(screen, FG, centre, radius, 0)
+    pygame.draw.circle(screen, BG, centre, radius-thickness, 0)
+    bboxi = (x+hw-thickness-ht, y, 3*thickness, hh)
+    pygame.draw.rect(screen, BG, bboxi, 0)
+    bboxi = (x+hw-ht, y-thickness, thickness, hh+thickness)
+    pygame.draw.rect(screen, FG, bboxi, 0)
+    #bboxi = (x+3*d, y+3*d, w-6*d, h-6*d)
+    #pygame.draw.arc(screen, FG, bboxi, 0,    1.22, thickness)
+    #pygame.draw.arc(screen, FG, bboxi, 1.92, 6.28, thickness)
+    #pygame.draw.lines(screen, FG, False, [(x+w/2,y+h/2), (x+w/2,y+2*d)], thickness)
 
 def draw_up(win_id, bbox, flags):
     if flags & 0x04: # enabled
