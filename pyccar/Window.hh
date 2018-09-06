@@ -150,6 +150,12 @@ namespace PyCCar {
 
   class Menu {
   public:
+    struct Info {
+      unsigned      m_id;
+      const char *  m_label;
+      struct Info * m_submenu;
+    };
+
     class Item {
     private:
       friend class Menu;
@@ -172,6 +178,8 @@ namespace PyCCar {
 	return m_label;
       }
       void set_label (const char * str);
+
+      void set_submenu (Menu * menu);
     };
 
   private:
@@ -184,7 +192,7 @@ namespace PyCCar {
     unsigned m_offset;
 
   public:
-    Menu ();
+    Menu (struct Info * info);
 
     ~Menu ();
 
@@ -241,23 +249,52 @@ namespace PyCCar {
     void menu_down ();
   };
 
-  class AppManager : public Button::Handler {
+  class MenuManager : public Button::Handler {
   public:
+    class Handler {
+    public:
+      virtual bool notify_menu_will_open () = 0;              // return false to cancel menu
+      virtual bool notify_menu_closed (unsigned menu_id) = 0; // return false to stop timer
+
+      virtual ~Handler () { }
+    };
   private:
-    Button * m_Main; // alt. Back
-    Button * m_Exit;
+    Handler * m_handler;
+
+    Button *  m_Main; // alt. Back
+    Button *  m_Exit;
 
     ScrollableMenu * m_Menu;
 
-    Menu *   m_menu_main;
-    Menu *   m_menu_exit;
+    Menu      m_menu_Main;
+    Menu      m_menu_Exit;
+
+    unsigned  m_off_x;
+    unsigned  m_off_y;
+    unsigned  m_W;
+    unsigned  m_H;
 
   public:
-    AppManager ();
+    MenuManager (Handler * H, struct Menu::Info * main_info, struct Menu::Info * exit_info);
 
-    virtual ~AppManager ();
+    virtual ~MenuManager ();
 
     virtual bool button_press (unsigned button_id);
+
+    inline void bbox (unsigned & x, unsigned & y, unsigned & width, unsigned & height) const {
+      x = m_off_x;
+      y = m_off_y;
+
+      width  = m_W;
+      height = m_H;
+    }
+
+    inline Menu::Item * main_menu_find_id (unsigned id) {
+      return m_menu_Main.find_id (id);
+    }
+    inline Menu::Item * exit_menu_find_id (unsigned id) {
+      return m_menu_Exit.find_id (id);
+    }
   };
 } // namespace PyCCar
 

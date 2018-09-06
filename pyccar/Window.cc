@@ -331,14 +331,36 @@ void Menu::Item::set_label (const char * str) {
   }
 }
 
-Menu::Menu () :
+void Menu::Item::set_submenu (Menu * menu) {
+  if (m_submenu) {
+    delete m_submenu;
+  }
+  m_submenu = menu;
+}
+
+Menu::Menu (struct Info * info) :
   m_parent(0),
   m_item_first(0),
   m_item_last(0),
   m_length(0),
   m_offset(0)
 {
-  // ...
+  if (info) {
+    struct Info * I = info;
+
+    while (I->m_id) {
+      Item * item = add (I->m_id, I->m_label);
+
+      if (item && I->m_submenu) {
+	Menu * M = new Menu(I->m_submenu);
+	if (M) {
+	  M->m_parent = this;
+	  item->set_submenu (M);
+	}
+      }
+      ++I;
+    }
+  }
 }
 
 Menu::~Menu () {
@@ -518,21 +540,25 @@ void ScrollableMenu::menu_down () {
   // ...
 }
 
-AppManager::AppManager () :
+MenuManager::MenuManager (Handler * H, struct Menu::Info * main_info, struct Menu::Info * exit_info) :
+  m_handler(H),
   m_Main(0), // alt. Back
   m_Exit(0),
-  m_menu_main(0),
-  m_menu_exit(0)
+  m_menu_Main(main_info),
+  m_menu_Exit(exit_info),
+  m_off_x(0),
+  m_off_y(0),
+  m_W(Window::root().window_width ()),
+  m_H(Window::root().window_height ())
 {
-  unsigned width  = Window::root().window_width ();
-  unsigned height = Window::root().window_height ();
+  m_off_x = ((m_W < m_H) ? m_W : m_H) / 5;
 
-  unsigned button_size = ((width < height) ? width : height) / 5;
+  m_W -= m_off_x;
 
-  m_Main = new Button(Window::root(), 0,                    0, button_size, button_size);
-  m_Exit = new Button(Window::root(), 0, height - button_size, button_size, button_size);
+  m_Main = new Button(Window::root(), 0,             0, m_off_x, m_off_x);
+  m_Exit = new Button(Window::root(), 0, m_H - m_off_x, m_off_x, m_off_x);
 
-  m_Menu = new ScrollableMenu(Window::root(), button_size, 0, width - button_size, height);
+  m_Menu = new ScrollableMenu(Window::root(), m_off_x, m_off_y, m_W, m_H);
 
   if (m_Main) {
     m_Main->set_visible (true);
@@ -550,25 +576,39 @@ AppManager::AppManager () :
   }
 }
 
-AppManager::~AppManager () {
-  // 
+MenuManager::~MenuManager () {
+  if (m_Menu) {
+    delete m_Menu;
+  }
+  if (m_Main) {
+    delete m_Main;
+  }
+  if (m_Exit) {
+    delete m_Exit;
+  }
 }
 
-bool AppManager::button_press (unsigned button_id) {
+bool MenuManager::button_press (unsigned menu_id) {
   bool response = true; // keep the timer running
 
-  if (button_id == ButtonID_Exit) { // setup & start exit menu
-    response = false; // stop the timer // FIXME
-    // 
-  } else if (button_id == ButtonID_Back) { // setup & start main menu
-    m_Exit->set_enabled (false);
-    // 
+  if (menu_id == ButtonID_Exit) { // setup & start exit menu
+    if (m_handler)
+      if (m_handler->notify_menu_will_open ()) {
+	m_Exit->set_enabled (false);
+	// 
+      }
+  } else if (menu_id == ButtonID_Back) { // setup & start main menu
+    if (m_handler)
+      if (m_handler->notify_menu_will_open ()) {
+	m_Exit->set_enabled (false);
+	// 
+      }
   } else {
     // return from menu sequence - tidy up
     m_Exit->set_enabled (true);
 
-    if (button_id) { // a button was pressed!
-      // ...
+    if (m_handler) {
+      response = m_handler->notify_menu_closed (menu_id);
     }
   }
 

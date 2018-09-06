@@ -39,6 +39,76 @@ static const char * video_driver = "fbcon";
 
 static TouchInput * TI = 0;
 
+#define MENU_ID_Exit     1
+#define MENU_ID_Reboot   2
+#define MENU_ID_Shutdown 3
+
+#define MENU_ID_Item0   10
+#define MENU_ID_Item1   11
+#define MENU_ID_Item2   12
+#define MENU_ID_Item3   13
+#define MENU_ID_Item4   14
+#define MENU_ID_Item5   15
+#define MENU_ID_Item6   16
+#define MENU_ID_Item7   17
+#define MENU_ID_Item8   18
+#define MENU_ID_Item9   19
+
+#define MENU_ID_Sub0    20
+#define MENU_ID_Sub1    22
+#define MENU_ID_Sub2    22
+
+static struct Menu::Info s_menu_SubMenu[] = {
+  { MENU_ID_Sub0, "§±!@£$%^&*()_+-=`~",         0 },
+  { MENU_ID_Sub1, "Lorem ipsum dolor sit amet", 0 },
+  { MENU_ID_Sub2, "consectetur adipiscing elit", 0 },
+  { 0, 0, 0 }
+};
+
+static struct Menu::Info s_menu_Main[] = {
+  { MENU_ID_Item0, "The quick",          0 },
+  { MENU_ID_Item1, "brown fox jumps",    0 },
+  { MENU_ID_Item2, "over the lazy dog.", 0 },
+  { MENU_ID_Item3, "Testing,",           0 },
+  { MENU_ID_Item4, "testing,",           0 },
+  { MENU_ID_Item5, "1, 2, 3,...",        s_menu_SubMenu },
+  { MENU_ID_Item6, "0123456789",         0 },
+  { MENU_ID_Item7, "qwertyuiop",         0 },
+  { MENU_ID_Item8, "QWERTYUIOP",         0 },
+  { MENU_ID_Item9, "{}[]:\"|;'\\<>?,./", 0 },
+  { 0, 0, 0 }
+};
+
+static struct Menu::Info s_menu_Exit[] = {
+  { MENU_ID_Exit,     "Exit",     0 },
+  { MENU_ID_Reboot,   "Reboot",   0 },
+  { MENU_ID_Shutdown, "Shutdown", 0 },
+  { 0, 0, 0 }
+};
+
+class PyCCarMenu : public MenuManager::Handler {
+public:
+  MenuManager MM;
+
+  PyCCarMenu () :
+    MM(this, s_menu_Main, s_menu_Exit)
+  {
+    // 
+  }
+
+  virtual ~PyCCarMenu () {
+    // ...
+  }
+
+  virtual bool notify_menu_will_open () { // return false to cancel menu
+    return true;
+  }
+
+  virtual bool notify_menu_closed (unsigned menu_id) { // return false to stop timer
+    return false;
+  }
+};
+
 int main (int argc, char ** argv) {
   WString Name(application_name);
   WStrArr Args(argc, argv);
@@ -116,6 +186,8 @@ int main (int argc, char ** argv) {
     if (bUI) {
       if (Window::init (screen_width, screen_height)) {
 	// TODO: create UI
+	PyCCarMenu Menu;
+
 	Window::root().redraw ();
 	TI->run (refresh_interval);
       } else {
