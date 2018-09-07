@@ -236,6 +236,7 @@ Button::Button (Window & parent, int rel_x, int rel_y, unsigned width, unsigned 
   m_handler(0),
   m_button_id(0)
 {
+  m_bTouchable = true;
   m_flags = PyCCar_BORDER;
   set_enabled (true);
 }
@@ -258,7 +259,6 @@ void Button::set_enabled (bool bEnabled) {
     } else {
       redraw ();
     }
-    m_bTouchable = enabled ();
   }
 }
 
@@ -274,31 +274,45 @@ void Button::set_active (bool bActive) {
   }
 }
 
+void Button::set_has_submenu (bool bHasSubmenu) {
+  if (bHasSubmenu)
+    m_flags |=  PyCCar_SUBMENU;
+  else
+    m_flags &= ~PyCCar_SUBMENU;
+
+  ui().set_flags (m_flags);
+}
+
 void Button::touch_enter () {
+  if (!enabled ()) return;
+
   // ...
 }
 
 void Button::touch_leave () {
+  if (!enabled ()) return;
+
   set_active (false);
 }
 
 bool Button::touch_event (TouchInput::TouchEvent te, const struct TouchInput::touch_event_data & event_data) {
   bool response = true; // keep the timer running
 
-  if (te == TouchInput::te_End) {
-    if (active ()) { // a touch-end event in a highlighted button - the button has been pressed
-      set_active (false);
+  if (enabled ()) {
+    if (te == TouchInput::te_End) {
+      if (active ()) { // a touch-end event in a highlighted button - the button has been pressed
+	set_active (false);
 
-      if (m_handler) {
-	response = m_handler->button_press (m_button_id);
+	if (m_handler) {
+	  response = m_handler->button_press (m_button_id);
+	}
+      } else {         // not currently highlighted - uncertain selection? => ditch the event
+	// ...
       }
-    } else {         // not currently highlighted - uncertain selection? => ditch the event
-      // ...
+    } else {
+      set_active (true);
     }
-  } else {
-    set_active (true);
   }
-
   return response;
 }
 
@@ -421,10 +435,10 @@ Menu::Item * Menu::find_id (unsigned id) { // recursive search for item by id
 
 ScrollableMenu::ScrollableMenu (Window & parent, int rel_x, int rel_y, unsigned width, unsigned height) :
   Window(parent, rel_x, rel_y, width, height),
-  m_Back(0),
   m_Up(0),
   m_Down(0),
-  m_Scroll(0)
+  m_Scroll(0),
+  m_app(0)
 {
   for (int i = 0; i < 6; i++) {
     m_Item[i] = 0;
@@ -440,7 +454,6 @@ ScrollableMenu::ScrollableMenu (Window & parent, int rel_x, int rel_y, unsigned 
     m_Item[i] = new Button(*this, 0, i * item_height, item_width, item_height);
 
     if (m_Item[i]) {
-      m_Item[i]->set_visible (false);
       m_Item[i]->set_handler (this, ButtonID_Item0 + i);
       m_Item[i]->ui().set_type ("Menu Item");
       // TODO - font size, ??
@@ -452,21 +465,18 @@ ScrollableMenu::ScrollableMenu (Window & parent, int rel_x, int rel_y, unsigned 
   m_Scroll = new Button(*this, item_width,                 scroll_width, scroll_width, scroll_height);
 
   if (m_Up) {
-    m_Up->set_enabled (false);
+    m_Up->set_visible (false);
     m_Up->set_handler (this, ButtonID_Up);
     m_Up->ui().set_type ("Up");
-    // TODO
   }
   if (m_Down) {
-    m_Down->set_enabled (false);
+    m_Down->set_visible (false);
     m_Down->set_handler (this, ButtonID_Down);
     m_Down->ui().set_type ("Down");
-    // TODO
   }
   if (m_Scroll) {
     m_Scroll->set_visible (false);
     m_Scroll->ui().set_type ("Scroll");
-    // TODO - min, max
   }
 }
 
@@ -487,24 +497,33 @@ ScrollableMenu::~ScrollableMenu () {
   }
 }
 
-void ScrollableMenu::manage_menu (Menu * menu, Button * back, Button::Handler * app_manager) {
-  m_menu = menu;
-  m_Back = back;
-  m_app = app_manager;
-  // TODO
-  // manage visibility, etc.
-  // need back() & close() methods to manage submenus & button-clicks
-  // menus need parents
-  // implement handler here & redirect
+void ScrollableMenu::manage_menu (Menu & menu, Button * back, Button::Handler * menu_manager) {
+  if (m_app || !back || !menu_manager) {
+    return;
+  }
+
+  m_menu = &menu;
+  m_app = menu_manager;
+
+  back->set_handler (this, ButtonID_Back);
+  back->ui().set_type ("Back");
+
+  configure ();
+
+  set_visible (true);
 }
 
 bool ScrollableMenu::button_press (unsigned button_id) {
   bool response = true; // keep the timer running
+  bool bClose = false;
 
   switch (button_id) {
   case ButtonID_Back:
     {
-      menu_back ();
+      if (!menu_back ()) { // we've exited the menu
+	button_id = ButtonID_None;
+	bClose = true;
+      }
       break;
     }
   case ButtonID_Up:
@@ -520,24 +539,100 @@ bool ScrollableMenu::button_press (unsigned button_id) {
   default:
     {
       button_id -= ButtonID_Item0;
-      // ...
+      // TODO
+      // manage submenus
+      bClose = true;
       break;
     }
   }
-
+  if (bClose) {
+    set_visible (false);
+    response = m_app->button_press (button_id);
+    m_app = 0;
+  }
   return response;
 }
 
-void ScrollableMenu::menu_back () {
-  // ...
+void ScrollableMenu::configure () {
+  unsigned vis_it = 0; // visible items
+
+  unsigned offset = 0; // menu offset
+  unsigned length = 0; // menu length
+
+  if (m_menu) {
+    offset = m_menu->offset ();
+    length = m_menu->length ();
+
+    if (length < 6) {
+      vis_it = length;
+      offset = 0;
+      m_menu->set_offset (offset);
+    } else {
+      vis_it = 6;
+
+      if (offset + 6 > length) {
+	offset = length - 6;
+	m_menu->set_offset (offset);
+      }
+    }
+  }
+
+  fprintf (stderr, "Menu: length=%u, offset=%u, visible items = %u\n", length, offset, vis_it);
+
+  for (unsigned i = 0; i < vis_it; i++) {
+    if (m_Item[i]) {
+      Menu::Item * I = m_menu->item_no (offset + i);
+      
+      m_Item[i]->ui().set_label (I->label ());
+      m_Item[i]->set_has_submenu (I->m_submenu);
+      m_Item[i]->set_enabled (I->m_bEnabled);
+      m_Item[i]->set_visible (true);
+    }
+  }
+  for (unsigned i = vis_it; i < 6; i++) {
+    if (m_Item[i]) {
+      m_Item[i]->set_visible (false);
+    }
+  }
+
+  m_Up->set_enabled (offset > 0);
+  m_Down->set_enabled (length - offset > 6);
+
+  unsigned s_min = 0;
+  unsigned s_max = 100;
+
+  if (length > 6) {
+    s_min = ( offset      * 100) / length;
+    s_max = ((offset + 6) * 100) / length;
+  }
+  m_Scroll->ui().set_scroll (s_min, s_max);
+}
+
+bool ScrollableMenu::menu_back () {
+  if (m_menu) { // should always be true
+    m_menu = m_menu->parent ();
+    configure ();
+  }
+  return m_menu;
 }
 
 void ScrollableMenu::menu_up () {
-  // ...
+  unsigned offset = m_menu->offset ();
+
+  if (offset > 0) { // should always be true
+    m_menu->set_offset (--offset);
+    configure ();
+  }
 }
 
 void ScrollableMenu::menu_down () {
-  // ...
+  unsigned offset = m_menu->offset ();
+  unsigned length = m_menu->length ();
+
+  if (length - offset > 6) { // should always be true
+    m_menu->set_offset (++offset);
+    configure ();
+  }
 }
 
 MenuManager::MenuManager (Handler * H, struct Menu::Info * main_info, struct Menu::Info * exit_info) :
@@ -563,16 +658,14 @@ MenuManager::MenuManager (Handler * H, struct Menu::Info * main_info, struct Men
   if (m_Main) {
     m_Main->set_visible (true);
     m_Main->set_enabled (true);
-    m_Main->set_handler (this, ButtonID_Back);
-    m_Main->ui().set_type ("Back"); // FIXME
-    // TODO
+    m_Main->set_handler (this, ButtonID_Main);
+    m_Main->ui().set_type ("Main");
   }
   if (m_Exit) {
     m_Exit->set_visible (true);
     m_Exit->set_enabled (true);
     m_Exit->set_handler (this, ButtonID_Exit);
     m_Exit->ui().set_type ("Exit");
-    // TODO
   }
 }
 
@@ -595,17 +688,21 @@ bool MenuManager::button_press (unsigned menu_id) {
     if (m_handler)
       if (m_handler->notify_menu_will_open ()) {
 	m_Exit->set_enabled (false);
-	// 
+	m_Menu->manage_menu (m_menu_Exit, m_Main, this);
       }
-  } else if (menu_id == ButtonID_Back) { // setup & start main menu
+  } else if (menu_id == ButtonID_Main) { // setup & start main menu
     if (m_handler)
       if (m_handler->notify_menu_will_open ()) {
 	m_Exit->set_enabled (false);
-	// 
+	m_Menu->manage_menu (m_menu_Main, m_Main, this);
       }
   } else {
     // return from menu sequence - tidy up
     m_Exit->set_enabled (true);
+
+    // reconfigure the Menu / Back button
+    m_Main->set_handler (this, ButtonID_Main);
+    m_Main->ui().set_type ("Main");
 
     if (m_handler) {
       response = m_handler->notify_menu_closed (menu_id);

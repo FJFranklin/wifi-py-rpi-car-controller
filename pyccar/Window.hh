@@ -143,6 +143,8 @@ namespace PyCCar {
     }
     void set_active (bool bActive);
   public:
+    void set_has_submenu (bool bHasSubmenu);
+
     virtual void touch_enter ();
     virtual void touch_leave ();
     virtual bool touch_event (TouchInput::TouchEvent te, const struct TouchInput::touch_event_data & event_data);
@@ -196,14 +198,14 @@ namespace PyCCar {
 
     ~Menu ();
 
-    inline int length () const {
+    inline unsigned length () const {
       return m_length;
     }
 
     inline void set_offset (unsigned offset) {
       m_offset = offset;
     }
-    inline int offset () const {
+    inline unsigned offset () const {
       return m_offset;
     }
 
@@ -225,7 +227,6 @@ namespace PyCCar {
   private:
     Button * m_Item[6];
 
-    Button * m_Back;
     Button * m_Up;
     Button * m_Down;
     Window * m_Scroll;
@@ -239,12 +240,14 @@ namespace PyCCar {
 
     virtual ~ScrollableMenu ();
 
-    void manage_menu (Menu * menu, Button * back, Button::Handler * app_manager);
+    void manage_menu (Menu & menu, Button * back, Button::Handler * app_manager);
 
     virtual bool button_press (unsigned button_id);
 
   private:
-    void menu_back ();
+    void configure ();
+
+    bool menu_back ();
     void menu_up ();
     void menu_down ();
   };

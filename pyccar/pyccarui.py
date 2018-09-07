@@ -199,6 +199,8 @@ def ui_draw(win_id):
         type = get_property(win_id, 'type')
         if type == 'Back':
             draw_back(win_id, bbox, flags)
+        elif type == 'Main':
+            draw_back(win_id, bbox, flags) # FIXME
         elif type == 'Exit':
             draw_exit(win_id, bbox, flags)
         elif type == 'Up':
