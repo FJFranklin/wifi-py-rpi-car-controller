@@ -346,7 +346,7 @@ void TouchInput::run (unsigned long interval) {
   while (m_timer_active) {
     unsigned long time = timer_millis ();  // just call this the once
 #if 1
-    if (time - time_start > 10000) // stop after 10 seconds
+    if (time - time_start > 30000) // stop after 30 seconds
       break;
 #endif
     if (last_milli < time) { // time is in milliseconds

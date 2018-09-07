@@ -465,12 +465,12 @@ ScrollableMenu::ScrollableMenu (Window & parent, int rel_x, int rel_y, unsigned 
   m_Scroll = new Button(*this, item_width,                 scroll_width, scroll_width, scroll_height);
 
   if (m_Up) {
-    m_Up->set_visible (false);
+    m_Up->set_visible (true);
     m_Up->set_handler (this, ButtonID_Up);
     m_Up->ui().set_type ("Up");
   }
   if (m_Down) {
-    m_Down->set_visible (false);
+    m_Down->set_visible (true);
     m_Down->set_handler (this, ButtonID_Down);
     m_Down->ui().set_type ("Down");
   }
@@ -582,7 +582,7 @@ void ScrollableMenu::configure () {
   for (unsigned i = 0; i < vis_it; i++) {
     if (m_Item[i]) {
       Menu::Item * I = m_menu->item_no (offset + i);
-      
+      fprintf (stderr, "Item %u: label=\"%s\"\n", i, I->label ());
       m_Item[i]->ui().set_label (I->label ());
       m_Item[i]->set_has_submenu (I->m_submenu);
       m_Item[i]->set_enabled (I->m_bEnabled);

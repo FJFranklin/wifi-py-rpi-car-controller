@@ -124,10 +124,6 @@ def draw_exit(win_id, bbox, flags):
     pygame.draw.rect(screen, BG, bboxi, 0)
     bboxi = (x+hw-ht, y-thickness, thickness, hh+thickness)
     pygame.draw.rect(screen, FG, bboxi, 0)
-    #bboxi = (x+3*d, y+3*d, w-6*d, h-6*d)
-    #pygame.draw.arc(screen, FG, bboxi, 0,    1.22, thickness)
-    #pygame.draw.arc(screen, FG, bboxi, 1.92, 6.28, thickness)
-    #pygame.draw.lines(screen, FG, False, [(x+w/2,y+h/2), (x+w/2,y+2*d)], thickness)
 
 def draw_up(win_id, bbox, flags):
     if flags & 0x04: # enabled
@@ -137,12 +133,13 @@ def draw_up(win_id, bbox, flags):
     thickness = get_property(win_id, 'line')
     d         = get_property(win_id, 'inset')
     (x, y, w, h) = bbox
+    hw = int(round(w/2))
     xl = x + 3*d
     yt = y + 3*d
-    x0 = x + w/2
-    xr = x + w - 6*d
-    yb = y + h - 6*d
-    pygame.draw.lines(screen, FG, True, [(xl,yb), (x0,yt), (xr,yb)], thickness)
+    x0 = x + hw
+    xr = x + w - 3*d
+    yb = y + h - 3*d
+    pygame.draw.polygon(screen, FG, [(xl,yb), (x0,yt), (xr,yb)], 0)
 
 def draw_down(win_id, bbox, flags):
     if flags & 0x04: # enabled
@@ -152,12 +149,13 @@ def draw_down(win_id, bbox, flags):
     thickness = get_property(win_id, 'line')
     d         = get_property(win_id, 'inset')
     (x, y, w, h) = bbox
+    hw = int(round(w/2))
     xl = x + 3*d
     yt = y + 3*d
-    x0 = x + w/2
-    xr = x + w - 6*d
-    yb = y + h - 6*d
-    pygame.draw.lines(screen, FG, True, [(xl,yt), (x0,yb), (xr,yt)], thickness)
+    x0 = x + hw
+    xr = x + w - 3*d
+    yb = y + h - 3*d
+    pygame.draw.polygon(screen, FG, [(xl,yt), (x0,yb), (xr,yt)], 0)
 
 def draw_scroll(win_id, bbox, flags):
     d      = get_property(win_id, 'inset')
