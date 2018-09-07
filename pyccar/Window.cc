@@ -26,13 +26,14 @@
 
 using namespace PyCCar;
 
-#define ButtonID_None  0
-#define ButtonID_Exit  1
-#define ButtonID_Main  2
-#define ButtonID_Back  ButtonID_Main
-#define ButtonID_Up    3
-#define ButtonID_Down  4
-#define ButtonID_Item0 5
+#define ButtonID_None    0
+#define ButtonID_Exit    1
+#define ButtonID_Main    2
+#define ButtonID_Back    ButtonID_Main
+#define ButtonID_Up      3
+#define ButtonID_Down    4
+#define ButtonID_Item0   5
+#define ButtonID_Offset 16
 
 static unsigned s_id_counter = 0;
 
@@ -462,7 +463,7 @@ ScrollableMenu::ScrollableMenu (Window & parent, int rel_x, int rel_y, unsigned 
 
   m_Up     = new Button(*this, item_width,                            0, scroll_width, scroll_width);
   m_Down   = new Button(*this, item_width, scroll_width + scroll_height, scroll_width, scroll_width);
-  m_Scroll = new Button(*this, item_width,                 scroll_width, scroll_width, scroll_height);
+  m_Scroll = new Window(*this, item_width,                 scroll_width, scroll_width, scroll_height);
 
   if (m_Up) {
     m_Up->set_visible (true);
@@ -475,7 +476,7 @@ ScrollableMenu::ScrollableMenu (Window & parent, int rel_x, int rel_y, unsigned 
     m_Down->ui().set_type ("Down");
   }
   if (m_Scroll) {
-    m_Scroll->set_visible (false);
+    m_Scroll->set_visible (true);
     m_Scroll->ui().set_type ("Scroll");
   }
 }
@@ -521,7 +522,7 @@ bool ScrollableMenu::button_press (unsigned button_id) {
   case ButtonID_Back:
     {
       if (!menu_back ()) { // we've exited the menu
-	button_id = ButtonID_None;
+	button_id = ButtonID_Offset;
 	bClose = true;
       }
       break;
@@ -538,9 +539,11 @@ bool ScrollableMenu::button_press (unsigned button_id) {
     }
   default:
     {
-      button_id -= ButtonID_Item0;
-      // TODO
-      // manage submenus
+      Menu::Item * I = m_menu->item_no (m_menu->offset () + button_id - ButtonID_Item0);
+
+      // TODO: manage submenus
+
+      button_id = ButtonID_Offset + I->id ();
       bClose = true;
       break;
     }
@@ -577,12 +580,10 @@ void ScrollableMenu::configure () {
     }
   }
 
-  fprintf (stderr, "Menu: length=%u, offset=%u, visible items = %u\n", length, offset, vis_it);
-
   for (unsigned i = 0; i < vis_it; i++) {
     if (m_Item[i]) {
       Menu::Item * I = m_menu->item_no (offset + i);
-      fprintf (stderr, "Item %u: label=\"%s\"\n", i, I->label ());
+
       m_Item[i]->ui().set_label (I->label ());
       m_Item[i]->set_has_submenu (I->m_submenu);
       m_Item[i]->set_enabled (I->m_bEnabled);
@@ -606,6 +607,8 @@ void ScrollableMenu::configure () {
     s_max = ((offset + 6) * 100) / length;
   }
   m_Scroll->ui().set_scroll (s_min, s_max);
+
+  redraw ();
 }
 
 bool ScrollableMenu::menu_back () {
@@ -696,7 +699,7 @@ bool MenuManager::button_press (unsigned menu_id) {
 	m_Exit->set_enabled (false);
 	m_Menu->manage_menu (m_menu_Main, m_Main, this);
       }
-  } else {
+  } else if (menu_id >= ButtonID_Offset) {
     // return from menu sequence - tidy up
     m_Exit->set_enabled (true);
 
@@ -705,8 +708,10 @@ bool MenuManager::button_press (unsigned menu_id) {
     m_Main->ui().set_type ("Main");
 
     if (m_handler) {
-      response = m_handler->notify_menu_closed (menu_id);
+      response = m_handler->notify_menu_closed (menu_id - ButtonID_Offset);
     }
+  } else {
+    fprintf (stderr, "MenuManager::button_press: unexpected menu-id = %u\n", menu_id);
   }
 
   return response;

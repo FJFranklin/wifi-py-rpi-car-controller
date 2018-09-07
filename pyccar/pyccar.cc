@@ -106,8 +106,8 @@ public:
   }
 
   virtual bool notify_menu_closed (unsigned menu_id) { // return false to stop timer
-    fputs ("notify_menu_closed\n", stderr);
-    return false;
+    fprintf (stderr, "notify_menu_closed: menu-id = %u\n", menu_id);
+    return menu_id != MENU_ID_Exit;
   }
 };
 

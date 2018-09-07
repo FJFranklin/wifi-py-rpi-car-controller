@@ -372,7 +372,7 @@ bool PyCCarUI::set_scroll (unsigned s_min, unsigned s_max) {
 
   PyObject * value = Py_BuildValue ("II", s_min, s_max);
   if (value) {
-    bOkay = set_property ("bbox", value);
+    bOkay = set_property ("Scroll", value);
     Py_DECREF (value);
   }
   return bOkay;

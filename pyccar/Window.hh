@@ -58,10 +58,9 @@ namespace PyCCar {
   private:
     Window (unsigned width, unsigned height);
 
-  protected:
+  public:
     Window (Window & parent, int rel_x, int rel_y, unsigned width, unsigned height);
 
-  public:
     virtual ~Window ();
 
     static Window & root ();

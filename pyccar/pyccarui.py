@@ -164,7 +164,7 @@ def draw_scroll(win_id, bbox, flags):
     pygame.draw.rect(screen, grey, (x+d, y, w-2*d, h), 0)
     if scroll:
         (s_min, s_max) = scroll
-        bboxi = (x+2*d, y+(h*s_min)/100, w-4*d, (h*(s_max-s_min))/100)
+        bboxi = (x+2*d, int(round(y+(h*s_min)/100)), w-4*d, int(round((h*(s_max-s_min))/100)))
         pygame.draw.rect(screen, blue, bboxi, 0)
 
 def draw_menu_item(win_id, bbox, flags):
@@ -183,7 +183,7 @@ def draw_menu_item(win_id, bbox, flags):
         y0 = y + h/2
         xr = x + w - 2*d
         yb = y + h - 2*d
-        pygame.draw.lines(screen, FG, True, [(xl,yt), (xl,yb), (xr,y0)], thickness)
+        pygame.draw.polygon(screen, FG, [(xl,yt), (xl,yb), (xr,y0)], 0)
 
 def ui_draw(win_id):
     flags = get_property(win_id, 'flags')
