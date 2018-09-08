@@ -451,13 +451,15 @@ ScrollableMenu::ScrollableMenu (Window & parent, int rel_x, int rel_y, unsigned 
   unsigned item_width  = width - scroll_width;
   unsigned item_height = height / 6;
 
+  unsigned font_size = item_height - 20;
+
   for (int i = 0; i < 6; i++) {
     m_Item[i] = new Button(*this, 0, i * item_height, item_width, item_height);
 
     if (m_Item[i]) {
       m_Item[i]->set_handler (this, ButtonID_Item0 + i);
       m_Item[i]->ui().set_type ("Menu Item");
-      // TODO - font size, ??
+      m_Item[i]->ui().set_font_size (font_size);
     }
   }
 
@@ -541,10 +543,13 @@ bool ScrollableMenu::button_press (unsigned button_id) {
     {
       Menu::Item * I = m_menu->item_no (m_menu->offset () + button_id - ButtonID_Item0);
 
-      // TODO: manage submenus
-
-      button_id = ButtonID_Offset + I->id ();
-      bClose = true;
+      if (I->m_submenu) {
+	m_menu = I->m_submenu;
+	configure ();
+      } else {
+	button_id = ButtonID_Offset + I->id ();
+	bClose = true;
+      }
       break;
     }
   }
