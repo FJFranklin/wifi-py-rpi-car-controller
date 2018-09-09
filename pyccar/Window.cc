@@ -133,9 +133,9 @@ void Window::set_visible (bool bVisible) {
     ui().set_flags (m_flags);
 
     if (bVisible) {
-      redraw ();
+      set_dirty (true); // redraw ();
     } else {
-      m_parent->redraw ();
+      m_parent->set_dirty (true); // redraw ();
     }
   }
 }
@@ -212,24 +212,34 @@ bool Window::touch_event (TouchInput::TouchEvent te, const struct TouchInput::to
   return true; // keep the timer running
 }
 
-void Window::redraw () {
+bool Window::redraw (bool bForceRedraw) {
   if (!visible ())
-    return;
+    return bForceRedraw;
+
+  /* Once you start to redraw, you have to continue
+   * TODO: Track bounding box for redraw updates
+   */
+  if (dirty ()) {
+    bForceRedraw = true;
+  }
 
   /* Draw self first
    */
-  ui().draw ();
-
-  set_dirty (false);
+  if (bForceRedraw) {
+    ui().draw ();
+    set_dirty (false);
+  }
 
   /* Draw children, bottom to top
    */
   Window * child = m_child_bottom;
 
   while (child) {
-    child->redraw ();
+    bForceRedraw = child->redraw (bForceRedraw);
     child = child->m_sibling_upper;
   }
+
+  return bForceRedraw;
 }
 
 Button::Button (Window & parent, int rel_x, int rel_y, unsigned width, unsigned height) :
@@ -253,12 +263,11 @@ void Button::set_enabled (bool bEnabled) {
     else
       m_flags &= ~PyCCar_ENABLED;
 
-    ui().set_flags (m_flags);
-
     if (!enabled () && active ()) {
       set_active (false);
     } else {
-      redraw ();
+      set_dirty (true); // redraw ();
+      ui().set_flags (m_flags);
     }
   }
 }
@@ -271,7 +280,7 @@ void Button::set_active (bool bActive) {
       m_flags &= ~PyCCar_ACTIVE;
 
     ui().set_flags (m_flags);
-    redraw ();
+    set_dirty (true); // redraw ();
   }
 }
 
@@ -613,7 +622,7 @@ void ScrollableMenu::configure () {
   }
   m_Scroll->ui().set_scroll (s_min, s_max);
 
-  redraw ();
+  set_dirty (true); // redraw ();
 }
 
 bool ScrollableMenu::menu_back () {

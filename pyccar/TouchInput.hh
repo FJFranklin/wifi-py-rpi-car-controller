@@ -65,6 +65,14 @@ namespace PyCCar {
       virtual ~Handler () { }
     };
 
+    class RunTimer {
+    public:
+      virtual bool run_timer_tick () = 0;
+      virtual bool run_timer_interval () = 0;
+
+      virtual ~RunTimer () { }
+    };
+
   private:
     Handler * m_handler;
 
@@ -128,7 +136,7 @@ namespace PyCCar {
      * calls tick() every millisecond, and event_process() every <interval>
      * (interval specified in milliseconds; must be non-zero)
      */
-    void run (unsigned long interval);
+    void run (unsigned long interval, RunTimer * RT = 0);
 
     /* stop the event loop
      */

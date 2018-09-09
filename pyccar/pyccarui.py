@@ -240,16 +240,14 @@ def ui_event():
         if event.type == pygame.QUIT:
             next = ('Q', None)
             break
+        pos = pygame.mouse.get_pos()
         if event.type == pygame.MOUSEMOTION: #      pos, rel, buttons
-            pos = pygame.mouse.get_pos()
             next = ('M', pos)
             break
         if event.type == pygame.MOUSEBUTTONUP: #    pos, button
-            pos = pygame.mouse.get_pos()
             next = ('U', pos)
             break
         if event.type == pygame.MOUSEBUTTONDOWN: #  pos, button
-            pos = pygame.mouse.get_pos()
             next = ('D', pos)
             break
     return next

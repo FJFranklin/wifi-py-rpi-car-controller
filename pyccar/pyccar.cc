@@ -86,7 +86,7 @@ static struct Menu::Info s_menu_Exit[] = {
   { 0, 0, 0 }
 };
 
-class PyCCarMenu : public MenuManager::Handler {
+class PyCCarMenu : public MenuManager::Handler, public TouchInput::RunTimer {
 public:
   MenuManager MM;
 
@@ -98,6 +98,16 @@ public:
 
   virtual ~PyCCarMenu () {
     // ...
+  }
+
+  virtual bool run_timer_tick () { // return false to stop timer
+    // ...
+    return true;
+  }
+
+  virtual bool run_timer_interval () { // return false to stop timer
+    Window::root().redraw ();
+    return true;
   }
 
   virtual bool notify_menu_will_open () { // return false to cancel menu
@@ -190,8 +200,8 @@ int main (int argc, char ** argv) {
 	// TODO: create UI
 	PyCCarMenu Menu;
 
-	Window::root().redraw ();
-	TI->run (refresh_interval);
+	Window::root().redraw (true);
+	TI->run (refresh_interval, &Menu);
       } else {
 	fputs ("Failed to initialise window manager!\n", stderr);
       }

@@ -332,7 +332,7 @@ void TouchInput::event_process () {
   PyCCarUI::refresh ();
 }
 
-void TouchInput::run (unsigned long interval) {
+void TouchInput::run (unsigned long interval, RunTimer * RT) {
   if (m_timer_active) { // already active; just return
     return;
   }
@@ -351,14 +351,23 @@ void TouchInput::run (unsigned long interval) {
 #endif
     if (last_milli < time) { // time is in milliseconds
       last_milli = time;     // note current time
+
       if (!tick ()) {
 	break;               // break loop if tick() fails
+      }
+      if (RT && m_timer_active) {
+	m_timer_active = RT->run_timer_tick (); // break loop if callback~tick() fails
       }
     }
     if (interval) {
       if (last_event + interval <= time) {
 	last_event += interval;
+
 	event_process ();
+
+	if (RT && m_timer_active) {
+	  m_timer_active = RT->run_timer_interval (); // break loop if callback~interval() fails
+	}
       }
     }
     usleep (1);

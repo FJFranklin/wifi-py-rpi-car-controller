@@ -81,7 +81,7 @@ namespace PyCCar {
       return PyCCarUI(m_id);
     }
 
-    inline void set_dirty (bool bDirty) { // FIXME: what to do about this?
+    inline void set_dirty (bool bDirty) {
       m_bDirty = bDirty;
     }
     inline bool dirty () const {
@@ -101,7 +101,7 @@ namespace PyCCar {
     virtual void touch_leave ();
     virtual bool touch_event (TouchInput::TouchEvent te, const struct TouchInput::touch_event_data & event_data);
 
-    virtual void redraw ();
+    bool redraw (bool bForceRedraw = false);
 
   private:
     void add_child (Window * child);
