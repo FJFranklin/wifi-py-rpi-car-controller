@@ -288,7 +288,7 @@ bool TouchInput::tick () {
   }
 #if HAVE_LINUX_INPUT_H
   if (m_devfd < 0) {
-    return;
+    return false;
   }
   struct input_event * ev = reinterpret_cast<struct input_event *>(ev_buffer);
 
