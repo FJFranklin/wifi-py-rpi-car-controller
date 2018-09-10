@@ -53,18 +53,14 @@ Window::Window (unsigned width, unsigned height) :
   m_child_top(0),
   m_sibling_lower(0),
   m_sibling_upper(0),
-  m_abs_x(0),
-  m_abs_y(0),
-//m_rel_x(0),
-//m_rel_y(0),
-  m_W(width),
-  m_H(height),
   m_id(0),
   m_flags(0),
-  m_bDirty(true),
-  m_bTouchable(true)
+  m_bTouchable(true),
+  m_bbox(0, 0, width, height)
 {
-  ui().set_bbox (m_abs_x, m_abs_y, m_W, m_H);
+  ui().set_bbox (m_bbox);
+
+  set_dirty (true); // mark everything as dirty, requiring complete redraw
 
   /* Settings for root window
    */
@@ -78,20 +74,16 @@ Window::Window (Window & parent, int rel_x, int rel_y, unsigned width, unsigned 
   m_child_top(0),
   m_sibling_lower(0),
   m_sibling_upper(0),
-  m_abs_x(parent.m_abs_x + rel_x),
-  m_abs_y(parent.m_abs_y + rel_y),
-//m_rel_x(rel_x),
-//m_rel_y(rel_y),
-  m_W(width),
-  m_H(height),
   m_id(s_id_next ()),
   m_flags(0),
-  m_bDirty(true),
-  m_bTouchable(false)
+  m_bTouchable(false),
+  m_bbox(parent.origin_x () + rel_x, parent.origin_y () + rel_y, width, height)
 {
   parent.add_child (this);
 
-  ui().set_bbox (m_abs_x, m_abs_y, m_W, m_H);
+  ui().set_bbox (m_bbox);
+
+  set_dirty (true); // mark whole window as dirty, requiring complete redraw
 }
 
 Window::~Window () {
@@ -138,16 +130,6 @@ void Window::set_visible (bool bVisible) {
       m_parent->set_dirty (true); // redraw ();
     }
   }
-}
-
-bool Window::coord_in_bounds (int x, int y) {
-  if ((x < m_abs_x) || (y < m_abs_y)) {
-    return false;
-  }
-  if ((x >= m_abs_x + static_cast<int>(m_W)) || (y >= m_abs_y + static_cast<int>(m_H))) {
-    return false;
-  }
-  return true;
 }
 
 TouchInput::Handler * Window::touch_handler (const struct TouchInput::touch_event_data & event_data) {
@@ -212,22 +194,20 @@ bool Window::touch_event (TouchInput::TouchEvent te, const struct TouchInput::to
   return true; // keep the timer running
 }
 
-bool Window::redraw (bool bForceRedraw) {
-  if (!visible ())
-    return bForceRedraw;
+void Window::redraw (BBox & dirty, bool bForceRedraw) {
+  if (!visible ()) return;
 
-  /* Once you start to redraw, you have to continue
-   * TODO: Track bounding box for redraw updates
-   */
-  if (dirty ()) {
-    bForceRedraw = true;
+  if (!bForceRedraw) {
+    if (m_dirty.exists () || m_bbox.intersects (dirty)) {
+      dirty.combine (m_bbox); // TODO: This is clumsy still, since either the whole window redraws or not at all
+      bForceRedraw = true;
+    }
   }
 
   /* Draw self first
    */
   if (bForceRedraw) {
     ui().draw ();
-    set_dirty (false);
   }
 
   /* Draw children, bottom to top
@@ -235,11 +215,11 @@ bool Window::redraw (bool bForceRedraw) {
   Window * child = m_child_bottom;
 
   while (child) {
-    bForceRedraw = child->redraw (bForceRedraw);
+    child->redraw (dirty, bForceRedraw);
     child = child->m_sibling_upper;
   }
 
-  return bForceRedraw;
+  set_dirty (false);
 }
 
 Button::Button (Window & parent, int rel_x, int rel_y, unsigned width, unsigned height) :

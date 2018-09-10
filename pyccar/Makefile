@@ -34,6 +34,7 @@ ALL_SOURCES=\
 	PyCCarUI.cc
 
 ALL_HEADERS=\
+	BBox.hh \
 	TouchInput.hh \
 	Window.hh \
 	pyccar.hh

@@ -38,24 +38,17 @@ namespace PyCCar {
     Window * m_sibling_lower;
     Window * m_sibling_upper;
 
-    int m_abs_x;
-    int m_abs_y;
-//  int m_rel_x;
-//  int m_rel_y;
-
-    unsigned m_W;
-    unsigned m_H;
-
     unsigned m_id;
+
   protected:
     unsigned m_flags;
 
-  private:
-    bool m_bDirty;
-  protected:
-    bool m_bTouchable;
+    bool     m_bTouchable;
 
   private:
+    BBox     m_bbox;
+    BBox     m_dirty;
+
     Window (unsigned width, unsigned height);
 
   public:
@@ -67,25 +60,39 @@ namespace PyCCar {
 
     static bool init (unsigned width, unsigned height);
 
-    inline unsigned window_width () const {
-      return m_W;
-    }
-    inline unsigned window_height () const {
-      return m_H;
-    }
-
     inline unsigned id () const {
       return m_id;
     }
+
     inline PyCCarUI ui () const {
       return PyCCarUI(m_id);
     }
 
-    inline void set_dirty (bool bDirty) {
-      m_bDirty = bDirty;
+    inline bool coord_in_bounds (unsigned x, unsigned y) const {
+      return m_bbox.includes (x, y);
     }
-    inline bool dirty () const {
-      return m_bDirty;
+    inline unsigned origin_x () const { // all coordinates are absolute; origin locates top-left corner of window
+      return m_bbox.m_x;
+    }
+    inline unsigned origin_y () const {
+      return m_bbox.m_y;
+    }
+    inline unsigned window_width () const {
+      return m_bbox.m_width;
+    }
+    inline unsigned window_height () const {
+      return m_bbox.m_height;
+    }
+
+    inline void set_dirty (const BBox & region) { // mark a region of the window as dirty
+      m_dirty.combine (region);
+    }
+    inline void set_dirty (bool bDirty) { // mark the whole window as dirty or clean
+      if (bDirty) {
+	m_dirty = m_bbox;
+      } else {
+	m_dirty.clear ();
+      }
     }
 
     inline bool visible () const {
@@ -93,18 +100,21 @@ namespace PyCCar {
     }
     void set_visible (bool bVisible);
 
-    bool coord_in_bounds (int x, int y);
-
     virtual TouchInput::Handler * touch_handler (const struct TouchInput::touch_event_data & event_data);
 
     virtual void touch_enter ();
     virtual void touch_leave ();
     virtual bool touch_event (TouchInput::TouchEvent te, const struct TouchInput::touch_event_data & event_data);
 
-    bool redraw (bool bForceRedraw = false);
-
+    inline void redraw (bool bForceRedraw = false) {
+      BBox dirty;
+      root().redraw (dirty, bForceRedraw);
+    }
   private:
+    void redraw (BBox & dirty, bool bForceRedraw);
+
     void add_child (Window * child);
+    // TODO: Need a remove_child also...
   };
 
   class Button : public Window {

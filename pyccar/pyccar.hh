@@ -26,6 +26,8 @@
 
 #include <Python.h>
 
+#include "BBox.hh"
+
 /* interface flags
  */
 #define PyCCar_VISIBLE 0x01u // whether the window/button is visible
@@ -50,6 +52,7 @@ public:
       int x, y;
     } pos;
   };
+
 private:
   unsigned m_id;
 public:
@@ -78,7 +81,7 @@ public:
 
   /* Set properties
    */
-  bool set_bbox (int x, int y, unsigned width, unsigned height);
+  bool set_bbox (const PyCCar::BBox & bbox);
   bool set_flags (unsigned flags);
   bool set_type (const char * window_type);
   bool set_bg_color (unsigned char r, unsigned char g, unsigned char b);

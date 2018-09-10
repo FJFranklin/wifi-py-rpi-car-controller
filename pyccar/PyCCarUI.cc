@@ -312,10 +312,10 @@ bool PyCCarUI::set_property (const char * property, PyObject * value) {
   return false;
 }
 
-bool PyCCarUI::set_bbox (int x, int y, unsigned width, unsigned height) {
+bool PyCCarUI::set_bbox (const PyCCar::BBox & bbox) {
   bool bOkay = false;
 
-  PyObject * value = Py_BuildValue ("iiII", x, y, width, height);
+  PyObject * value = Py_BuildValue ("IIII", bbox.m_x, bbox.m_y, bbox.m_width, bbox.m_height);
   if (value) {
     bOkay = set_property ("bbox", value);
     Py_DECREF (value);
