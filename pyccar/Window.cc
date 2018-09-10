@@ -157,19 +157,19 @@ TouchInput::Handler * Window::touch_handler (const struct TouchInput::touch_even
 }
 
 void Window::touch_enter () {
-#if 1
+#if 0
   fputs ("<enter>\n", stderr);
 #endif
 }
 
 void Window::touch_leave () {
-#if 1
+#if 0
   fputs ("<leave>\n", stderr);
 #endif
 }
 
 bool Window::touch_event (TouchInput::TouchEvent te, const struct TouchInput::touch_event_data & event_data) {
-#if 1
+#if 0
   switch (te) {
   case TouchInput::te_None:
     fputs ("(none)\n", stderr);

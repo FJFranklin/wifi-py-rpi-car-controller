@@ -249,43 +249,46 @@ void TouchInput::handle (const struct input_event * event) {
 }
 
 bool TouchInput::tick () {
-  struct PyCCarUI::event_data data;
+  if (!m_devfd) {
+    struct PyCCarUI::event_data data;
 
-  while (PyCCarUI::event (data)) {
-    if (data.type == PyCCarUI::et_Quit) {
-      return false;
-    }
-    switch (data.type) {
-    case PyCCarUI::et_Mouse_Motion:
-      {
-	m_touch.t1.x = data.pos.x;
-	m_touch.t1.y = data.pos.y;
-	m_touch.t2 = m_touch.t1;
-	touch_event_change ();
-	break;
+    while (PyCCarUI::event (data)) {
+      if (data.type == PyCCarUI::et_Quit) {
+	return false;
       }
-    case PyCCarUI::et_Mouse_Up:
-      {
-	m_touch.t1.x = data.pos.x;
-	m_touch.t1.y = data.pos.y;
-	m_touch.t2 = m_touch.t1;
-	touch_event_end ();
-	break;
-      }
-    case PyCCarUI::et_Mouse_Down:
-      {
-	m_touch.t1.x = data.pos.x;
-	m_touch.t1.y = data.pos.y;
-	m_touch.t2 = m_touch.t1;
-	touch_event_begin ();
-	break;
-      }
-    default:
-      {
-	break;
+      switch (data.type) {
+      case PyCCarUI::et_Mouse_Motion:
+	{
+	  m_touch.t1.x = data.pos.x;
+	  m_touch.t1.y = data.pos.y;
+	  m_touch.t2 = m_touch.t1;
+	  touch_event_change ();
+	  break;
+	}
+      case PyCCarUI::et_Mouse_Up:
+	{
+	  m_touch.t1.x = data.pos.x;
+	  m_touch.t1.y = data.pos.y;
+	  m_touch.t2 = m_touch.t1;
+	  touch_event_end ();
+	  break;
+	}
+      case PyCCarUI::et_Mouse_Down:
+	{
+	  m_touch.t1.x = data.pos.x;
+	  m_touch.t1.y = data.pos.y;
+	  m_touch.t2 = m_touch.t1;
+	  touch_event_begin ();
+	  break;
+	}
+      default:
+	{
+	  break;
+	}
       }
     }
   }
+
 #if HAVE_LINUX_INPUT_H
   if (m_devfd < 0) {
     return false;
