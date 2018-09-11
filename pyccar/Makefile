@@ -9,14 +9,17 @@ LDFLAGS=$(shell python3-config --ldflags)
 
 all:	pyccar
 
-runX:	pyccar
-	PYTHONPATH=`pwd` ./pyccar
-
-runhp:	pyccar
+runcar:	pyccar
 	PYTHONPATH=`pwd` ./pyccar --fb-touch
 
-runtft:	pyccar
-	PYTHONPATH=`pwd` ./pyccar --fb-touch --fb-device=/dev/fb1
+runX:	pyccar
+	PYTHONPATH=`pwd` ./pyccar --timeout
+
+runfb0:	pyccar
+	PYTHONPATH=`pwd` ./pyccar --fb-touch --timeout
+
+runfb1:	pyccar
+	PYTHONPATH=`pwd` ./pyccar --fb-touch --fb-device=/dev/fb1 --timeout
 
 clean:
 	rm -f *~ *.o

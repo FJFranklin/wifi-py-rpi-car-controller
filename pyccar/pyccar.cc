@@ -24,6 +24,7 @@
 #include "pyccar.hh"
 
 #include <cstring>
+#include <unistd.h>
 
 #include "TouchInput.hh"
 #include "Window.hh"
@@ -55,7 +56,7 @@ static TouchInput * TI = 0;
 #define MENU_ID_Item9   19
 
 #define MENU_ID_Sub0    20
-#define MENU_ID_Sub1    22
+#define MENU_ID_Sub1    21
 #define MENU_ID_Sub2    22
 
 static struct Menu::Info s_menu_SubMenu[] = {
@@ -90,8 +91,11 @@ class PyCCarMenu : public MenuManager::Handler, public TouchInput::RunTimer {
 public:
   MenuManager MM;
 
-  PyCCarMenu () :
-    MM(this, s_menu_Main, s_menu_Exit)
+  unsigned long m_time_stop;
+
+  PyCCarMenu (unsigned long time_stop_ms) :
+    MM(this, s_menu_Main, s_menu_Exit),
+    m_time_stop(time_stop_ms)
   {
     // 
   }
@@ -100,9 +104,8 @@ public:
     // ...
   }
 
-  virtual bool run_timer_tick () { // return false to stop timer
-    // ...
-    return true;
+  virtual bool run_timer_tick (unsigned long time_in_ms) { // return false to stop timer
+    return true; // m_time_stop ? (time_in_ms < m_time_stop) : true;
   }
 
   virtual bool run_timer_interval () { // return false to stop timer
@@ -117,7 +120,93 @@ public:
 
   virtual bool notify_menu_closed (unsigned menu_id) { // return false to stop timer
     fprintf (stderr, "notify_menu_closed: menu-id = %u\n", menu_id);
-    return menu_id != MENU_ID_Exit;
+
+    bool response = true;
+
+    switch (menu_id) {
+    case MENU_ID_Exit:
+      {
+	response = false;
+	break;
+      }
+    case MENU_ID_Reboot:
+      {
+	execl ("/sbin/reboot", "reboot", (char *) 0);
+	break;
+      }
+    case MENU_ID_Shutdown:
+      {
+	execl ("/sbin/shutdown", "shutdown", "-h", "now", (char *) 0);
+	break;
+      }
+    case MENU_ID_Item0:
+      {
+	// ...
+	break;
+      }
+    case MENU_ID_Item1:
+      {
+	// ...
+	break;
+      }
+    case MENU_ID_Item2:
+      {
+	// ...
+	break;
+      }
+    case MENU_ID_Item3:
+      {
+	// ...
+	break;
+      }
+    case MENU_ID_Item4:
+      {
+	// ...
+	break;
+      }
+    case MENU_ID_Item5:
+      {
+	// ...
+	break;
+      }
+    case MENU_ID_Item6:
+      {
+	// ...
+	break;
+      }
+    case MENU_ID_Item7:
+      {
+	// ...
+	break;
+      }
+    case MENU_ID_Item8:
+      {
+	// ...
+	break;
+      }
+    case MENU_ID_Item9:
+      {
+	// ...
+	break;
+      }
+    case MENU_ID_Sub0:
+      {
+	// ...
+	break;
+      }
+    case MENU_ID_Sub1:
+      {
+	// ...
+	break;
+      }
+    case MENU_ID_Sub2:
+      {
+	// ...
+	break;
+      }
+    }
+
+    return response;
   }
 };
 
@@ -127,12 +216,17 @@ int main (int argc, char ** argv) {
 
   bool bTouch = false;
 
+  unsigned long time_stop_ms = 0;
+
   unsigned screen_width  = 800;
   unsigned screen_height = 480;
 
   unsigned refresh_interval = 15;
 
   for (int arg = 1; arg < argc; arg++) {
+    if (strcmp (argv[arg], "--timeout") == 0) {
+      time_stop_ms = 30000;
+    }
     if (strcmp (argv[arg], "--fb-touch") == 0) {
       bTouch = true;
     }
@@ -144,7 +238,8 @@ int main (int argc, char ** argv) {
       touch_device = argv[arg] + 15;
     }
     if (strcmp (argv[arg], "--help") == 0) {
-      fprintf (stdout, "%s [--frame-buffer] [--hyperpixel] [--fb-device=<dev>] [--touch-device=]\n\n"
+      fprintf (stdout, "%s [--timeout] [--fb-touch] [--fb-device=<dev>] [--touch-device=<dev>]\n\n"
+	       "  --timeout            Exit automatically after 30 seconds.\n"
 	       "  --fb-touch           Use the touch screen in framebuffer mode as the display.\n"
 	       "  --fb-device=<dev>    Framebuffer device [default: /dev/fb0].\n"
 	       "  --touch-device=<dev> Touch event input device [default: /dev/input/event0].\n"
@@ -198,7 +293,7 @@ int main (int argc, char ** argv) {
     if (bUI) {
       if (Window::init (screen_width, screen_height)) {
 	// TODO: create UI
-	PyCCarMenu Menu;
+	PyCCarMenu Menu(time_stop_ms);
 
 	Window::root().redraw (true);
 	TI->run (refresh_interval, &Menu);

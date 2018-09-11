@@ -67,7 +67,7 @@ namespace PyCCar {
 
     class RunTimer {
     public:
-      virtual bool run_timer_tick () = 0;
+      virtual bool run_timer_tick (unsigned long time_in_ms) = 0;
       virtual bool run_timer_interval () = 0;
 
       virtual ~RunTimer () { }

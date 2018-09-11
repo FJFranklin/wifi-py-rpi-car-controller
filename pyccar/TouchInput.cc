@@ -249,12 +249,15 @@ void TouchInput::handle (const struct input_event * event) {
 }
 
 bool TouchInput::tick () {
-  if (!m_devfd) {
+  bool response = true;
+
+  if (m_devfd < 0) {
     struct PyCCarUI::event_data data;
 
     while (PyCCarUI::event (data)) {
       if (data.type == PyCCarUI::et_Quit) {
-	return false;
+	response = false;
+	break;
       }
       switch (data.type) {
       case PyCCarUI::et_Mouse_Motion:
@@ -287,30 +290,27 @@ bool TouchInput::tick () {
 	}
       }
     }
-  }
-
+  } else {
 #if HAVE_LINUX_INPUT_H
-  if (m_devfd < 0) {
-    return false;
-  }
-  struct input_event * ev = reinterpret_cast<struct input_event *>(ev_buffer);
+    struct input_event * ev = reinterpret_cast<struct input_event *>(ev_buffer);
 
-  int bytes_read = read (m_devfd, ev_buffer + ev_count, TouchInput_BUFSIZE - ev_count);
-  if (bytes_read > 0) {
-    ev_count += bytes_read;
+    int bytes_read = read (m_devfd, ev_buffer + ev_count, TouchInput_BUFSIZE - ev_count);
+    if (bytes_read > 0) {
+      ev_count += bytes_read;
 
-    int count = ev_count / sizeof (struct input_event);
+      int count = ev_count / sizeof (struct input_event);
 
-    for (int c = 0; c < count; c++) {
-      handle (ev + c);
-      ev_count -= sizeof (struct input_event);
+      for (int c = 0; c < count; c++) {
+	handle (ev + c);
+	ev_count -= sizeof (struct input_event);
+      }
+      if (ev_count) {
+	ev[0] = ev[count];
+      }
     }
-    if (ev_count) {
-      ev[0] = ev[count];
-    }
-  }
 #endif
-  return true;
+  }
+  return response;
 }
 
 void TouchInput::event_process () {
@@ -348,10 +348,7 @@ void TouchInput::run (unsigned long interval, RunTimer * RT) {
 
   while (m_timer_active) {
     unsigned long time = timer_millis ();  // just call this the once
-#if 1
-    if (time - time_start > 30000) // stop after 30 seconds
-      break;
-#endif
+
     if (last_milli < time) { // time is in milliseconds
       last_milli = time;     // note current time
 
@@ -359,7 +356,7 @@ void TouchInput::run (unsigned long interval, RunTimer * RT) {
 	break;               // break loop if tick() fails
       }
       if (RT && m_timer_active) {
-	m_timer_active = RT->run_timer_tick (); // break loop if callback~tick() fails
+	m_timer_active = RT->run_timer_tick (time - time_start); // break loop if callback~tick() fails
       }
     }
     if (interval) {
