@@ -100,6 +100,24 @@ def draw_back(win_id, bbox, flags):
     yarr = y + hh
     pygame.draw.polygon(screen, FG, [(xarr-d,yarr), (xarr+d,yarr), (xarr,yarr+d)], 0)
 
+def draw_main(win_id, bbox, flags):
+    BG = get_property(win_id, 'BG')
+    if flags & 0x04: # enabled
+        FG = get_property(win_id, 'FG')
+    else: # disabled
+        FG = get_property(win_id, 'dis_FG')
+    thickness = get_property(win_id, 'line')
+    d         = get_property(win_id, 'inset')
+    (x, y, w, h) = bbox
+    x = x + 3 * d
+    y = y + 3 * d
+    w = w - 6 * d
+    h = h - 6 * d
+    t = int(round(h/7))
+    for i in range(0, 4):
+        bboxi = (x, y+2*i*t, w, t)
+        pygame.draw.rect(screen, FG, bboxi, 0)
+
 def draw_exit(win_id, bbox, flags):
     BG = get_property(win_id, 'BG')
     if flags & 0x04: # enabled
@@ -198,7 +216,7 @@ def ui_draw(win_id):
         if type == 'Back':
             draw_back(win_id, bbox, flags)
         elif type == 'Main':
-            draw_back(win_id, bbox, flags) # FIXME
+            draw_main(win_id, bbox, flags)
         elif type == 'Exit':
             draw_exit(win_id, bbox, flags)
         elif type == 'Up':
