@@ -118,12 +118,17 @@ public:
   virtual bool touch_event (TouchInput::TouchEvent te, const struct TouchInput::touch_event_data & event_data) {
     unsigned touch_count = 1;
 
-    ui().set_property_coordinate ("CT1", event_data.t1.x, event_data.t1.y);
+    if (te == TouchInput::te_End) {
+      ui().set_bg_color (127, 127, 127);
+      touch_count = 0;
+    } else {
+      ui().set_bg_color (0, 0, 0);
+      ui().set_property_coordinate ("CT1", event_data.t1.x, event_data.t1.y);
 
-    if ((event_data.t1.x != event_data.t2.x) || (event_data.t1.y != event_data.t2.y)) {
-      ui().set_property_coordinate ("CT2", event_data.t2.x, event_data.t2.y);
-
-      touch_count = 2;
+      if ((event_data.t1.x != event_data.t2.x) || (event_data.t1.y != event_data.t2.y)) {
+	ui().set_property_coordinate ("CT2", event_data.t2.x, event_data.t2.y);
+	touch_count = 2;
+      }
     }
     ui().set_property_number ("CT#", touch_count);
 
