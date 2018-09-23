@@ -8,9 +8,9 @@
 
 #include "util.hh"
 
-#ifdef CORE_TEENSY
-
 #include <SdFat.h>
+
+#if ENABLE_SDIO_CLASS
 
 #define SD_PATH_MAX MESSAGE_MAXSIZE // maximum length of path, i.e., 250
 #define SD_FILE_MAX 63              // maximum length of filename - an arbitrary choice here; arguably should be (SD_PATH_MAX-1)
@@ -64,6 +64,6 @@ public:
   static bool rmdir (Message & response, const char * path);
 };
 
-#endif /* CORE_TEENSY */
+#endif /* ENABLE_SDIO_CLASS */
 
 #endif /* ! ArduinoHello_sd_path_hh */

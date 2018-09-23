@@ -8,9 +8,9 @@
 
 #include "util.hh"
 
-#ifdef CORE_TEENSY
-
 #include "sd_path.hh"
+
+#if ENABLE_SDIO_CLASS
 
 static SdFatSdio sd;
 
@@ -548,4 +548,4 @@ bool SD_Path::rmdir (Message & response, const char * path) {
   return bOkay;
 }
 
-#endif /* CORE_TEENSY */
+#endif /* ENABLE_SDIO_CLASS */

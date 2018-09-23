@@ -4,25 +4,22 @@
  */
 
 #include "sd.hh"
-
-#ifdef CORE_TEENSY
 #include "sd_path.hh"
-#endif /* CORE_TEENSY */
 
 static SD_Manager * s_manager = 0;
 
 SD_Manager * SD_Manager::manager () {
-#ifdef CORE_TEENSY
+#if ENABLE_SDIO_CLASS
   if (!s_manager) {
     s_manager = new SD_Manager;
   }
-#endif /* CORE_TEENSY */
+#endif /* ENABLE_SDIO_CLASS */
   return s_manager;
 }
 
 CommandStatus SD_Manager::command (Message & response, const ArgList & Args) {
   CommandStatus cs = cs_UnknownCommand;
-#ifdef CORE_TEENSY
+#if ENABLE_SDIO_CLASS
   Arg first = Args[0];
   uint8_t argc = Args.count ();
 
@@ -81,6 +78,6 @@ CommandStatus SD_Manager::command (Message & response, const ArgList & Args) {
     }
     cs = cs_Okay;
   }
-#endif /* CORE_TEENSY */
+#endif /* ENABLE_SDIO_CLASS */
   return cs;
 }

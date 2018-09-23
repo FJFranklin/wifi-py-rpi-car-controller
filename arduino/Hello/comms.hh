@@ -15,7 +15,7 @@
 #ifdef CORE_TEENSY
 #define ENABLE_CHANNEL_2
 #define ENABLE_CHANNEL_3
-#define ENABLE_CHANNEL_4
+// #define ENABLE_CHANNEL_4 // Not available for Teensy 3.2
 // #define ENABLE_CHANNEL_5
 // #define ENABLE_CHANNEL_6
 #endif /* CORE_TEENSY */
