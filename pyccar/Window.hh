@@ -114,7 +114,7 @@ namespace PyCCar {
     void redraw (BBox & dirty, bool bForceRedraw);
 
     void add_child (Window * child);
-    // TODO: Need a remove_child also...
+    void remove_child (Window * child);
   };
 
   class Button : public Window {
@@ -293,12 +293,8 @@ namespace PyCCar {
 
     virtual bool button_press (unsigned button_id);
 
-    inline void bbox (unsigned & x, unsigned & y, unsigned & width, unsigned & height) const {
-      x = m_off_x;
-      y = m_off_y;
-
-      width  = m_W;
-      height = m_H;
+    inline BBox bbox () const {
+      return BBox(m_off_x, m_off_y, m_W, m_H);
     }
 
     inline Menu::Item * main_menu_find_id (unsigned id) {

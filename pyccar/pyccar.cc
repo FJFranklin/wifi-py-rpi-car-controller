@@ -87,21 +87,76 @@ static struct Menu::Info s_menu_Exit[] = {
   { 0, 0, 0 }
 };
 
+class Canvas : public Window {
+public:
+  Canvas (Window & parent, int rel_x, int rel_y, unsigned width, unsigned height) :
+    Window(parent, rel_x, rel_y, width, height)
+  {
+    m_bTouchable = true;
+    ui().set_property_number ("CT#", 0);
+    ui().set_bg_color (127, 127, 127);
+    ui().set_fg_color (  0,   0, 255);
+  }
+
+  ~Canvas () {
+    // ...
+  }
+
+  virtual void touch_enter () {
+    ui().set_bg_color (0, 0, 0);
+
+    set_dirty (true);
+  }
+
+  virtual void touch_leave () {
+    ui().set_property_number ("CT#", 0);
+    ui().set_bg_color (127, 127, 127);
+
+    set_dirty (true);
+  }
+
+  virtual bool touch_event (TouchInput::TouchEvent te, const struct TouchInput::touch_event_data & event_data) {
+    unsigned touch_count = 1;
+
+    ui().set_property_coordinate ("CT1", event_data.t1.x, event_data.t1.y);
+
+    if ((event_data.t1.x != event_data.t2.x) || (event_data.t1.y != event_data.t2.y)) {
+      ui().set_property_coordinate ("CT2", event_data.t2.x, event_data.t2.y);
+
+      touch_count = 2;
+    }
+    ui().set_property_number ("CT#", touch_count);
+
+    set_dirty (true);
+    return true;
+  }
+};
+
 class PyCCarMenu : public MenuManager::Handler, public TouchInput::RunTimer {
 public:
   MenuManager MM;
+
+  Canvas * m_Canvas;
 
   unsigned long m_time_stop;
 
   PyCCarMenu (unsigned long time_stop_ms) :
     MM(this, s_menu_Main, s_menu_Exit),
+    m_Canvas(0),
     m_time_stop(time_stop_ms)
   {
-    // 
+    /* Create canvas window using the same bbox as the scrolling menu
+     */
+    BBox bbox = MM.bbox ();
+    m_Canvas = new Canvas (Window::root (), bbox.m_x, bbox.m_y, bbox.m_width, bbox.m_height);
+    m_Canvas->ui().set_type ("Canvas:Tracker");
+    m_Canvas->set_visible (true);
   }
 
   virtual ~PyCCarMenu () {
-    // ...
+    if (m_Canvas) {
+      delete m_Canvas;
+    }
   }
 
   virtual bool run_timer_tick (unsigned long time_in_ms) { // return false to stop timer
@@ -114,12 +169,20 @@ public:
   }
 
   virtual bool notify_menu_will_open () { // return false to cancel menu
-    fputs ("notify_menu_will_open\n", stderr);
+    // fputs ("notify_menu_will_open\n", stderr);
+
+    if (m_Canvas) {
+      m_Canvas->set_visible (false);
+    }
     return true;
   }
 
   virtual bool notify_menu_closed (unsigned menu_id) { // return false to stop timer
-    fprintf (stderr, "notify_menu_closed: menu-id = %u\n", menu_id);
+    // fprintf (stderr, "notify_menu_closed: menu-id = %u\n", menu_id);
+
+    if (m_Canvas) {
+      m_Canvas->set_visible (true);
+    }
 
     bool response = true;
 

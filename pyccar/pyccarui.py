@@ -203,6 +203,48 @@ def draw_menu_item(win_id, bbox, flags):
         yb = y + h - 2*d
         pygame.draw.polygon(screen, FG, [(xl,yt), (xl,yb), (xr,y0)], 0)
 
+def draw_canvas_tracker_point(bbox, location, BG, FG):
+    (x, y, w, h) = bbox
+    half_size = int(round(min(w,h)/12)) # half-size of square to draw around touch point
+    thickness = 2
+    (tx, ty) = location
+    if x + half_size > tx:
+        sx = x
+        sw = half_size + tx - x
+    elif tx + half_size > x + w:
+        sx = tx - half_size
+        sw = x + w - sx
+    else:
+        sx = tx - half_size
+        sw = 2 * half_size
+    if y + half_size > ty:
+        sy = y
+        sh = half_size + ty - y
+    elif ty + half_size > y + h:
+        sy = ty - half_size
+        sh = y + h - sy
+    else:
+        sy = ty - half_size
+        sh = 2 * half_size
+    pygame.draw.rect(screen, FG, (sx, sy, sw, sh), 0)
+    pygame.draw.rect(screen, BG, (sx+thickness, sy+thickness, sw-2*thickness, sh-2*thickness), 0)
+
+def draw_canvas_tracker(win_id, bbox, flags):
+    count = get_property(win_id, 'CT#')
+    loc_1 = None
+    loc_2 = None
+    if count is not None:
+        if count > 0:
+            loc_1 = get_property(win_id, 'CT1')
+        if count > 1:
+            loc_2 = get_property(win_id, 'CT2')
+    if loc_1 is not None:
+        FG = get_property(win_id, 'FG')
+        BG = get_property(win_id, 'BG')
+        draw_canvas_tracker_point(bbox, loc_1, BG, FG)
+        if loc_2 is not None:
+            draw_canvas_tracker_point(bbox, loc_2, BG, FG)
+
 def ui_draw(win_id):
     flags = get_property(win_id, 'flags')
     if flags & 0x01: # visible
@@ -227,6 +269,8 @@ def ui_draw(win_id):
             draw_scroll(win_id, bbox, flags)
         elif type == 'Menu Item':
             draw_menu_item(win_id, bbox, flags)
+        elif type == 'Canvas:Tracker':
+            draw_canvas_tracker(win_id, bbox, flags)
 
 def ui_refresh():
     pygame.display.update()

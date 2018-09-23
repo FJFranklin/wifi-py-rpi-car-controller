@@ -79,6 +79,9 @@ public:
   bool draw ();
   bool set_property (const char * property, PyObject * value);
 
+  bool set_property_number (const char * property, unsigned number);
+  bool set_property_coordinate (const char * property, unsigned x, unsigned y);
+
   /* Set properties
    */
   bool set_bbox (const PyCCar::BBox & bbox);

@@ -312,6 +312,21 @@ bool PyCCarUI::set_property (const char * property, PyObject * value) {
   return false;
 }
 
+bool PyCCarUI::set_property_number (const char * property, unsigned number) {
+  return s_set_property_unsigned (m_id, property, number);
+}
+
+bool PyCCarUI::set_property_coordinate (const char * property, unsigned x, unsigned y) {
+  bool bOkay = false;
+
+  PyObject * value = Py_BuildValue ("II", x, y);
+  if (value) {
+    bOkay = set_property (property, value);
+    Py_DECREF (value);
+  }
+  return bOkay;
+}
+
 bool PyCCarUI::set_bbox (const PyCCar::BBox & bbox) {
   bool bOkay = false;
 
@@ -368,14 +383,7 @@ bool PyCCarUI::set_thickness (unsigned thickness) {
 }
 
 bool PyCCarUI::set_scroll (unsigned s_min, unsigned s_max) {
-  bool bOkay = false;
-
-  PyObject * value = Py_BuildValue ("II", s_min, s_max);
-  if (value) {
-    bOkay = set_property ("Scroll", value);
-    Py_DECREF (value);
-  }
-  return bOkay;
+  return set_property_coordinate ("Scroll", s_min, s_max);
 }
 
 #include <cstring>

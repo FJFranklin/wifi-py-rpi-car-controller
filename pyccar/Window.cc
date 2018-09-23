@@ -87,7 +87,7 @@ Window::Window (Window & parent, int rel_x, int rel_y, unsigned width, unsigned 
 }
 
 Window::~Window () {
-  // ...
+  m_parent->remove_child (this);
 }
 
 bool Window::init (unsigned width, unsigned height) {
@@ -112,6 +112,32 @@ void Window::add_child (Window * child) {
     child->m_sibling_upper = 0;
     m_child_bottom = child;
     m_child_top    = child;
+  }
+}
+
+void Window::remove_child (Window * child) {
+  if (m_child_top == child) {
+    m_child_top = m_child_top->m_sibling_lower;
+
+    if (m_child_top) {
+      m_child_top->m_sibling_upper = 0;
+    } else {
+      m_child_bottom = 0;
+    }
+  } else if (m_child_bottom == child) {
+    m_child_bottom = m_child_bottom->m_sibling_upper;
+    m_child_bottom->m_sibling_lower = 0;
+  } else {
+    Window * c = m_child_top;
+
+    while (c->m_sibling_lower != m_child_bottom) {
+      if (c->m_sibling_lower == child) {
+	c->m_sibling_lower = child->m_sibling_lower;
+	c->m_sibling_lower->m_sibling_upper = c;
+	break;
+      }
+      c = c->m_sibling_lower;
+    }
   }
 }
 
@@ -636,6 +662,7 @@ MenuManager::MenuManager (Handler * H, struct Menu::Info * main_info, struct Men
   m_handler(H),
   m_Main(0), // alt. Back
   m_Exit(0),
+  m_Menu(0),
   m_menu_Main(main_info),
   m_menu_Exit(exit_info),
   m_off_x(0),
