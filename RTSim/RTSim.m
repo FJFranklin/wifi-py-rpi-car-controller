@@ -15,6 +15,7 @@ classdef RTSim < handle
     %   
     %     RTSim(seconds) - The constructor sets up the simulation and runs
     %                      it for <seconds>, or until successful completion.
+    %     get_target()   - Returns the current target to aim for.
     %     new_target()   - Sets (and returns) a random target to aim for.
     %     micros()       - Microseconds since program started.
     %     millis()       - Milliseconds since program started.
@@ -147,12 +148,46 @@ classdef RTSim < handle
                 disp(['Success! Course completed in ',num2str(obj.millis()/1000),'s'])
             end
         end
+        function pos = get_target (obj)
+            pos = obj.target;
+        end
         function pos = new_target (obj)
             obj.target = obj.position(1,1:2);
             while (norm (obj.position(1,1:2) - obj.target) < 3)
                 obj.target = -4.5 + 9 * rand(1,2);
             end
             pos = obj.target;
+        end
+        function reset_barriers(obj, seed)
+            rng (seed);
+            par = rand(1,7);
+            b1x = -3.5 + par(1);
+            b1y1 = -4 + 2 * par(2);
+            b1y2 = b1y1 + 1;
+            b2x = 2.5 + par(3);
+            b2y2 = 4 - 2 * par(4);
+            b2y1 = b2y2 - 1;
+            b3x1 = b1x + 1 + par(5);
+            b3x2 = b2x - 1 - par(6);
+            b3y = -1 + 2 * par(7);
+            obj.barriers = [
+                -5.05, -5.00,  0.05, 10;
+                -5.00,  5.00, 10,     0.05;
+                -5.00, -5.05, 10,     0.05;
+                 5.00, -5.00,  0.05, 10;
+                 b1x,   b1y2,  0.05,  5-b1y2;
+                 b1x,  -5.00,  0.05,  b1y1-(-5.00);
+                 b2x,   b2y2,  0.05,  5-b2y2;
+                 b2x,  -5.00,  0.05,  b2y1-(-5.00);
+                 b3x2-0.05,  b3y-2, 0.05,  2;
+                 b3x1,  b3y+0.05, 0.05,  2;
+                 b3x1,  b3y,   (b3x2-b3x1),  0.2
+                ];
+            rng (cputime);
+            par = rand (1, 3);
+            obj.position(1,3) = 359 * par(3);
+            obj.position(1,2) = -4.5 + 9 * par(1);
+            obj.target(1,2)   = -4.5 + 9 * par(2);
         end
         function t_us = micros (obj)
             t_us = floor (1000000 * (cputime - obj.timeStart));
@@ -188,7 +223,7 @@ classdef RTSim < handle
         end
         function ping_send (obj)
             thisTime = cputime - obj.timeStart;
-            if (thisTime - obj.pingTime >= 0.5) % 100 milliseconds
+            if (thisTime - obj.pingTime >= 0.1) % 100 milliseconds
                 obj.pingTime(1) = thisTime;
                 % disp (['ping, time=',num2str(thisTime)]);
             end
@@ -299,6 +334,9 @@ classdef RTSim < handle
             for c = 1:count
                 rectangle('Position',obj.barriers(c,:),'FaceColor',[0 .5 .5])
             end
+            % the target
+            target = [obj.target(1,1:2)-0.3,0.6,0.6];
+            rectangle('Position',target,'Curvature',[1 1],'EdgeColor',[1 0.5 0.5])
             % the robot
             bot = [obj.position(1,1:2)-0.2,0.4,0.4];
             rectangle('Position',bot,'Curvature',[1 1],'FaceColor',[1 0.5 0.5])
@@ -321,7 +359,7 @@ classdef RTSim < handle
             if (obj.posCount)
                 plot (obj.posPoints(1:obj.posCount,1),obj.posPoints(1:obj.posCount,2),'k^');
             end
-            text(3.5,4.7,['Time: ',num2str(obj.millis()/1000),'s']);
+            text(3.0,4.7,['Time: ',num2str(obj.millis()/1000),'s']);
             hold off;
             drawnow
         end

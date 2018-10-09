@@ -1,6 +1,11 @@
 from RTSim import RTSim
 
 class RTRobot(RTSim):
+    """
+    RTRobot Controller for RTSim real-time robot simulation.
+    https://github.com/FJFranklin/wifi-py-rpi-car-controller/tree/master/RTSim
+    """
+
     def __init__(self, seconds):
         # usage: RTRobot (seconds)
         RTSim.__init__(self, seconds)
@@ -27,12 +32,14 @@ class RTRobot(RTSim):
         self.orientation = self.get_compass() # which direction we're looking
 
         if currentTime > 4:
-            self.ping_send() # it won't actually send more often than every 0.1s
+            self.ping_send()                  # it won't actually send more often than every 0.1s
 
         self.set_ping_angle(180)
         self.set_wheel_speeds(-127, -126)
 
     def ping_receive(self, distance):
+        # response to an self.ping_send()
+
         # For example:
         self.last_ping_time = self.millis()  # the last time we received a ping [in milliseconds]
         self.last_ping_distance = distance   # distance measured (-ve if no echo)
