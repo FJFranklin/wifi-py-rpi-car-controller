@@ -43,25 +43,25 @@ where the ’30’ (or whatever) is how long you want the simulation to last.
 The methods available for controlling the robot are:
 
 ### `obj.reset_barriers (seed);`
-    Generate map for seed (any positive integer) with random initial and target positions; use this in `setup()`.
+Generate map for seed (any positive integer) with random initial and target positions; use this in `setup()`.
 ### `target = obj.new_target ();`
-    Sets (and returns) a random target to aim for; use this in `setup()`.
+Sets (and returns) a random target to aim for; use this in `setup()`.
 ### `target = obj.get_target ();`
-    Returns the current target to aim for.
+Returns the current target to aim for.
 ### `time_us = obj.micros ();`
-    Microseconds since program started.
+Microseconds since program started.
 ### `time_ms = obj.millis();`
-    Milliseconds since program started.
+Milliseconds since program started.
 ### `obj.set_wheel_speeds (left, right);`
-    Set left and right wheel speeds (-127..127).
+Set left and right wheel speeds (-127..127).
 ### `obj.set_ping_angle (angle);`
-    Set angle (0..359) of sonar sensor.
+Set angle (0..359) of sonar sensor.
 ### `obj.ping_send ();`
-    Send a ping; the sonar takes 40ms to respond, but 100ms before another ping can be sent.
+Send a ping; the sonar takes 40ms to respond, but 100ms before another ping can be sent.
 ### `position = obj.get_GPS ();`
-    The current position; updates once a second.
+The current position; updates once a second.
 ### `orientation = obj.get_compass ();`
-    The orientation [degrees]; updates once a second. 
+The orientation [degrees]; updates once a second. 
 
 ## Python
 
@@ -86,25 +86,25 @@ where the ’30’ (or whatever) is how long you want the simulation to last.
 The methods available for controlling the robot are:
 
 ### `self.reset_barriers (seed);`
-    Generate map for seed (any positive integer) with random initial and target positions; use this in `setup()`.
+Generate map for seed (any positive integer) with random initial and target positions; use this in `setup()`.
 ### `target = self.new_target ();`
-    Sets (and returns) a random target to aim for; use this in `setup()`.
+Sets (and returns) a random target to aim for; use this in `setup()`.
 ### `target = self.get_target ();`
-    Returns the current target to aim for.
+Returns the current target to aim for.
 ### `time_us = self.micros ();`
-    Microseconds since program started.
+Microseconds since program started.
 ### `time_ms = self.millis();`
-    Milliseconds since program started.
+Milliseconds since program started.
 ### `self.set_wheel_speeds (left, right);`
-    Set left and right wheel speeds (-127..127).
+Set left and right wheel speeds (-127..127).
 ### `self.set_ping_angle (angle);`
-    Set angle (0..359) of sonar sensor.
+Set angle (0..359) of sonar sensor.
 ### `self.ping_send ();`
-    Send a ping; the sonar takes 40ms to respond, but 100ms before another ping can be sent.
+Send a ping; the sonar takes 40ms to respond, but 100ms before another ping can be sent.
 ### `position = self.get_GPS ();`
-    The current position; updates once a second.
+The current position; updates once a second.
 ### `orientation = self.get_compass ();`
-    The orientation [degrees]; updates once a second. 
+The orientation [degrees]; updates once a second. 
 
 --------
 
