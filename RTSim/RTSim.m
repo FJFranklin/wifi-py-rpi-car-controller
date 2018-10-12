@@ -17,6 +17,10 @@ classdef RTSim < handle
     %                      it for <seconds>, or until successful completion.
     %     get_target()   - Returns the current target to aim for.
     %     new_target()   - Sets (and returns) a random target to aim for.
+    %     reset_barriers(seed)
+    %                    - Generate map for seed (any positive integer) with
+    %                      random initial and target positions; use
+    %                      this in setup().
     %     micros()       - Microseconds since program started.
     %     millis()       - Milliseconds since program started.
     %     set_wheel_speeds(left,right)
@@ -423,8 +427,8 @@ classdef RTSim < handle
             if (closest_distance >= 0)
                 obj.pingCount = obj.pingCount + 1;
                 obj.pingPoints(obj.pingCount,:) = closest_point;
-                obj.ping_receive (round (closest_distance, 2));
             end
+	    obj.ping_receive (round (closest_distance, 2));
         end
         function [distance,point] = intersection(~, pos, dir, line)
             distance = -1; % no intersection
