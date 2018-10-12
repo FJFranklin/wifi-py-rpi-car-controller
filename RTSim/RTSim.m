@@ -428,7 +428,7 @@ classdef RTSim < handle
                 obj.pingCount = obj.pingCount + 1;
                 obj.pingPoints(obj.pingCount,:) = closest_point;
             end
-	    obj.ping_receive (round (closest_distance, 2));
+            obj.ping_receive (round (closest_distance, 2));
         end
         function [distance,point] = intersection(~, pos, dir, line)
             distance = -1; % no intersection
