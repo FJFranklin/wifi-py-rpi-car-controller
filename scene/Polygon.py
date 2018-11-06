@@ -19,10 +19,20 @@ class Polygon(object):
         x, y = xy
         self.verts[index,:] = [x, y]
 
+    def square(self, dimension):
+        d = dimension / 2
+        self.verts[0,:] = [ d, d]
+        self.verts[1,:] = [-d, d]
+        self.verts[2,:] = [-d,-d]
+        self.verts[3,:] = [ d,-d]
+
     def get_colors(self, light_vector, ambient): # vector points to light source
         brightness = self.plane.brightness(light_vector)
         face_color = self.material.color(ambient, brightness)
 
-        edge_color = None # TODO: ??
+        if face_color is None:
+            edge_color = (0,0,0,1)
+        else:
+            edge_color = None
 
         return face_color, edge_color

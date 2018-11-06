@@ -2,6 +2,7 @@ from operator import itemgetter
 
 import Plane
 import Polygon
+import Receiver
 
 import numpy as np
 
@@ -123,3 +124,36 @@ class Space(object):
             self.__make_zones(p_right, verts, [1,2,6,5], zone_material, itemgetter(1, 5, 9, 6)(edge_list))
             self.__make_zones(p_back,  verts, [2,3,7,6], zone_material, itemgetter(2, 6,10, 7)(edge_list))
             self.__make_zones(p_left,  verts, [3,0,4,7], zone_material, itemgetter(3, 7,11, 4)(edge_list))
+
+    def cube(self, center, cube_dimension, material, add_to_scene=True):
+        polygons = []
+
+        origin = np.asarray(center)
+
+        plane = self.horizontal_plane(origin + [0,0,cube_dimension/2], True)
+        polygons.append(Polygon.Polygon(plane, 4, material))
+
+        plane = self.horizontal_plane(origin - [0,0,cube_dimension/2], False)
+        polygons.append(Polygon.Polygon(plane, 4, material))
+
+        plane = self.vertical_plane(origin + [0,cube_dimension/2,0],   0)
+        polygons.append(Polygon.Polygon(plane, 4, material))
+
+        plane = self.vertical_plane(origin + [cube_dimension/2,0,0],  90)
+        polygons.append(Polygon.Polygon(plane, 4, material))
+
+        plane = self.vertical_plane(origin - [0,cube_dimension/2,0], 180)
+        polygons.append(Polygon.Polygon(plane, 4, material))
+
+        plane = self.vertical_plane(origin - [cube_dimension/2,0,0], 270)
+        polygons.append(Polygon.Polygon(plane, 4, material))
+
+        for p in polygons:
+            p.square(cube_dimension)
+            if add_to_scene:
+                self.__add_poly(p)
+
+        return polygons
+
+    def make_receiver(self, origin, cube_dimension, material):
+        return Receiver.Receiver(self, origin, cube_dimension, material)

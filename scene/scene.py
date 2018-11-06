@@ -1,30 +1,39 @@
 from vispy import scene
-from vispy.scene.cameras.perspective import PerspectiveCamera
 from vispy.scene.cameras.turntable import TurntableCamera
-from vispy.color import Color
 
 import numpy as np
 
 import Space
 import Material
 
-source = Material.Material((0,1,0,0.5))
-source.make_source(0) # no absorption
+# Define the different types of material, etc.
 
+# Surfaces that may contain source points
+source = Material.Material((0,1,0,0.5))
+source.make_source(0) # reflection; no absorption
+
+# Diffraction surfaces
 diffzone = Material.Material((0,0,1,0.1))
 diffzone.make_refractive()
 
+# Purely for illustration
+darkzone = Material.Material((0,0,0,0.5))
+darkzone.make_illustrative()
+
+# Actual materials
 concrete = Material.Material((1,1,1,1))
 concrete.make_reflective(0.1) # very low absorption
 
 brick = Material.Material((0.8,0.1,0,1))
 brick.make_reflective(0.2) # low absorption
 
+barrier = Material.Material((0.1,0.1,0.1,0.5))
+barrier.make_reflective(0.9) # high absorption
+
 grass = Material.Material((0,0.8,0,1))
 grass.make_reflective(1) # total absorption
 
-barrier = Material.Material((0.1,0.1,0.1,0.5))
-barrier.make_reflective(0.9) # high absorption
+# Make the scene
 
 S = Space.Space()
 
@@ -40,6 +49,13 @@ S.add_box([-19,-35,0],(62,30),1,0,grass)
 S.add_box([ 35,-19,0],(30,62),1,0,grass)
 
 S.add_box([0,0,0],(20,20),40,30,brick,(diffzone,[0,0,0,0,1,1,1,1,1,1,1,1]))
+
+# Add a receiver
+
+receiver = S.make_receiver([-20,-20,20],1,darkzone)
+receiver.search()
+
+# Display scene
 
 # Normal vector towards the sun / light-source
 lv_phi = 200 * np.pi / 180
