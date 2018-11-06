@@ -24,7 +24,4 @@ class Plane(object):
         return (local_x, local_y), local_z
 
     def brightness(self, light_vector):
-        b = np.dot(self.basis_k, light_vector)
-        if b < 0:
-            b = 0
-        return b
+        return np.dot(self.basis_k, light_vector)

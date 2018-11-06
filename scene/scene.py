@@ -6,26 +6,40 @@ from vispy.color import Color
 import numpy as np
 
 import Space
+import Material
+
+source = Material.Material((0,1,0,0.5))
+source.make_source(0) # no absorption
+
+diffzone = Material.Material((0,0,1,0.1))
+diffzone.make_refractive()
+
+concrete = Material.Material((1,1,1,1))
+concrete.make_reflective(0.1) # very low absorption
+
+brick = Material.Material((0.8,0.1,0,1))
+brick.make_reflective(0.2) # low absorption
+
+grass = Material.Material((0,0.8,0,1))
+grass.make_reflective(1) # total absorption
+
+barrier = Material.Material((0.1,0.1,0.1,0.5))
+barrier.make_reflective(0.9) # high absorption
 
 S = Space.Space()
 
-concrete = {}
-concrete['color'] = (1,1,1)
+S.add_box([0,0,-1],(100,100),1,0,concrete)
 
-grass = {}
-grass['color'] = (0,1,0)
+S.add_box([0,45,1],(100,3),3,0,source)
 
-brick = {}
-brick['color'] = (1,0,0)
+S.add_box([0,41,0],(100,1),4,0,barrier,(diffzone,[0,0,0,0,0,0,0,0,1,0,0,0]))
 
-S.add_box([0,0,0],(100,100),0.01,0,concrete)
+S.add_box([ 19, 30,0],(62,20),1,0,grass)
+S.add_box([-35, 14,0],(30,52),1,0,grass)
+S.add_box([-19,-35,0],(62,30),1,0,grass)
+S.add_box([ 35,-19,0],(30,62),1,0,grass)
 
-S.add_box([ 19, 35,0.01],(62,30),1,0,grass)
-S.add_box([-35, 19,0.01],(30,62),1,0,grass)
-S.add_box([-19,-35,0.01],(62,30),1,0,grass)
-S.add_box([ 35,-19,0.01],(30,62),1,0,grass)
-
-S.add_box([0,0,0.01],(20,20),40,30,brick)
+S.add_box([0,0,0],(20,20),40,30,brick,(diffzone,[0,0,0,0,1,1,1,1,1,1,1,1]))
 
 # Normal vector towards the sun / light-source
 lv_phi = 200 * np.pi / 180
