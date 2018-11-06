@@ -17,6 +17,7 @@ classdef RTSim < handle
     %                      it for <seconds>, or until successful completion.
     %     get_target()   - Returns the current target to aim for.
     %     new_target()   - Sets (and returns) a random target to aim for.
+    %     new_position() - Sets a random start position; use this in setup().
     %     reset_barriers(seed)
     %                    - Generate map for seed (any positive integer) with
     %                      random initial and target positions; use
@@ -162,7 +163,16 @@ classdef RTSim < handle
             end
             pos = obj.target;
         end
-        function reset_barriers(obj, seed)
+        function new_position (obj)
+            obj.position(1,1:2) = obj.target;
+            while (norm (obj.position(1,1:2) - obj.target) < 3) || ~obj.position_valid (obj.position(1,1:2))
+                par = rand (1, 3);
+                obj.position(1,1:2) = -4.5 + 9 * par(1:2);
+                obj.position(1,3) = 359 * par(3);
+            end
+            obj.update_position ();
+        end
+        function reset_barriers (obj, seed)
             rng (seed);
             par = rand(1,7);
             b1x = -3.5 + par(1);
@@ -192,6 +202,7 @@ classdef RTSim < handle
             obj.position(1,3) = 359 * par(3);
             obj.position(1,2) = -4.5 + 9 * par(1);
             obj.target(1,2)   = -4.5 + 9 * par(2);
+            obj.update_position ();
         end
         function t_us = micros (obj)
             t_us = floor (1000000 * (cputime - obj.timeStart));
