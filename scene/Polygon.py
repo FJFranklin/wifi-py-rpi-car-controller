@@ -190,23 +190,15 @@ class Polygon(object):
 
         return (window_poly, proj)
 
-    def __compare_2D_poly(self, polygon):
+    def compare_2D_poly(self, polygon):
         # assumes polygon is coplanar and shares same coordinate system, i.e., self.plane == polygon.plane
         # is_exterior is True if all points in polygon are outside self
         # is_interior is True if all points in polygon are within self
-        is_exterior = False # TODO
-        is_interior = False # FIXME
-        return is_exterior, is_interior
 
-        polygon_intersects = False
-        polygon_contained  = False
-        self_contained     = False
+        is_exterior = False
+        is_interior = True
 
-        # compare - we now have two co-planar convex polygons
-        polygon_intersects = True
-        polygon_contained  = True
-
-        for s1 in range(0,self.count):
+        for s1 in range(0, self.count):
             s2 = s1 + 1
             if s2 == self.count:
                 s2 = 0
@@ -215,39 +207,15 @@ class Polygon(object):
             Bj = np.asarray([-Bi[1],Bi[0]]) # points inwards; not a normalised basis vector
 
             all_outside = True
-            for i in range(0,count):
-                dp = np.dot(proj_verts[i,:] - self.verts[s1,:], Bj)
+            for i in range(0, polygon.count):
+                dp = np.dot(polygon.verts[i,:] - self.verts[s1,:], Bj)
                 if dp > 0:
                     all_outside = False
                 if dp < 0:
-                    polygon_contained = False
+                    is_interior = False
             if all_outside:
-                polygon_intersects = False
-                polygon_contained = False
+                is_exterior = True
+                is_interior = False
                 break
 
-        if polygon_intersects: # or, rather, we don't know yet...
-
-            self_contained = True
-
-            for i1 in range(0,self.count):
-                i2 = i1 + 1
-                if i2 == self.count:
-                    i2 = 0
-
-                Bi = proj_verts[i2,:] - proj_verts[i1,:]
-                Bj = np.asarray([-Bi[1],Bi[0]]) * sense # points inwards; not a normalised basis vector
-
-                all_outside = True
-                for s in range(0,count):
-                    dp = np.dot(self.verts[s,:] - proj_verts[i1,:], Bj)
-                    if dp > 0:
-                        all_outside = False
-                    if dp < 0:
-                        self_contained = False
-                if all_outside:
-                    polygon_intersects = False
-                    self_contained = False
-                    break
-
-        return (polygon_intersects, polygon_contained, self_contained) # FIXME
+        return is_exterior, is_interior
