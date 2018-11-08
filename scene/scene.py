@@ -49,10 +49,11 @@ S.add_box([-19,-35,0],(62,30),1,0,grass)
 S.add_box([ 35,-19,0],(30,62),1,0,grass)
 
 S.add_box([0,0,0],(20,20),40,30,brick,(diffzone,[0,0,0,0,1,1,1,1,1,1,1,1]))
+#S.add_box([0,0,0],(20,20),40,30,brick)
 
 # Add a receiver
 
-receiver = S.make_receiver([-20,-20,20],1,darkzone)
+receiver = S.make_receiver([-20,-20,20],10,darkzone)
 receiver.search()
 
 # Display scene

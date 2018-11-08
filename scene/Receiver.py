@@ -9,6 +9,7 @@ class Receiver(object):
         self._space = space
         self._views = []
 
+        space.cube(self._origin, cube_dimension * 0.9, material, True)
         polygons = space.cube(self._origin, cube_dimension, material, False)
         for p in polygons:
             self._views.append(View.View(space, self, self._origin, p))

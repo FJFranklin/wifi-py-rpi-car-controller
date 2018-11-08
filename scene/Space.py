@@ -46,7 +46,9 @@ class Space(object):
 
         return Plane.Plane(P1, self.__axes)
 
-    def __add_poly(self, polygon):
+    def add_poly(self, polygon):
+        if polygon.material.is_illustrative():
+            polygon.ill_only = True
         self.polygons.append(polygon)
 
     def __make_poly(self, verts, indices, material):
@@ -57,7 +59,7 @@ class Space(object):
             xy, z = plane.project(verts[i,:])
             polygon.set_vertex(pi, xy)
             pi += 1
-        self.__add_poly(polygon)
+        self.add_poly(polygon)
         return polygon
 
     def __make_zone(self, polygon, vert1, vert2, zone_material, zone_width):
@@ -151,7 +153,7 @@ class Space(object):
         for p in polygons:
             p.square(cube_dimension)
             if add_to_scene:
-                self.__add_poly(p)
+                self.add_poly(p)
 
         return polygons
 
