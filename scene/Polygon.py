@@ -8,11 +8,13 @@ class Polygon(object):
         self.verts = np.zeros((vertex_count, 2))
         self.__v3D = np.zeros((vertex_count, 3))
         self.material = material
-        self.ill_only = False # for illustration only
+        self.ill_only = None # if not None, then for illustration only; otherwise it's an offset
 
     def vertices(self):
         for v in range(0, self.count):
             self.__v3D[v,:] = self.plane.coordinate((self.verts[v,0], self.verts[v,1]))
+            if self.ill_only is not None:
+                self.__v3D[v,:] = self.__v3D[v,:] + self.ill_only
 
         return self.__v3D, self.count
 

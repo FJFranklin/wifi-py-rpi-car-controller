@@ -48,7 +48,8 @@ class Space(object):
 
     def add_poly(self, polygon):
         if polygon.material.is_illustrative():
-            polygon.ill_only = True
+            if polygon.ill_only is None:
+                polygon.ill_only = [0,0,0]
         self.polygons.append(polygon)
 
     def __make_poly(self, verts, indices, material):

@@ -10,16 +10,14 @@ class View(object):
         self._origin = np.copy(origin)
         self._window = window
         self._target = None
+        self._visibles = None
 
-    def search(self):
-        # self._target should be None at this point
-
-        subviews = []
-        visibles = []
+    def __search_space(self):
+        self._visibles = []
 
         for p in self._space.polygons:
             # Immediately discard any non-real surfaces
-            if p.ill_only:
+            if p.ill_only is not None:
                 continue
 
             # Let's see where we are relative to the polygon
@@ -33,20 +31,18 @@ class View(object):
             # Let's check the polygon relative to our window
             pp = self._window.project_and_crop(self._origin, p)
             if pp is not None:
-                visibles.append(pp) # although it may be occluded
+                self._visibles.append(pp) # although it may be occluded
 
-        if len(visibles) == 0: # can't see anything, can't do anything
-            return subviews    # it's empty at this point
-
+    def __remove_occluded(self):
         iv1 = 0
-        while (iv1 < len(visibles)) and (len(visibles) > 1):
+        while (iv1 < len(self._visibles)) and (len(self._visibles) > 1):
             poly1_is_occluded = False
 
-            poly1, proj1 = visibles[iv1]
-            for iv2 in range(0, len(visibles)):
+            poly1, proj1 = self._visibles[iv1]
+            for iv2 in range(0, len(self._visibles)):
                 if iv1 == iv2:
                     continue
-                poly2, proj2 = visibles[iv2]
+                poly2, proj2 = self._visibles[iv2]
 
                 # check to see if poly1 is contained within poly2
                 is_exterior, is_interior = poly2.compare_2D_poly(poly1)
@@ -59,24 +55,49 @@ class View(object):
                         break
 
             if poly1_is_occluded:
-                del visibles[iv1]
+                del self._visibles[iv1]
             else:
                 iv1 += 1
 
-        for pp in visibles:
-            poly, proj = pp
-            poly.ill_only = True
-            self._space.add_poly(poly)
+    def __refine(self):
+        subviews = []
+        resolved = []
 
-        if len(visibles) == 1: # can see only one thing; restrict view & return
-            poly, proj = visibles[0]
+        if len(self._visibles) == 0: # can't see anything
+            return subviews, resolved
+
+        self.__remove_occluded() # remove any obviously occluded polygons
+
+        if len(self._visibles) == 1: # can see only one thing; restrict view & return
+            poly, proj = self._visibles[0]
             self._window = poly
             self._target = proj
-            subviews.append(self)
-            return subviews
+            resolved.append(self)
+            return subviews, resolved
 
-        # TODO: new method refine():
+        # TODO:
         # - search for/through poly edges that divide the window, and select the one with the nearest vertice(s)
-        # - split the window in two and refine the set of visibles, etc.
+        # - split the window in two and refine the set of self._visibles, etc.
 
-        return subviews
+        return subviews, resolved
+
+    def search(self):
+        # self._target should be None at this point
+
+        self.__search_space()
+
+        resolved = []
+        subviews = [self]
+
+        while len(subviews) > 0:
+            subview = subviews.pop(0)
+            refined_subviews, refined_resolved = subview.__refine()
+            subviews += refined_subviews # __refine() will drop the view as empty; or move itself to resolved
+            resolved += refined_resolved # if reduced to a single visible; or it will divide into two subviews
+
+        for rv in resolved:
+            poly, proj = rv._visibles[0]       # each resolved view should have one and only one visible
+            poly.ill_only = poly.plane.basis_k # offset the polygon and make it illustrative only
+            self._space.add_poly(poly)
+
+        return resolved
