@@ -41,6 +41,74 @@ class Polygon(object):
         return face_color, edge_color
 
     @staticmethod
+    def __tidy_2D_poly(verts, count): # ensures a strictly convex polygon and removes points that are nearly indistinguishable
+        tolerance = 1E-9
+
+        if count < 3:
+            verts = None
+            count = 0
+            return verts, count
+
+        # remove vertices that are too close to their next neighbour
+
+        i1 = 0
+        while i1 < count:
+            if i1 == count - 1:
+                i2 = 0
+            else:
+                i2 = i1 + 1
+
+            v1 = verts[i1]
+            v2 = verts[i2]
+
+            if np.linalg.norm(v2 - v1) < tolerance:
+                if count < 4:
+                    verts = None
+                    count = 0
+                else:
+                    if i1 < count - 1:
+                        verts[i1:(count-1),:] = verts[i2:count,:]
+                    count -= 1
+            else:
+                i1 += 1
+
+        # ensure strict convexity, aggressively
+
+        i2 = 0
+        while i2 < count:
+            if i2 == 0:
+                i1 = count - 1
+            else:
+                i1 = i2 - 1
+            if i2 == count - 1:
+                i3 = 0
+            else:
+                i3 = i2 + 1
+
+            v1 = verts[i1]
+            v2 = verts[i2]
+            v3 = verts[i3]
+
+            Bi = v3 - v1
+            Bj = np.asarray([-Bi[1],Bi[0]])
+            Bj /= np.linalg.norm(Bj) # normalise the inward-pointing vector
+
+            if np.dot(v2 - v1, Bj) > -tolerance:
+                if count < 4:
+                    verts = None
+                    count = 0
+                else:
+                    if i2 < count - 1:
+                        verts[i2:(count-1),:] = verts[i3:count,:]
+                    count -= 1
+            else:
+                i2 += 1
+
+        if verts is not None:
+            verts = verts[0:count,:]
+        return verts, count
+
+    @staticmethod
     def __crop_2D_line(verts, count, v1, v2): # crops an anticlockwise polygon to the interior, assuming v1 & v2 are consecutive vertices of an anticlockwise polygon
         Bi = v2 - v1
         Bj = np.asarray([-Bi[1],Bi[0]])
@@ -69,13 +137,7 @@ class Polygon(object):
             crop_verts[crop_count,:] = verts[i1,:] - dj_1 * (verts[i2,:] - verts[i1,:]) / (dj_0 - dj_1)
             crop_count += 1
 
-        if crop_count > 2:
-            verts = crop_verts[0:crop_count,:]
-            count = crop_count
-        else:
-            verts = None
-            count = 0
-        return verts, count
+        return Polygon.__tidy_2D_poly(crop_verts, crop_count)
 
     def crop_2D_poly(self, polygon): # crops a polygon to the interior of self - assumes self.plane == polygon.plane
         verts = polygon.verts
@@ -85,7 +147,7 @@ class Polygon(object):
             s2 = s1 + 1
             if s2 == self.count:
                 s2 = 0
-            verts, count = self.__crop_2D_line(verts, count, self.verts[s1,:], self.verts[s2,:])
+            verts, count = Polygon.__crop_2D_line(verts, count, self.verts[s1,:], self.verts[s2,:])
             if verts is None:
                 break
 
@@ -97,9 +159,19 @@ class Polygon(object):
 
         return poly
 
+    def split(self, v1, v2): # crops self-polygon to the line specified by 2D in-plane coordinates v1 & v2
+        verts, count = Polygon.__crop_2D_line(self.verts, self.count, v1, v2)
+
+        if verts is not None:
+            poly = Polygon(self.plane, count, self.material)
+            poly.verts[:,:] = verts
+        else:
+            poly = None
+
+        return poly
+
     def crop_3D_poly(self, polygon):
         # crops a polygon above self-plane
-        # TODO: tolerances.. merge near-points
 
         v3D, count = polygon.vertices()
 
@@ -127,22 +199,23 @@ class Polygon(object):
             crop_verts[crop_count,:] = polygon.verts[i1,:] - z_1 * (polygon.verts[i2,:] - polygon.verts[i1,:]) / (z_0 - z_1)
             crop_count += 1
 
-        if crop_count > 2:
+        crop_verts, crop_count = self.__tidy_2D_poly(crop_verts, crop_count)
+
+        if crop_verts is not None:
             crop_poly = Polygon(polygon.plane, crop_count, polygon.material)
-            crop_poly.verts[:,:] = crop_verts[0:crop_count,:]
+            crop_poly.verts[:,:] = crop_verts
         else:
             crop_poly = None
 
         return crop_poly
 
     def project_3D_poly(self, origin, polygon):
-        # assumes the polygon is above self-plane
-        # TODO: tolerances.. merge near-points
+        self_xy, self_z = self.plane.project(origin)
+        poly_xy, poly_z = polygon.plane.project(origin)
 
-        local_xy, local_z = polygon.plane.project(origin)
-        if local_z > 0:
+        if self_z * poly_z < 0:
             reorientate = True # projected polygon will be clockwise
-        elif local_z < 0:
+        elif self_z * poly_z > 0:
             reorientate = False
         else:
             return None # projection will be a line
@@ -162,62 +235,39 @@ class Polygon(object):
                 i2 = i1
             proj_verts[i2,:], z_i = self.plane.project(origin - z_o * (v3D[i1,:] - origin) / (z_i - z_o))
 
-        if proj_count > 2:
+        proj_verts, proj_count = self.__tidy_2D_poly(proj_verts, proj_count)
+
+        if proj_verts is not None:
             proj_poly = Polygon(self.plane, proj_count, polygon.material)
-            proj_poly.verts[:,:] = proj_verts[0:proj_count,:]
+            proj_poly.verts[:,:] = proj_verts
         else:
             proj_poly = None
 
         return proj_poly
 
+    def crop_visible(self, origin, pp):
+        poly, proj = pp
+
+        cropped_poly = self.crop_2D_poly(poly)
+        if cropped_poly is None: # cropped away, or lost amidst the tolerances...
+            return None
+
+        # project polygon back onto original plane
+        cropped_proj = proj.project_3D_poly(origin, cropped_poly)
+
+        return (cropped_poly, cropped_proj)
+
     def project_and_crop(self, origin, polygon):
         # the projection origin must be behind us
 
         # crop polygon above self-plane
-        crop_poly = self.crop_3D_poly(polygon)
-        if crop_poly is None: # cropped away, or lost amidst the tolerances...
+        poly = self.crop_3D_poly(polygon)
+        if poly is None: # cropped away, or lost amidst the tolerances...
             return None
 
         # project polygon onto self-plane
-        proj_poly = self.project_3D_poly(origin, crop_poly)
-        if proj_poly is None: # lost amidst the tolerances...
+        poly = self.project_3D_poly(origin, poly)
+        if poly is None: # lost amidst the tolerances...
             return None
 
-        window_poly = self.crop_2D_poly(proj_poly)
-        if window_poly is None: # cropped away, or lost amidst the tolerances...
-            return None
-
-        # project polygon back onto original plane
-        proj = polygon.project_3D_poly(origin, window_poly)
-
-        return (window_poly, proj)
-
-    def compare_2D_poly(self, polygon):
-        # assumes polygon is coplanar and shares same coordinate system, i.e., self.plane == polygon.plane
-        # is_exterior is True if all points in polygon are outside self
-        # is_interior is True if all points in polygon are within self
-
-        is_exterior = False
-        is_interior = True
-
-        for s1 in range(0, self.count):
-            s2 = s1 + 1
-            if s2 == self.count:
-                s2 = 0
-
-            Bi = self.verts[s2,:] - self.verts[s1,:]
-            Bj = np.asarray([-Bi[1],Bi[0]]) # points inwards; not a normalised basis vector
-
-            all_outside = True
-            for i in range(0, polygon.count):
-                dp = np.dot(polygon.verts[i,:] - self.verts[s1,:], Bj)
-                if dp > 0:
-                    all_outside = False
-                if dp < 0:
-                    is_interior = False
-            if all_outside:
-                is_exterior = True
-                is_interior = False
-                break
-
-        return is_exterior, is_interior
+        return self.crop_visible(origin, (poly, polygon))

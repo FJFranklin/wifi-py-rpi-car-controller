@@ -11,10 +11,17 @@ class Receiver(object):
 
         polygons = space.cube(self._origin, cube_dimension, material, True)
         for p in polygons:
-            self._views.append(View.View(space, self, self._origin, p))
+            self._views.append(View.View(self._origin, p))
 
-    def search(self):
-        subviews = []
+    def search(self, show_projections=False):
+        resolved = []
+
         for v in self._views:
-            subviews += v.search()
-        self._views = subviews
+            resolved += v.search(self._space.polygons)
+        self._views = resolved
+
+        if show_projections:
+            for rv in resolved:
+                poly = rv.region.window
+                poly.ill_only = poly.plane.basis_k # make the polygon illustrative only and offset it
+                self._space.add_poly(poly)
