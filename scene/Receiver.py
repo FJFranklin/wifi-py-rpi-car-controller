@@ -1,6 +1,6 @@
 import numpy as np
 
-import View
+from View import View
 
 class Receiver(object):
 
@@ -11,17 +11,33 @@ class Receiver(object):
 
         polygons = space.cube(self._origin, cube_dimension, material, True)
         for p in polygons:
-            self._views.append(View.View(self._origin, p))
+            self._views.append(View(self._origin, p))
 
     def search(self, show_projections=False):
-        resolved = []
+        sources = []
 
-        for v in self._views:
-            resolved += v.search(self._space.polygons)
-        self._views = resolved
+        for it in range(1,3):
+            resolved = []
 
-        if show_projections:
-            for rv in resolved:
-                poly = rv.region.window
-                poly.ill_only = poly.plane.basis_k # make the polygon illustrative only and offset it
-                self._space.add_poly(poly)
+            while len(self._views) > 0:
+                v = self._views.pop(0)
+                resolved += v.search(self._space.polygons)
+
+            while len(resolved) > 0:
+                v = resolved.pop(0)
+
+                if show_projections:
+                    poly = v.region.window
+                    poly.ill_only = poly.plane.basis_k * it # make the polygon illustrative only and offset it
+                    self._space.add_poly(poly)
+
+                material = v.region.target.material
+
+                if material.is_source():
+                    print("Source view added")
+                    sources.append(v.copy())
+
+                if material.is_reflective():
+                    self._views.append(v.reflect_view())
+                elif material.is_refractive():
+                    self._views.append(v.refract_view())

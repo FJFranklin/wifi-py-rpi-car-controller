@@ -6,6 +6,7 @@ class View(object):
 
     def __init__(self, origin, window, visibles=None):
         self.region = Visible(np.copy(origin), window)
+        self.parent = None
 
         if visibles is not None:
             self._visibles = visibles.copy()
@@ -13,7 +14,10 @@ class View(object):
             self._visibles = None
 
     def copy(self):
-        return View(self.region.origin, self.region.window, self._visibles)
+        view = View(self.region.origin, self.region.window, self._visibles)
+        view.region.target = self.region.target
+        view.parent = self.parent
+        return view
 
     def __search_polygons(self, polygons):
         self._visibles = []
@@ -133,3 +137,21 @@ class View(object):
             resolved += refined_resolved # if reduced to a single visible; or it will divide into two subviews
 
         return resolved
+
+    def reflect_view(self):
+        #TODO:
+        # Plane.reflect()
+        # Polygon.center()
+        # Polygon.reverse() - watch out for the other basis vector changing; reorder points & reflect in-plane
+        origin = self.region.target.plane.reflect(self.region.origin)
+        child = View(origin, self.region.target.reverse())
+        child.parent = self
+        return child
+
+    def refract_view(self, scale=0.5):
+        center = self.region.target.center()
+        origin = self.region.target.plane.reflect(center - self.region.origin) * scale + center
+        # we may need to reverse the poly - check first # FIXME
+        child = View(origin, self.region.target.reverse())
+        child.parent = self
+        return child
