@@ -185,6 +185,17 @@ class Polygon(object):
 
         return poly
 
+    def intersections_3D(self, origin, v3D, count):
+        i3D = np.copy(v3D)
+
+        xy_o, z_o = self.plane.project(origin)
+
+        for i in range(0, count):
+            xy_i, z_i = self.plane.project(v3D[i,:])
+            i3D[i,:] = origin - z_o * (v3D[i,:] - origin) / (z_i - z_o)
+
+        return i3D
+
     def crop_3D_poly(self, polygon):
         # crops a polygon above self-plane
 

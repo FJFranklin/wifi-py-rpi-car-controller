@@ -1,5 +1,6 @@
 import numpy as np
 
+from Polygon import Polygon
 from Visible import Visible
 
 class View(object):
@@ -147,7 +148,7 @@ class View(object):
         child.parent = self
         return child
 
-    def refract_view(self, scale=0.1):
+    def refract_view(self, scale=0.25):
         center = self.region.target.center()
         origin = self.region.target.plane.reflect(center - self.region.origin) * scale + center
 
@@ -159,3 +160,30 @@ class View(object):
         child = View(origin, window)
         child.parent = self
         return child
+
+    def show_history(self, space):
+        material = self.region.target.material
+
+        i3D, count = self.region.target.vertices()
+
+        v = self
+        while v:
+            v3D = i3D
+            i3D = v.region.window.intersections_3D(v.region.origin, v3D, count)
+
+            for i2 in range(1, count):
+                i1 = i2 - 1
+
+                plane = space.plane_from_points(v.region.origin, v3D[i1,:], v3D[i2,:])
+
+                poly = Polygon(plane, 4, material)
+
+                poly.verts[0,:], z_0 = plane.project(v3D[i1,:])
+                poly.verts[1,:], z_1 = plane.project(v3D[i2,:])
+                poly.verts[2,:], z_2 = plane.project(i3D[i2,:])
+                poly.verts[3,:], z_3 = plane.project(i3D[i1,:])
+
+                poly.ill_only = [0,0,0]
+                space.add_poly(poly)
+
+            v = v.parent

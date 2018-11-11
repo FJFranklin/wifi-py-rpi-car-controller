@@ -27,15 +27,12 @@ class Receiver(object):
             while len(resolved) > 0:
                 v = resolved.pop(0)
 
-                if show_projections:
-                    poly = v.region.window
-                    poly.ill_only = poly.plane.basis_k # make the polygon illustrative only and offset it
-                    self._space.add_poly(poly)
-
                 material = v.region.target.material
 
                 if material.is_source():
                     print("Source view added")
+                    if show_projections:
+                        v.show_history(self._space)
                     sources.append(v.copy())
 
                 if material.is_refractive():
