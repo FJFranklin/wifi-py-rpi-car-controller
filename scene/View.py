@@ -139,19 +139,23 @@ class View(object):
         return resolved
 
     def reflect_view(self):
-        #TODO:
-        # Plane.reflect()
-        # Polygon.center()
-        # Polygon.reverse() - watch out for the other basis vector changing; reorder points & reflect in-plane
         origin = self.region.target.plane.reflect(self.region.origin)
-        child = View(origin, self.region.target.reverse())
+
+        window = self.region.target
+
+        child = View(origin, window)
         child.parent = self
         return child
 
-    def refract_view(self, scale=0.5):
+    def refract_view(self, scale=0.1):
         center = self.region.target.center()
         origin = self.region.target.plane.reflect(center - self.region.origin) * scale + center
-        # we may need to reverse the poly - check first # FIXME
-        child = View(origin, self.region.target.reverse())
+
+        window = self.region.target
+        xy_w, z_w = window.plane.project(origin)
+        if z_w > 0:
+            window = window.reverse()
+
+        child = View(origin, window)
         child.parent = self
         return child

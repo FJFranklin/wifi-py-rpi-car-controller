@@ -8,6 +8,7 @@ class Receiver(object):
         self._origin = np.copy(origin)
         self._space = space
         self._views = []
+        self._material = material
 
         polygons = space.cube(self._origin, cube_dimension, material, True)
         for p in polygons:
@@ -16,7 +17,7 @@ class Receiver(object):
     def search(self, show_projections=False):
         sources = []
 
-        for it in range(1,3):
+        for it in range(1,5):
             resolved = []
 
             while len(self._views) > 0:
@@ -28,7 +29,7 @@ class Receiver(object):
 
                 if show_projections:
                     poly = v.region.window
-                    poly.ill_only = poly.plane.basis_k * it # make the polygon illustrative only and offset it
+                    poly.ill_only = poly.plane.basis_k # make the polygon illustrative only and offset it
                     self._space.add_poly(poly)
 
                 material = v.region.target.material
@@ -37,7 +38,9 @@ class Receiver(object):
                     print("Source view added")
                     sources.append(v.copy())
 
-                if material.is_reflective():
+                if material.is_refractive():
+                    rv = v.refract_view()
+                    # self._space.cube(rv.region.origin, 1, self._material, True)
+                    self._views.append(rv)
+                elif material.is_reflective():
                     self._views.append(v.reflect_view())
-                elif material.is_refractive():
-                    self._views.append(v.refract_view())

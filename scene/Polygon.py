@@ -10,6 +10,18 @@ class Polygon(object):
         self.material = material
         self.ill_only = None # if not None, then for illustration only; otherwise it's an offset
 
+    def reverse(self):
+        poly = Polygon(self.plane.reverse(), self.count, self.material)
+
+        # flip y-axis & reverse order of vertices
+
+        for s in range(0, self.count):
+            i = self.count - 1 - s
+            vert = self.verts[s,:]
+            poly.verts[i,:] = [vert[0],-vert[1]]
+
+        return poly
+
     def vertices(self):
         for v in range(0, self.count):
             self.__v3D[v,:] = self.plane.coordinate((self.verts[v,0], self.verts[v,1]))
@@ -17,6 +29,9 @@ class Polygon(object):
                 self.__v3D[v,:] = self.__v3D[v,:] + self.ill_only
 
         return self.__v3D, self.count
+
+    def center(self):
+        return self.plane.coordinate(np.mean(self.verts, axis=0))
 
     def set_vertex(self, index, xy):
         x, y = xy
@@ -173,12 +188,18 @@ class Polygon(object):
     def crop_3D_poly(self, polygon):
         # crops a polygon above self-plane
 
+        tolerance = 1E-9
+
         v3D, count = polygon.vertices()
 
         crop_verts = np.zeros((count+1,2))
         crop_count = 0
 
+        coplanar = True
+
         xy_0, z_0 = self.plane.project(v3D[0,:])
+        if (z_0 < -tolerance) or (z_0 > tolerance):
+            coplanar = False
         xy_1, z_1 = xy_0, z_0
         if z_1 >= 0:
             crop_verts[crop_count,:] = polygon.verts[0,:]
@@ -186,6 +207,8 @@ class Polygon(object):
         for i2 in range(1,count):
             i1 = i2 - 1
             xy_2, z_2 = self.plane.project(v3D[i2,:])
+            if (z_2 < -tolerance) or (z_2 > tolerance):
+                coplanar = False
             if ((z_1 < 0) and (z_2 > 0)) or ((z_1 > 0) and (z_2 < 0)):
                 crop_verts[crop_count,:] = polygon.verts[i1,:] - z_1 * (polygon.verts[i2,:] - polygon.verts[i1,:]) / (z_2 - z_1)
                 crop_count += 1
@@ -199,6 +222,9 @@ class Polygon(object):
             crop_verts[crop_count,:] = polygon.verts[i1,:] - z_1 * (polygon.verts[i2,:] - polygon.verts[i1,:]) / (z_0 - z_1)
             crop_count += 1
 
+        if coplanar:
+            return None
+
         crop_verts, crop_count = self.__tidy_2D_poly(crop_verts, crop_count)
 
         if crop_verts is not None:
@@ -209,7 +235,7 @@ class Polygon(object):
 
         return crop_poly
 
-    def project_3D_poly(self, origin, polygon):
+    def project_3D_poly(self, origin, polygon, printing=False):
         self_xy, self_z = self.plane.project(origin)
         poly_xy, poly_z = polygon.plane.project(origin)
 
@@ -235,6 +261,8 @@ class Polygon(object):
                 i2 = i1
             proj_verts[i2,:], z_i = self.plane.project(origin - z_o * (v3D[i1,:] - origin) / (z_i - z_o))
 
+        if printing:
+            print(proj_verts)
         proj_verts, proj_count = self.__tidy_2D_poly(proj_verts, proj_count)
 
         if proj_verts is not None:
@@ -254,6 +282,11 @@ class Polygon(object):
 
         # project polygon back onto original plane
         cropped_proj = proj.project_3D_poly(origin, cropped_poly)
+
+        if cropped_proj is None:
+            print("Oops!")
+            print(cropped_poly.verts)
+            cropped_proj = proj.project_3D_poly(origin, cropped_poly, True)
 
         return (cropped_poly, cropped_proj)
 
