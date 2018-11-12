@@ -17,7 +17,7 @@ class Receiver(object):
     def search(self, show_projections=False):
         sources = []
 
-        for it in range(1,5):
+        for it in range(0,5):
             resolved = []
 
             while len(self._views) > 0:
@@ -30,14 +30,15 @@ class Receiver(object):
                 material = v.region.target.material
 
                 if material.is_source():
-                    print("Source view added")
                     if show_projections:
                         v.show_history(self._space)
                     sources.append(v.copy())
 
                 if material.is_refractive():
                     rv = v.refract_view()
-                    # self._space.cube(rv.region.origin, 1, self._material, True)
+                    #self._space.cube(rv.region.origin, 0.1, self._material, True)
                     self._views.append(rv)
                 elif material.is_reflective():
                     self._views.append(v.reflect_view())
+
+            print("Sources total: " + str(len(sources)))

@@ -150,7 +150,8 @@ class View(object):
 
     def refract_view(self, scale=0.25):
         center = self.region.target.center()
-        origin = self.region.target.plane.reflect(center - self.region.origin) * scale + center
+        origin = center + (self.region.origin - center) * scale
+        #origin = center + (center - self.region.target.plane.reflect(self.region.origin)) * scale
 
         window = self.region.target
         xy_w, z_w = window.plane.project(origin)

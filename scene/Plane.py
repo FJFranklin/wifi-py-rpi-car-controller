@@ -15,11 +15,21 @@ class Plane(object):
             self.basis_k = np.asarray([0,0,1])
 
     def reverse(self):
+        #plane = Plane(self.origin,np.asarray([self.basis_i,self.basis_j,self.basis_k]))
         plane = Plane(self.origin)
 
-        plane.basis_i[:] =  self.basis_i
-        plane.basis_j[:] = -self.basis_j
-        plane.basis_k[:] = -self.basis_k
+        plane.basis_i = np.copy( self.basis_i)
+        plane.basis_j = np.copy(-self.basis_j)
+        plane.basis_k = np.copy(-self.basis_k)
+
+        return plane
+
+    def jki(self, origin):
+        plane = Plane(origin)
+
+        plane.basis_i[:] = self.basis_j
+        plane.basis_j[:] = self.basis_k
+        plane.basis_k[:] = self.basis_i
 
         return plane
 

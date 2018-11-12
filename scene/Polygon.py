@@ -196,8 +196,9 @@ class Polygon(object):
 
         return i3D
 
-    def crop_3D_poly(self, polygon):
-        # crops a polygon above self-plane
+    @staticmethod
+    def __crop_3D_poly(plane, polygon, discard_coplanar=True):
+        # crops a polygon above plane
 
         tolerance = 1E-9
 
@@ -208,7 +209,7 @@ class Polygon(object):
 
         coplanar = True
 
-        xy_0, z_0 = self.plane.project(v3D[0,:])
+        xy_0, z_0 = plane.project(v3D[0,:])
         if (z_0 < -tolerance) or (z_0 > tolerance):
             coplanar = False
         xy_1, z_1 = xy_0, z_0
@@ -217,7 +218,7 @@ class Polygon(object):
             crop_count += 1
         for i2 in range(1,count):
             i1 = i2 - 1
-            xy_2, z_2 = self.plane.project(v3D[i2,:])
+            xy_2, z_2 = plane.project(v3D[i2,:])
             if (z_2 < -tolerance) or (z_2 > tolerance):
                 coplanar = False
             if ((z_1 < 0) and (z_2 > 0)) or ((z_1 > 0) and (z_2 < 0)):
@@ -233,10 +234,10 @@ class Polygon(object):
             crop_verts[crop_count,:] = polygon.verts[i1,:] - z_1 * (polygon.verts[i2,:] - polygon.verts[i1,:]) / (z_0 - z_1)
             crop_count += 1
 
-        if coplanar:
+        if coplanar and discard_coplanar:
             return None
 
-        crop_verts, crop_count = self.__tidy_2D_poly(crop_verts, crop_count)
+        crop_verts, crop_count = Polygon.__tidy_2D_poly(crop_verts, crop_count)
 
         if crop_verts is not None:
             crop_poly = Polygon(polygon.plane, crop_count, polygon.material)
@@ -245,6 +246,10 @@ class Polygon(object):
             crop_poly = None
 
         return crop_poly
+
+    def crop_3D_poly(self, polygon):
+        # crops a polygon above self-plane
+        return Polygon.__crop_3D_poly(self.plane, polygon)
 
     def project_3D_poly(self, origin, polygon, printing=False):
         self_xy, self_z = self.plane.project(origin)
@@ -274,7 +279,7 @@ class Polygon(object):
 
         if printing:
             print(proj_verts)
-        proj_verts, proj_count = self.__tidy_2D_poly(proj_verts, proj_count)
+        proj_verts, proj_count = Polygon.__tidy_2D_poly(proj_verts, proj_count)
 
         if proj_verts is not None:
             proj_poly = Polygon(self.plane, proj_count, polygon.material)
@@ -304,8 +309,17 @@ class Polygon(object):
     def project_and_crop(self, origin, polygon):
         # the projection origin must be behind us
 
+        # crop refractive plane according to incidence
+        if polygon.material.is_refractive():
+            poly_xy, poly_z = polygon.plane.project(origin)
+            poly = Polygon.__crop_3D_poly(polygon.plane.jki(origin), polygon, False)
+        else:
+            poly = polygon
+        if poly is None: # cropped away, or lost amidst the tolerances...
+            return None
+
         # crop polygon above self-plane
-        poly = self.crop_3D_poly(polygon)
+        poly = self.crop_3D_poly(poly)
         if poly is None: # cropped away, or lost amidst the tolerances...
             return None
 

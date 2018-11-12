@@ -74,10 +74,10 @@ class Space(object):
         offset = zone_width * (Bk * np.sqrt(3) - Bj) / 2
 
         verts = np.zeros((4,3))
-        verts[0,:] = vert1
-        verts[1,:] = vert2
-        verts[2,:] = vert2 + offset
-        verts[3,:] = vert1 + offset
+        verts[0,:] = vert2
+        verts[1,:] = vert2 + offset
+        verts[2,:] = vert1 + offset
+        verts[3,:] = vert1
 
         self.__make_poly(verts, range(0, 4), zone_material)
 
