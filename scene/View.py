@@ -148,19 +148,24 @@ class View(object):
         child.parent = self
         return child
 
-    def refract_view(self, scale=0.25):
-        center = self.region.target.center()
-        origin = center + (self.region.origin - center) * scale
-        #origin = center + (center - self.region.target.plane.reflect(self.region.origin)) * scale
-
+    def refract_view(self):
         window = self.region.target
-        xy_w, z_w = window.plane.project(origin)
+        xy_w, z_w = window.plane.project(self.region.origin)
         if z_w > 0:
             window = window.reverse()
 
+        center = window.center()
+        origin = center - np.linalg.norm(self.region.origin - center) * window.plane.basis_k
+
+        # rotate origin until directly behind the window's center
         child = View(origin, window)
         child.parent = self
-        return child
+
+        # let's also treat the refractive surface as transparent
+        through = View(self.region.origin, window)
+        through.parent = self
+
+        return through, child
 
     def show_history(self, space):
         material = self.region.target.material

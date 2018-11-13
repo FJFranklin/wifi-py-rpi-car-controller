@@ -35,9 +35,10 @@ class Receiver(object):
                     sources.append(v.copy())
 
                 if material.is_refractive():
-                    rv = v.refract_view()
+                    tv, rv = v.refract_view()
                     #self._space.cube(rv.region.origin, 0.1, self._material, True)
-                    self._views.append(rv)
+                    self._views.append(tv) # through-view
+                    self._views.append(rv) # refracted view
                 elif material.is_reflective():
                     self._views.append(v.reflect_view())
 
