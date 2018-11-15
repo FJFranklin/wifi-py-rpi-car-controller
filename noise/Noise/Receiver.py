@@ -1,6 +1,6 @@
 import numpy as np
 
-from View import View
+from .View import View
 
 class Receiver(object):
 

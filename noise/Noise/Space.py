@@ -2,10 +2,10 @@ from operator import itemgetter
 
 import numpy as np
 
-from Basis import Basis
-from Plane import Plane
-from Polygon import Polygon
-from Receiver import Receiver
+from .Basis import Basis
+from .Plane import Plane
+from .Polygon import Polygon
+from .Receiver import Receiver
 
 class Space(Basis):
 
@@ -16,6 +16,10 @@ class Space(Basis):
     def add_poly(self, polygon, material=None):
         if material is not None:
             polygon.props['material'] = material
+        else:
+            material = polygon.props['material']
+        if material.is_illustrative():
+            polygon.props['ill_only'] = True
         self.polygons.append(polygon)
 
     def __make_poly(self, verts, indices, material):
@@ -32,7 +36,8 @@ class Space(Basis):
         return polygon
 
     def __add_zone(self, poly, indices, neighbour, zone_width, zone_material):
-        angle = (310 * np.pi / 180 - np.arccos(np.dot(poly.plane.normal(), neighbour.plane.normal()))) / 2
+        angle = np.arccos(np.dot(poly.plane.normal(), neighbour.plane.normal())) * 180 / np.pi
+        angle = ((330 - angle) / 2) * np.pi / 180
 
         v3D, count = poly.vertices()
         v1 = v3D[indices[0], :]
@@ -45,7 +50,7 @@ class Space(Basis):
         Bi /= np.linalg.norm(Bi)
         Bj /= np.linalg.norm(Bj)
 
-        offset = zone_width * (Bk * np.cos(angle) - Bj * np.sin(angle))
+        offset = zone_width * (Bk * np.sin(angle) + Bj * np.cos(angle))
 
         v3D = np.zeros((4,3))
         v3D[0,:] = v2
@@ -143,6 +148,7 @@ class Space(Basis):
             radius, angles = w
             swing = True
         else:
+            radius = 0
             swing = False
 
         if isinstance(heights, tuple):
@@ -153,18 +159,38 @@ class Space(Basis):
             count = 4
 
         verts = np.zeros((count, 2))
-        verts[0,:] = [-h/2, height]
-        verts[1,:] = [-h/2, 0]
-        verts[2,:] = [ h/2, 0]
-        verts[3,:] = [ h/2, height]
+        verts[0,:] = [-radius-h/2, height]
+        verts[1,:] = [-radius-h/2, 0]
+        verts[2,:] = [-radius+h/2, 0]
+        verts[3,:] = [-radius+h/2, height]
 
         if count == 5:
-            verts[4,:] = [   0, height + roof]
+            verts[4,:] = [-radius, height + roof]
 
         if swing:
-            if radius > h and len(angles) > 1:
-                None
-                # TODO
+            count = len(angles)
+            if radius > h and count > 1:
+                
+                for i2 in range(1, count):
+                    i1 = i2 - 1
+                    a1 = angles[i1] - 90
+                    a2 = angles[i2] - 90
+                    
+                    left_plane  = Plane(basis.jki().rotate_j(a2+180))
+                    right_plane = Plane(basis.jki().rotate_j(a1))
+
+                    if diffraction_zones is not None:
+                        dz_material, dz_dims = diffraction_zones
+                        dz = dz_dims.copy()
+                        if i1 > 0:
+                            dz[1] = 0
+                        if i2 < count - 1:
+                            dz[0] = 0
+                        zones = (dz_material, dz)
+                    else:
+                        zones = None
+
+                    self.add_prism(verts, count, left_plane, right_plane, material, zones)
         else:
             left_plane  = Plane(basis.jki([-w/2,0,0]).rotate_j(180))
             right_plane = Plane(basis.jki([ w/2,0,0]))

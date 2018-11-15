@@ -1,6 +1,6 @@
 import numpy as np
 
-from Basis import Basis
+from .Basis import Basis
 
 class Polygon(object):
 

@@ -1,7 +1,7 @@
 import numpy as np
 
-from Polygon import Polygon
-from Visible import Visible
+from .Polygon import Polygon
+from .Visible import Visible
 
 class View(object):
 

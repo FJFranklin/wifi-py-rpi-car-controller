@@ -1,5 +1,7 @@
 import numpy as np
 
+from .Basis import Basis
+
 class Visible(object):
 
     def __init__(self, origin, window, target=None):

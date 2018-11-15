@@ -3,8 +3,8 @@ from vispy.scene.cameras.turntable import TurntableCamera
 
 import numpy as np
 
-from Space import Space
-from Material import Material
+from Noise.Space import Space
+from Noise.Material import Material
 
 # Define the different types of material, etc.
 
@@ -99,7 +99,12 @@ elif case == 3:
 elif case == 4:
 
     basis = S.offset([-5,5,0])
-    S.add_box(basis, (10,4), 6, brick, (diffzone, [1,2,3,4]))
+    S.add_box(basis, (10,4), 6, brick, (diffzone, [1,1,1,1]))
+    
+    basis = S.offset([5,5,0])
+    S.add_box(basis, (6,8), (5,2), concrete, (diffzone, [1,1,0,1]))
+    
+    S.add_box(S, ((20, [0,10,30,60,100]),8), (7,1), grass, (diffzone, [1,1,0,1]))
     
     # Add a receiver
     basis = S.jki([0,-5,2]).rotate_j(90)
@@ -109,7 +114,7 @@ receiver.search(True)
 
 # Display scene
 
-# Normal vector towards the sun / light-source
+# Normalised vector towards the sun / light-source
 lv_phi = 200 * np.pi / 180
 lv_psi =  60 * np.pi / 180
 lv = [np.cos(lv_phi)*np.cos(lv_psi),np.sin(lv_phi)*np.cos(lv_psi),np.sin(lv_psi)]
