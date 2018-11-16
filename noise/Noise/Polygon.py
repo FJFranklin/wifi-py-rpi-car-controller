@@ -257,6 +257,19 @@ class Polygon(object):
         # crops a polygon above self-plane
         return Polygon.__crop_3D_poly(self.plane, polygon)
 
+    def crop_3D_poly_between(self, planes, above=True):
+        # crops self above/below planes
+        poly = self
+        for p in planes:
+            if above:
+                plane = p
+            else:
+                plane = p.reverse()
+            poly = Polygon.__crop_3D_poly(plane, poly)
+            if poly is None:
+                break
+        return poly
+
     def project_3D_poly(self, origin, polygon, printing=False):
         self_xy, self_z = self.plane.project(origin)
         poly_xy, poly_z = polygon.plane.project(origin)
@@ -273,17 +286,38 @@ class Polygon(object):
         proj_verts = np.zeros((count,2))
         proj_count = count
 
+        found_zero = False
+
         xy_o, z_o = self.plane.project(origin)
+        if printing:
+            print(xy_o, z_o)
         for i1 in range(0, count):
             xy_i, z_i = self.plane.project(v3D[i1,:])
+            if z_i - z_o == 0:
+                found_zero = True
+                break
+            if printing:
+                #print(xy_i, z_i, z_o/(z_i-z_o))
+                print(origin - z_o * (v3D[i1,:] - origin) / (z_i - z_o))
 
             if reorientate:
                 i2 = count - 1 - i1
             else:
                 i2 = i1
             proj_verts[i2,:], z_i = self.plane.project(origin - z_o * (v3D[i1,:] - origin) / (z_i - z_o))
-
+        if found_zero:
+            if printing:
+                print('Found zero')
+            return None
         if printing:
+            print(origin)
+            print(self.plane.basis.origin)
+            print(self.plane.basis.matrix)
+            print(polygon.plane.basis.origin)
+            print(polygon.plane.basis.matrix)
+            print(polygon.verts)
+            print(v3D)
+            print(reorientate)
             print(proj_verts)
         proj_verts, proj_count = Polygon.__tidy_2D_poly(proj_verts, proj_count)
 

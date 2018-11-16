@@ -22,22 +22,25 @@ class Space(Basis):
             polygon.props['ill_only'] = True
         self.polygons.append(polygon)
 
-    def __make_poly(self, verts, indices, material):
-        plane = Plane.from_points(verts[indices[0],:], verts[indices[1],:], verts[indices[2],:])
+    def __make_poly(self, v3D, indices, material, crop_planes=None):
+        plane = Plane.from_points(v3D[indices[0],:], v3D[indices[1],:], v3D[indices[2],:])
         polygon = Polygon(plane, len(indices))
 
         pi = 0
         for i in indices:
-            xy, z = plane.project(verts[i,:])
+            xy, z = plane.project(v3D[i,:])
             polygon.set_vertex(pi, xy)
             pi += 1
+
+        if crop_planes is not None:
+            polygon = polygon.crop_3D_poly_between(crop_planes, False)
 
         self.add_poly(polygon, material)
         return polygon
 
-    def __add_zone(self, poly, indices, neighbour, zone_width, zone_material):
+    def __add_zone(self, poly, indices, neighbour, zone_width, zone_material, crop_planes=None):
         angle = np.arccos(np.dot(poly.plane.normal(), neighbour.plane.normal())) * 180 / np.pi
-        angle = ((330 - angle) / 2) * np.pi / 180
+        angle = (90 + angle / 3) * np.pi / 180
 
         v3D, count = poly.vertices()
         v1 = v3D[indices[0], :]
@@ -58,7 +61,7 @@ class Space(Basis):
         v3D[2,:] = v1 + offset
         v3D[3,:] = v1
 
-        self.__make_poly(v3D, range(0, 4), zone_material)
+        self.__make_poly(v3D, range(0, 4), zone_material, crop_planes)
 
     def add_prism(self, verts, count, left_plane, right_plane, material, diffraction_zones=None):
         # Diffraction zones: two planes angled relative to neighbouring faces
@@ -115,6 +118,8 @@ class Space(Basis):
             z_base  = zone_dimensions[2]
             z_other = zone_dimensions[3]
 
+            crop_planes = (left_plane, right_plane)
+
             for l1 in range(0, count):
                 l2 = l1 + 1
                 if l2 == count:
@@ -135,11 +140,11 @@ class Space(Basis):
                     self.__add_zone(p_right, [r2, r1], polygons[l1], z_right, zone_material)
                     self.__add_zone(polygons[l1], [2, 3], p_right, z_other, zone_material)
                 if z_base and z_other and l1 < 2:
-                    self.__add_zone(polygons[l1], [3, 0], polygons[l2], z_base, zone_material)
-                    self.__add_zone(polygons[l2], [1, 2], polygons[l1], z_base, zone_material)
+                    self.__add_zone(polygons[l1], [3, 0], polygons[l2], z_base, zone_material, crop_planes)
+                    self.__add_zone(polygons[l2], [1, 2], polygons[l1], z_base, zone_material, crop_planes)
                 if z_other and l1 > 1:
-                    self.__add_zone(polygons[l1], [3, 0], polygons[l2], z_other, zone_material)
-                    self.__add_zone(polygons[l2], [1, 2], polygons[l1], z_other, zone_material)
+                    self.__add_zone(polygons[l1], [3, 0], polygons[l2], z_other, zone_material, crop_planes)
+                    self.__add_zone(polygons[l2], [1, 2], polygons[l1], z_other, zone_material, crop_planes)
 
     def add_box(self, basis, base_wh, heights, material, diffraction_zones=None):
         w, h = base_wh
@@ -168,10 +173,10 @@ class Space(Basis):
             verts[4,:] = [-radius, height + roof]
 
         if swing:
-            count = len(angles)
-            if radius > h and count > 1:
+            a_count = len(angles)
+            if radius > h and a_count > 1:
                 
-                for i2 in range(1, count):
+                for i2 in range(1, a_count):
                     i1 = i2 - 1
                     a1 = angles[i1] - 90
                     a2 = angles[i2] - 90
@@ -184,7 +189,7 @@ class Space(Basis):
                         dz = dz_dims.copy()
                         if i1 > 0:
                             dz[1] = 0
-                        if i2 < count - 1:
+                        if i2 < a_count - 1:
                             dz[0] = 0
                         zones = (dz_material, dz)
                     else:
@@ -212,7 +217,7 @@ class Space(Basis):
         verts[3,:] = [ 0.5,-0.5, 0]
         poly_r = self.__make_poly(basis.rel_to_abs(verts * dimension), [3,2,1,0], material)
 
-        l = Receiver(self, [0,0,dimension/3], poly_l, material)
-        r = Receiver(self, [0,0,dimension/3], poly_r, material)
+        l = Receiver(self, basis.rel_to_abs([0,0,dimension/3]), poly_l, material)
+        r = Receiver(self, basis.rel_to_abs([0,0,dimension/3]), poly_r, material)
 
         return l, r

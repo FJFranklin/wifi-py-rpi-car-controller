@@ -16,7 +16,9 @@ class Visible(object):
 
         # project polygon back onto original plane
         cropped_proj = visible.target.project_3D_poly(self.origin, cropped_poly)
-
+        if cropped_proj is None:
+            print('Projection error')
+            return None
         return Visible(self.origin, cropped_poly, cropped_proj)
 
     def nearest_intersection(self, visible):

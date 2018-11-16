@@ -59,6 +59,7 @@ class View(object):
             poly1_is_occluded = False
 
             v1 = self._visibles[iv1]
+
             for iv2 in range(0, len(self._visibles)):
                 if iv1 == iv2:
                     continue

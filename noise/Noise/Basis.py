@@ -13,15 +13,15 @@ class Basis(object):
             else:
                 self.matrix = basis.matrix.copy()
         else:
-            self.origin = np.matrix([[0,0,0]])
-            self.matrix = np.matrix([[1,0,0],[0,1,0],[0,0,1]])
+            self.origin = np.matrix([[0,0,0]], dtype='float64')
+            self.matrix = np.matrix([[1,0,0],[0,1,0],[0,0,1]], dtype='float64')
 
     @staticmethod
     def using(origin_abs, ei, ej, ek):
         basis = Basis()
 
-        basis.origin = np.matrix(origin_abs)
-        basis.matrix = np.matrix([ei, ej, ek])
+        basis.origin = np.matrix(origin_abs, dtype='float64')
+        basis.matrix = np.matrix([ei, ej, ek], dtype='float64')
 
         return basis
 

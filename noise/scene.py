@@ -59,14 +59,14 @@ if case == 1:
     receiver = S.make_receiver([-20,30,5],2,darkzone)
 
 elif case == 2:
-    S.add_box([0,0,-1],(100,100),1,0,concrete)
+    S.add_box(S.offset([0,0,-1]), (100,100), 1, concrete)
 
-    S.add_box([0,45,1],(10,10),10,45,source)
+    S.add_box(S.rotate_k(45, [0,45,1]), (10,10), 10, source)
 
-    S.add_box([0,0,0],(20,20),40,30,brick,(diffzone,[0,0,0,0,5,5,5,5,0,0,0,0]))
+    S.add_box(S.rotate_k(30), (20,20), 40, brick, (diffzone,[5,5,5,5]))
 
     # Add a receiver
-    receiver = S.make_receiver([-10,-15,20],4,darkzone)
+    receiver, r_ear = S.make_receiver(S.jki([30,-15,20]).rotate_j(90), 2, darkzone)
 
 elif case == 3:
     sf = 200
@@ -105,6 +105,8 @@ elif case == 4:
     S.add_box(basis, (6,8), (5,2), concrete, (diffzone, [1,1,0,1]))
     
     S.add_box(S, ((20, [0,10,30,60,100]),8), (7,1), grass, (diffzone, [1,1,0,1]))
+    
+    S.add_box(S, ((20, [270,315]),8), (7,1), brick, (barrier, [2,2,2,2]))
     
     # Add a receiver
     basis = S.jki([0,-5,2]).rotate_j(90)
