@@ -4,6 +4,8 @@ class Material(object):
     __diffzone = None
     __darkzone = None
     __concrete = None
+    __wood = None
+    __foliage = None
     __brick = None
     __grass = None
     __glass = None
@@ -36,6 +38,20 @@ class Material(object):
             Material.__concrete = Material((1,1,1,1))
             Material.__concrete.make_reflective(0.1) # very low absorption
         return Material.__concrete
+
+    @staticmethod
+    def wood():
+        if Material.__wood is None:
+            Material.__wood = Material((0.596, 0.412, 0.376, 1))
+            Material.__wood.make_reflective(0.5) # medium absorption
+        return Material.__wood
+
+    @staticmethod
+    def foliage():
+        if Material.__foliage is None:
+            Material.__foliage = Material((0, 0.5, 0, 0.75))
+            Material.__foliage.make_refractive()
+        return Material.__foliage
 
     @staticmethod
     def brick():

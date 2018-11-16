@@ -76,8 +76,8 @@ class View(object):
                 if v1_interior and v1_farther:
                     poly1_is_occluded = True
                     break
-                if v1_coplanar:
-                    print('Error: coplanar polygons?')
+                if v1_interior and v1_coplanar:
+                    print('Error: interior-coplanar polygons?')
 
                 # check to see if poly2 is contained within poly1
                 v2_exterior, v2_interior, v2_farther, v2_coplanar = v1.compare_visible(v2, printing)
@@ -87,6 +87,8 @@ class View(object):
                     del self._visibles[iv2]
                     poly2_deleted = True
                     break
+                if v2_interior and v2_coplanar:
+                    print('Error: interior-coplanar polygons?')
                 if v1_interior and v2_interior:
                     print('Error: intersecting polygons? removing one...')
                     print(v1.target.vertices())

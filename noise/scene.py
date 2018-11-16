@@ -38,6 +38,9 @@ elif case == 2:
 
     S.add_box(S.rotate_k(30), (20,20), 40, Material.brick(), (Material.diffzone(),[5,5,5,5]))
 
+    S.add_tree(S.offset([20,20,0]), 2, 5, 3)
+    S.add_tree(S.offset([30,15,0]), 2, 5, 2)
+
     # Add a receiver
     l_ear, r_ear = S.make_receiver(S.rotate_k(90, [30,-15,20]), 2, Material.darkzone())
 
@@ -56,7 +59,7 @@ elif case == 3:
     S.add_box([-288,  76,0],( 72,8),7,0,brick,(diffzone,[0,0,0,0,1,1,1,1,1,1,1,1]))
     S.add_box([-288,  52,0],( 72,8),7,0,brick,(diffzone,[0,0,0,0,1,1,1,1,1,1,1,1]))
     S.add_box([-288,  16,0],( 72,8),7,0,brick,(diffzone,[0,0,0,0,1,1,1,1,1,1,1,1]))
-	
+
     S.add_box([-395, 117,0],( 30,8),7,0,brick,(diffzone,[0,0,0,0,1,1,1,1,1,1,1,1]))
     S.add_box([-404,  79,0],( 48,8),7,0,brick,(diffzone,[0,0,0,0,1,1,1,1,1,1,1,1]))
     S.add_box([-413,  41,0],( 66,8),7,0,brick,(diffzone,[0,0,0,0,1,1,1,1,1,1,1,1]))
@@ -80,7 +83,10 @@ elif case == 4:
     S.add_box(S, ((20, [0,10,30,60,100]),8), (7,1), Material.glass(), (Material.diffzone(), [1,1,0,1]))
     
     S.add_box(S, ((20, [270,315]),8), (7,1), Material.barrier(), (Material.diffzone(), [1,1,1,1]))
-    
+
+    S.add_tree(S.offset([-15,5,0]), 2, 5, 3)
+    S.add_tree(S.offset([-15,15,0]), 2, 5, 2)
+
     basis = S.offset([-5,10,0])
     S.add_box(basis, (2,2), 2, Material.source())
 
@@ -88,7 +94,7 @@ elif case == 4:
     basis = S.rotate_k(90, [0,-5,2])
     l_ear, r_ear = S.make_receiver(basis, 2, Material.darkzone())
 
-search_iterations = 3
+search_iterations = 5
 print('Left ear: Searching...')
 l_ear.search(search_iterations, True)
 print('Right ear: Searching...')

@@ -2,6 +2,7 @@ from operator import itemgetter
 
 import numpy as np
 
+from .Material import Material
 from .Basis import Basis
 from .Plane import Plane
 from .Polygon import Polygon
@@ -201,6 +202,27 @@ class Space(Basis):
             right_plane = Plane(basis.jki([ w/2,0,0]))
 
             self.add_prism(verts, count, left_plane, right_plane, material, diffraction_zones)
+
+    def add_tree(self, basis, radius, height, trunk=None):
+        count = 7
+        verts = np.zeros((count, 2))
+
+        for i in range(0, count):
+            theta = 2 * np.pi * i / count
+            verts[i,:] = [np.cos(theta), np.sin(theta)]
+
+        if trunk is not None:
+            t_rad = 0.3 # trunk radius
+            p_ttop = Plane(basis.offset([0,0,trunk]))
+            p_tbot = Plane(basis.rotate_j(180))
+            self.add_prism(verts * t_rad, count, p_tbot, p_ttop, Material.wood())
+            base = trunk
+        else:
+            base = 0
+
+        p_ftop = Plane(basis.offset([0,0,base+height]))
+        p_fbot = Plane(basis.rotate_j(180,[0,0,base]))
+        self.add_prism(verts * radius, count, p_fbot, p_ftop, Material.foliage(), (Material.foliage(), [0,0.5,1,1]))
 
     def make_receiver(self, basis, dimension, material):
         verts = np.zeros((4,3))
