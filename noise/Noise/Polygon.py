@@ -175,7 +175,7 @@ class Polygon(object):
                 break
 
         if count > 2:
-            poly = Polygon(self.plane, count, self.props)
+            poly = Polygon(self.plane, count, polygon.props)
             poly.verts[:,:] = verts[0:count,:]
         else:
             poly = None

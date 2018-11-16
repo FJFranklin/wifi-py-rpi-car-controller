@@ -31,6 +31,12 @@ class Basis(object):
         Basis.__resolution = 10**(-decimals)
 
     @staticmethod
+    def zero_if_negligible(value):
+        if (value > -Basis.__resolution) and (value < Basis.__resolution):
+            return 0
+        return value
+
+    @staticmethod
     def is_positive(value):
         return value > -Basis.__resolution
 
@@ -47,13 +53,23 @@ class Basis(object):
         return value < -Basis.__resolution
 
     def rel_to_abs(self, coord_rel):
-        return np.asarray(self.origin + np.asmatrix(coord_rel) * self.matrix)
+        coord_rel = np.asarray(coord_rel)
+
+        mat_rel = np.asarray(self.origin + np.asmatrix(coord_rel) * self.matrix)
+
+        if coord_rel.shape == (3,):
+            return mat_rel[0]
+
+        return mat_rel
 
     def abs_to_rel(self, coord_abs):
         mat_abs = (np.asmatrix(coord_abs) - self.origin) * self.matrix.getT()
 
-        if Basis.__eqdecimals > 0:
-            mat_abs = np.around(mat_abs, decimals=Basis.__eqdecimals)
+        #if Basis.__eqdecimals > 0:
+        #    mat_abs = np.around(mat_abs, decimals=Basis.__eqdecimals)
+
+        if coord_abs.shape == (3,):
+            return np.asarray(mat_abs)[0]
 
         return np.asarray(mat_abs)
 

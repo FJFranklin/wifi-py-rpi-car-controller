@@ -1,5 +1,6 @@
 import numpy as np
 
+from .Plane import Plane
 from .Polygon import Polygon
 from .Visible import Visible
 
@@ -20,7 +21,7 @@ class View(object):
         view.parent = self.parent
         return view
 
-    def __search_polygons(self, polygons):
+    def __search_polygons(self, polygons, space):
         self._visibles = []
 
         for p in polygons:
@@ -40,6 +41,10 @@ class View(object):
             pp = self.region.window.project_and_crop(self.region.origin, p)
             if pp is not None:
                 poly, proj = pp
+                if space is not None:
+                    proj.props['offset'] = proj.plane.normal()
+                    proj.props['ill_only'] = True
+                    space.add_poly(proj)
                 self._visibles.append(Visible(self.region.origin, poly, proj)) # although it may be occluded
 
     def __refine_visibles(self):
@@ -53,27 +58,46 @@ class View(object):
 
         self._visibles = visibles
 
-    def __remove_occluded(self):
+    def __remove_occluded(self, printing=False):
         iv1 = 0
-        while (iv1 < len(self._visibles)) and (len(self._visibles) > 1):
+        while (iv1 < len(self._visibles) - 1) and (len(self._visibles) > 1):
             poly1_is_occluded = False
+            poly2_deleted = False
 
             v1 = self._visibles[iv1]
 
-            for iv2 in range(0, len(self._visibles)):
-                if iv1 == iv2:
-                    continue
+            for iv2 in range(iv1+1, len(self._visibles)):
                 v2 = self._visibles[iv2]
 
                 # check to see if poly1 is contained within poly2
-                is_exterior, is_interior, is_farther = v2.compare_visible(v1)
-                if is_interior and is_farther:
+                v1_exterior, v1_interior, v1_farther, v1_coplanar = v2.compare_visible(v1, printing)
+                if printing:
+                    print('Exterior: '+str(v1_exterior)+', Interior: '+str(v1_interior)+', Farther: '+str(v1_farther)+', Coplanar: '+str(v1_coplanar))
+                if v1_interior and v1_farther:
                     poly1_is_occluded = True
+                    break
+                if v1_coplanar:
+                    print('Error: coplanar polygons?')
+
+                # check to see if poly2 is contained within poly1
+                v2_exterior, v2_interior, v2_farther, v2_coplanar = v1.compare_visible(v2, printing)
+                if printing:
+                    print('Exterior: '+str(v2_exterior)+', Interior: '+str(v2_interior)+', Farther: '+str(v2_farther)+', Coplanar: '+str(v2_coplanar))
+                if v2_interior and v2_farther:
+                    del self._visibles[iv2]
+                    poly2_deleted = True
+                    break
+                if v1_interior and v2_interior:
+                    print('Error: intersecting polygons? removing one...')
+                    print(v1.target.vertices())
+                    print(v2.target.vertices())
+                    del self._visibles[iv2]
+                    poly2_deleted = True
                     break
 
             if poly1_is_occluded:
                 del self._visibles[iv1]
-            else:
+            elif not poly2_deleted:
                 iv1 += 1
 
     def __refine(self):
@@ -110,6 +134,15 @@ class View(object):
                 d1_best = d1
                 d2_best = d2
 
+        if v1_best is None: # no valid edge found
+            print('View:')
+            print(self.region.window.verts)
+            print('Visibles:')
+            for v in self._visibles:
+                print(v.window.verts)
+            print('Occlusions:')
+            self.__remove_occluded(True) # remove any obviously occluded polygons
+
         # split the window in two and refine the set of self._visibles, etc.
 
         view = self.copy()
@@ -124,10 +157,10 @@ class View(object):
 
         return subviews, resolved
 
-    def search(self, polygons):
+    def search(self, polygons, space=None):
         # self._target should be None at this point
 
-        self.__search_polygons(polygons)
+        self.__search_polygons(polygons, space)
 
         resolved = []
         subviews = [self]
@@ -181,7 +214,7 @@ class View(object):
             for i2 in range(1, count):
                 i1 = i2 - 1
 
-                plane = space.plane_from_points(v.region.origin, v3D[i1,:], v3D[i2,:])
+                plane = Plane.from_points(v.region.origin, v3D[i1,:], v3D[i2,:])
 
                 poly = Polygon(plane, 4, props)
 

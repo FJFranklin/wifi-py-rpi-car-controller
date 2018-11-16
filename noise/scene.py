@@ -6,33 +6,6 @@ import numpy as np
 from Noise.Space import Space
 from Noise.Material import Material
 
-# Define the different types of material, etc.
-
-# Surfaces that may contain source points
-source = Material((0,1,0,0.5))
-source.make_source(0) # reflection; no absorption
-
-# Diffraction surfaces
-diffzone = Material((0,0,1,0.1))
-diffzone.make_refractive()
-
-# Purely for illustration
-darkzone = Material((0,0,0,0.5))
-darkzone.make_illustrative()
-
-# Actual materials
-concrete = Material((1,1,1,1))
-concrete.make_reflective(0.1) # very low absorption
-
-brick = Material((0.8,0.1,0,1))
-brick.make_reflective(0.2) # low absorption
-
-barrier = Material((0.1,0.1,0.1,0.5))
-barrier.make_reflective(0.9) # high absorption
-
-grass = Material((0,0.5,0,1))
-grass.make_reflective(1) # total absorption
-
 # Make the scene
 
 S = Space()
@@ -59,14 +32,14 @@ if case == 1:
     receiver = S.make_receiver([-20,30,5],2,darkzone)
 
 elif case == 2:
-    S.add_box(S.offset([0,0,-1]), (100,100), 1, concrete)
+    S.add_box(S.offset([0,0,-1]), (100,100), 1, Material.concrete())
 
-    S.add_box(S.rotate_k(45, [0,45,1]), (10,10), 10, source)
+    S.add_box(S.rotate_k(45, [0,45,1]), (10,10), 10, Material.source())
 
-    S.add_box(S.rotate_k(30), (20,20), 40, brick, (diffzone,[5,5,5,5]))
+    S.add_box(S.rotate_k(30), (20,20), 40, Material.brick(), (Material.diffzone(),[5,5,5,5]))
 
     # Add a receiver
-    receiver, r_ear = S.make_receiver(S.jki([30,-15,20]).rotate_j(90), 2, darkzone)
+    l_ear, r_ear = S.make_receiver(S.rotate_k(90, [30,-15,20]), 2, Material.darkzone())
 
 elif case == 3:
     sf = 200
@@ -99,20 +72,27 @@ elif case == 3:
 elif case == 4:
 
     basis = S.offset([-5,5,0])
-    S.add_box(basis, (10,4), 6, brick, (diffzone, [1,1,1,1]))
+    S.add_box(basis, (10,4), 6, Material.brick(), (Material.diffzone(), [1,1,1,1]))
     
     basis = S.offset([5,5,0])
-    S.add_box(basis, (6,8), (5,2), concrete, (diffzone, [1,1,0,1]))
+    S.add_box(basis, (6,8), (5,2), Material.concrete(), (Material.diffzone(), [1,1,0,1]))
     
-    S.add_box(S, ((20, [0,10,30,60,100]),8), (7,1), grass, (diffzone, [1,1,0,1]))
+    S.add_box(S, ((20, [0,10,30,60,100]),8), (7,1), Material.glass(), (Material.diffzone(), [1,1,0,1]))
     
-    S.add_box(S, ((20, [270,315]),8), (7,1), brick, (barrier, [2,2,2,2]))
+    S.add_box(S, ((20, [270,315]),8), (7,1), Material.barrier(), (Material.diffzone(), [1,1,1,1]))
     
-    # Add a receiver
-    basis = S.jki([0,-5,2]).rotate_j(90)
-    l_ear, receiver = S.make_receiver(basis, 2, darkzone)
+    basis = S.offset([-5,10,0])
+    S.add_box(basis, (2,2), 2, Material.source())
 
-receiver.search(True)
+    # Add a receiver
+    basis = S.rotate_k(90, [0,-5,2])
+    l_ear, r_ear = S.make_receiver(basis, 2, Material.darkzone())
+
+search_iterations = 3
+print('Left ear: Searching...')
+l_ear.search(search_iterations, True)
+print('Right ear: Searching...')
+r_ear.search(search_iterations, True)
 
 # Display scene
 

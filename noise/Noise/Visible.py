@@ -71,17 +71,18 @@ class Visible(object):
 
         return v1, d1, v2, d2
 
-    def compare_visible(self, visible):
+    def compare_visible(self, visible, printing=False):
         # assumes coincident origins & coplanar windows
         # i.e., self.origin == visible.origin & self.window.plane == visible.window.plane
 
         # is_exterior is True if all points in visible.window are outside self.window
         # is_interior is True if all points in visible.window are within self.window
-        # is_closer   is True if all points in visible.target are closer to the origin than self.target.plane
+        # is_farther  is True if any points in visible.target are opposite to the origin than self.target.plane
 
         is_exterior = False
         is_interior = True
         is_farther  = True
+        is_coplanar = True
 
         for s1 in range(0, self.window.count):
             s2 = s1 + 1
@@ -108,8 +109,13 @@ class Visible(object):
         xy_o, z_o = self.target.plane.project(self.origin)
         for i in range(0, count):
             xy_i, z_i = self.target.plane.project(v3D[i,:])
-            if Basis.is_strictly_positive(z_o * z_i):
+            zoi = z_o * z_i
+            if printing:
+                print('vis-cmp: '+str((z_o, z_i, zoi)))
+            if Basis.is_strictly_positive(zoi):
                 is_farther = False
-                break
+                is_coplanar = False
+            if Basis.is_strictly_negative(zoi):
+                is_coplanar = False
 
-        return is_exterior, is_interior, is_farther
+        return is_exterior, is_interior, is_farther, is_coplanar

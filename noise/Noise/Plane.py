@@ -29,13 +29,13 @@ class Plane(object):
         return self.basis.rel_to_abs([x, y, 0])
 
     def project(self, xyz):
-        pos = self.basis.abs_to_rel(xyz)[0]
-        return (pos[0], pos[1]), pos[2]
+        pos = self.basis.abs_to_rel(xyz)
+        return (pos[0], pos[1]), Basis.zero_if_negligible(pos[2])
 
     def reflect(self, xyz):
         pos = self.basis.abs_to_rel(xyz)
-        pos[0,2] = -pos[0,2]
-        return self.basis.rel_to_abs(pos)[0]
+        pos[2] = -pos[2]
+        return self.basis.rel_to_abs(pos)
 
     def normal(self):
         return self.basis.e_k()

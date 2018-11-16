@@ -205,16 +205,16 @@ class Space(Basis):
     def make_receiver(self, basis, dimension, material):
         verts = np.zeros((4,3))
 
-        verts[0,:] = [-0.5, 0.5, 0]
-        verts[1,:] = [ 0,   0.5, 1]
-        verts[2,:] = [ 0,  -0.5, 1]
-        verts[3,:] = [-0.5,-0.5, 0]
+        verts[0,:] = [ 0,  0.5,  0.5 ]
+        verts[1,:] = [ 1,  0,    0.5 ]
+        verts[2,:] = [ 1,  0,   -0.5 ]
+        verts[3,:] = [ 0,  0.5, -0.5 ]
         poly_l = self.__make_poly(basis.rel_to_abs(verts * dimension), [0,1,2,3], material)
 
-        verts[0,:] = [ 0.5, 0.5, 0]
-        verts[1,:] = [ 0,   0.5, 1]
-        verts[2,:] = [ 0,  -0.5, 1]
-        verts[3,:] = [ 0.5,-0.5, 0]
+        verts[0,:] = [ 0, -0.5,  0.5 ]
+        verts[1,:] = [ 1,  0,    0.5 ]
+        verts[2,:] = [ 1,  0,   -0.5 ]
+        verts[3,:] = [ 0, -0.5, -0.5 ]
         poly_r = self.__make_poly(basis.rel_to_abs(verts * dimension), [3,2,1,0], material)
 
         l = Receiver(self, basis.rel_to_abs([0,0,dimension/3]), poly_l, material)

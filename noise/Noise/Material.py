@@ -1,5 +1,70 @@
 class Material(object):
 
+    __source = None
+    __diffzone = None
+    __darkzone = None
+    __concrete = None
+    __brick = None
+    __grass = None
+    __glass = None
+    __barrier = None
+
+    @staticmethod
+    def source():
+        if Material.__source is None:
+            Material.__source = Material((0,1,0,0.5))
+            Material.__source.make_source(0) # reflection; no absorption
+        return Material.__source
+
+    @staticmethod
+    def diffzone():
+        if Material.__diffzone is None:
+            Material.__diffzone = Material((0,0,1,0.1))
+            Material.__diffzone.make_refractive()
+        return Material.__diffzone
+
+    @staticmethod
+    def darkzone():
+        if Material.__darkzone is None:
+            Material.__darkzone = Material((0,0,0,0.5))
+            Material.__darkzone.make_illustrative()
+        return Material.__darkzone
+
+    @staticmethod
+    def concrete():
+        if Material.__concrete is None:
+            Material.__concrete = Material((1,1,1,1))
+            Material.__concrete.make_reflective(0.1) # very low absorption
+        return Material.__concrete
+
+    @staticmethod
+    def brick():
+        if Material.__brick is None:
+            Material.__brick = Material((0.7,0.1,0,1))
+            Material.__brick.make_reflective(0.2) # low absorption
+        return Material.__brick
+
+    @staticmethod
+    def grass():
+        if Material.__grass is None:
+            Material.__grass = Material((0,0.5,0,1))
+            Material.__grass.make_reflective(1) # total absorption
+        return Material.__grass
+
+    @staticmethod
+    def glass():
+        if Material.__glass is None:
+            Material.__glass = Material((0,0,1,0.25))
+            Material.__glass.make_reflective(0.2) # low absorption
+        return Material.__glass
+
+    @staticmethod
+    def barrier():
+        if Material.__barrier is None:
+            Material.__barrier = Material((0.1,0.1,0.1,0.5))
+            Material.__barrier.make_reflective(0.9) # high absorption
+        return Material.__barrier
+
     def __init__(self, color=None):
         self._color = color      # 4-color (r, g, b, a) or None
         self._source = False
