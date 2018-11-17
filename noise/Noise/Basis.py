@@ -118,6 +118,8 @@ class Basis(object):
             cos_theta = np.cos(angle * np.pi / 180)
 
             basis = Basis(self, [[1,0,0],[0,cos_theta,sin_theta],[0,-sin_theta,cos_theta]])
+        else:
+            basis = Basis(self)
 
         if offset_origin_rel is not None:
             basis.origin = self.rel_to_abs(offset_origin_rel)
@@ -136,6 +138,8 @@ class Basis(object):
             cos_theta = np.cos(angle * np.pi / 180)
 
             basis = Basis(self, [[cos_theta,0,-sin_theta],[0,1,0],[sin_theta,0,cos_theta]])
+        else:
+            basis = Basis(self)
 
         if offset_origin_rel is not None:
             basis.origin = self.rel_to_abs(offset_origin_rel)
@@ -154,6 +158,8 @@ class Basis(object):
             cos_theta = np.cos(angle * np.pi / 180)
 
             basis = Basis(self, [[cos_theta,sin_theta,0],[-sin_theta,cos_theta,0],[0,0,1]])
+        else:
+            basis = Basis(self)
 
         if offset_origin_rel is not None:
             basis.origin = self.rel_to_abs(offset_origin_rel)
