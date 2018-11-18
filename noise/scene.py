@@ -37,7 +37,7 @@ if case == 1:
     S.add_box(B.rotate_k(-30,[0,0,1]), (20,20), 40, Material.brick(), (Material.diffzone(), [1,1,0,1]))
 
     # Add a receiver
-    l_ear, r_ear = S.make_receiver(B.rotate_k(90, [-20,30,5]), 2, Material.darkzone())
+    l_ear, r_ear = S.make_receiver(B.rotate_k(90, [-20,30,5]), 2)
 
 elif case == 2:
     S.add_box(S.offset([0,0,-1]), (100,100), 1, Material.concrete())
@@ -50,7 +50,7 @@ elif case == 2:
     S.add_tree(S.offset([30,15,0]), 2, 5, 2)
 
     # Add a receiver
-    l_ear, r_ear = S.make_receiver(S.rotate_k(90, [30,-15,20]), 2, Material.darkzone())
+    l_ear, r_ear = S.make_receiver(S.rotate_k(90, [30,-15,20]), 2)
 
 elif case == 3:
     sf = 400
@@ -178,7 +178,7 @@ elif case == 3:
         S.add_box(S.offset([0,5,0]), ((r-2,angles),4), 7.5, Material.concrete(), (Material.diffzone(), [1,1,0,1]))
 
     # Add a receiver
-    l_ear, r_ear = S.make_receiver(S.rotate_k(90, [0,0,2]), 2, Material.darkzone())
+    l_ear, r_ear = S.make_receiver(S.rotate_k(90, [0,0,2]), 2)
 
 elif case == 4:
 
@@ -200,13 +200,21 @@ elif case == 4:
 
     # Add a receiver
     basis = S.rotate_k(90, [0,-5,2])
-    l_ear, r_ear = S.make_receiver(basis, 2, Material.darkzone())
+    l_ear, r_ear = S.make_receiver(basis, 2)
 
-search_iterations = 3
+search_iterations = 5
+drop_if = 0.999
+show_projections = True
+
 print('Left ear: Searching...')
-l_ear.search(search_iterations, True)
+l_sources = l_ear.search(search_iterations, drop_if, show_projections)
 print('Right ear: Searching...')
-r_ear.search(search_iterations, True)
+r_sources = r_ear.search(search_iterations, drop_if, show_projections)
+
+print('Left ear: Calculating...')
+l_sum = l_ear.calc()
+print('Right ear: Calculating...')
+r_sum = r_ear.calc()
 
 # Display scene
 

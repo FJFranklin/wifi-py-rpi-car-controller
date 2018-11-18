@@ -224,7 +224,10 @@ class Space(Basis):
         p_fbot = Plane(basis.rotate_j(180,[0,0,base]))
         self.add_prism(verts * radius, count, p_fbot, p_ftop, Material.foliage(), (Material.foliage(), [0,0.5,1,1]))
 
-    def make_receiver(self, basis, dimension, material):
+    def make_receiver(self, basis, dimension, material=None):
+        if material is None:
+            material = Material.darkzone()
+
         verts = np.zeros((4,3))
 
         verts[0,:] = [ 0,  0.5,  0.5 ]
@@ -232,12 +235,14 @@ class Space(Basis):
         verts[2,:] = [ 1,  0,   -0.5 ]
         verts[3,:] = [ 0,  0.5, -0.5 ]
         poly_l = self.__make_poly(basis.rel_to_abs(verts * dimension), [0,1,2,3], material)
+        poly_l.props['ill_only'] = True
 
         verts[0,:] = [ 0, -0.5,  0.5 ]
         verts[1,:] = [ 1,  0,    0.5 ]
         verts[2,:] = [ 1,  0,   -0.5 ]
         verts[3,:] = [ 0, -0.5, -0.5 ]
         poly_r = self.__make_poly(basis.rel_to_abs(verts * dimension), [3,2,1,0], material)
+        poly_r.props['ill_only'] = True
 
         l = Receiver(self, basis.rel_to_abs([0,0,dimension/3]), poly_l, material)
         r = Receiver(self, basis.rel_to_abs([0,0,dimension/3]), poly_r, material)

@@ -6,9 +6,16 @@ class Polygon(object):
 
     def __init__(self, plane, vertex_count, props=None):
         self.plane = plane
-        self.count = vertex_count
-        self.verts = np.zeros((vertex_count, 2))
-        self.__v3D = np.zeros((vertex_count, 3))
+
+        if isinstance(vertex_count, tuple):
+            count, verts = vertex_count
+            self.count = count
+            self.verts = verts.copy()
+        else:
+            self.count = vertex_count
+            self.verts = np.zeros((vertex_count, 2))
+
+        self.__v3D = np.zeros((self.count, 3))
 
         if props is None:
             self.props = { }
@@ -18,9 +25,12 @@ class Polygon(object):
         #   'material'  Material class instance [required]
         #   'offset'    3D vector offset for the polygon when displaying [optional]
 
-    def copy(self):
-        poly = Polygon(self.plane, self.count, self.props)
-        poly.verts[:,:] = self.verts[:,:]
+    def copy(self, vertex_count=None):
+        if vertex_count is None:
+            poly = Polygon(self.plane, self.count, self.props)
+            poly.verts = self.verts.copy()
+        else:
+            poly = Polygon(self.plane, vertex_count, self.props)
         return poly
 
     def reverse(self, FlipY=True):
@@ -180,8 +190,7 @@ class Polygon(object):
                 break
 
         if count > 2:
-            poly = Polygon(self.plane, count, polygon.props)
-            poly.verts[:,:] = verts[0:count,:]
+            poly = polygon.copy((count, verts[0:count,:]))
         else:
             poly = None
 
@@ -191,8 +200,7 @@ class Polygon(object):
         verts, count = Polygon.__crop_2D_line(self.verts, self.count, v1, v2)
 
         if verts is not None:
-            poly = Polygon(self.plane, count, self.props)
-            poly.verts[:,:] = verts
+            poly = self.copy((count, verts))
         else:
             poly = None
 
@@ -251,8 +259,7 @@ class Polygon(object):
         crop_verts, crop_count = Polygon.__tidy_2D_poly(crop_verts, crop_count)
 
         if crop_verts is not None:
-            crop_poly = Polygon(polygon.plane, crop_count, polygon.props)
-            crop_poly.verts[:,:] = crop_verts
+            crop_poly = polygon.copy((crop_count, crop_verts))
         else:
             crop_poly = None
 
@@ -327,8 +334,7 @@ class Polygon(object):
         proj_verts, proj_count = Polygon.__tidy_2D_poly(proj_verts, proj_count)
 
         if proj_verts is not None:
-            proj_poly = Polygon(self.plane, proj_count, polygon.props)
-            proj_poly.verts[:,:] = proj_verts
+            proj_poly = self.copy((proj_count, proj_verts))
         else:
             proj_poly = None
 

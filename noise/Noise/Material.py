@@ -22,7 +22,7 @@ class Material(object):
     def diffzone():
         if Material.__diffzone is None:
             Material.__diffzone = Material((0,0,1,0.1))
-            Material.__diffzone.make_refractive()
+            Material.__diffzone.make_refractive((0.75, 0.25))
         return Material.__diffzone
 
     @staticmethod
@@ -50,7 +50,7 @@ class Material(object):
     def foliage():
         if Material.__foliage is None:
             Material.__foliage = Material((0, 0.5, 0, 0.75))
-            Material.__foliage.make_refractive()
+            Material.__foliage.make_refractive((0.25, 0.25))
         return Material.__foliage
 
     @staticmethod
@@ -136,11 +136,11 @@ class Material(object):
     def is_refractive(self):
         return self._refractive
 
-    def make_refractive(self):
+    def make_refractive(self, absorption): # where absorption=(transmitted,refracted)
         self._source = False
         self._reflective = False
         self._refractive = True
-        self._absorption = 0
+        self._absorption = absorption
         self._illustrative = False
 
     def is_illustrative(self):

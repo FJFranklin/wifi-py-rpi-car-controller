@@ -196,13 +196,14 @@ class View(object):
 
     def refract_view(self):
         material = self.region.target.props['material']
-        absorption = material.absorption()
+        abs_transmitted, abs_refracted = material.absorption()
 
         abs_prior = self.region.window.props['absorption']
-        abs_new = 1 - (1 - absorption) * (1 - abs_prior) # FIXME
+        abs_new_t = 1 - (1 - abs_transmitted) * (1 - abs_prior)
+        abs_new_r = 1 - (1 - abs_refracted) * (1 - abs_prior)
         
         window = self.region.target.copy()
-        window.props['absorption'] = abs_new
+        window.props['absorption'] = abs_new_r
 
         xy_w, z_w = window.plane.project(self.region.origin)
         if z_w > 0:
@@ -214,6 +215,9 @@ class View(object):
         # rotate origin until directly behind the window's center
         child = View(origin, window)
         child.parent = self
+
+        window = window.copy()
+        window.props['absorption'] = abs_new_t
 
         # let's also treat the refractive surface as transparent
         through = View(self.region.origin, window)
