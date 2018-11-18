@@ -17,7 +17,10 @@ class View(object):
 
     def copy(self):
         view = View(self.region.origin, self.region.window, self._visibles)
-        view.region.target = self.region.target
+        if self.region.target is not None:
+            view.region.target = self.region.target.copy()
+        else:
+            view.region.target = None
         view.parent = self.parent
         return view
 
@@ -176,16 +179,31 @@ class View(object):
         return resolved
 
     def reflect_view(self):
-        origin = self.region.target.plane.reflect(self.region.origin)
+        material = self.region.target.props['material']
+        absorption = material.absorption()
 
-        window = self.region.target
+        abs_prior = self.region.window.props['absorption']
+        abs_new = 1 - (1 - absorption) * (1 - abs_prior)
+        
+        window = self.region.target.copy()
+        window.props['absorption'] = abs_new
+
+        origin = window.plane.reflect(self.region.origin)
 
         child = View(origin, window)
         child.parent = self
         return child
 
     def refract_view(self):
-        window = self.region.target
+        material = self.region.target.props['material']
+        absorption = material.absorption()
+
+        abs_prior = self.region.window.props['absorption']
+        abs_new = 1 - (1 - absorption) * (1 - abs_prior) # FIXME
+        
+        window = self.region.target.copy()
+        window.props['absorption'] = abs_new
+
         xy_w, z_w = window.plane.project(self.region.origin)
         if z_w > 0:
             window = window.reverse()

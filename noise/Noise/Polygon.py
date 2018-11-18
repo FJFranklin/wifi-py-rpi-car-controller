@@ -18,6 +18,11 @@ class Polygon(object):
         #   'material'  Material class instance [required]
         #   'offset'    3D vector offset for the polygon when displaying [optional]
 
+    def copy(self):
+        poly = Polygon(self.plane, self.count, self.props)
+        poly.verts[:,:] = self.verts[:,:]
+        return poly
+
     def reverse(self, FlipY=True):
         poly = Polygon(self.plane.reverse(), self.count, self.props)
 

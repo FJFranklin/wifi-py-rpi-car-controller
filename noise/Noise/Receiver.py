@@ -8,6 +8,8 @@ class Receiver(object):
         self.space = space
         self.material = material
 
+        poly.props['absorbed'] = 0
+
         self._views = [View(origin, poly)]
 
     def search(self, iterations, show_projections=False):

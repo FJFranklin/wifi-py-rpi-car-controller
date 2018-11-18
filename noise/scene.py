@@ -12,31 +12,39 @@ S = Space()
 
 sf = 120 # scale factor
 
-case = 3
+case = 1
 
 if case == 1:
-    S.add_box([0,0,-1],(100,100),1,0,concrete)
+    B = S.offset([0,-30,0])
 
-    S.add_box([0,45,1],(100,3),3,0,source)
+    S.add_box(B.offset([0,44.5,-1]), (100,9), 1, Material.concrete())
 
-    S.add_box([0,41,0],(100,1),4,0,barrier,(diffzone,[0,0,0,0,0,0,0,0,1,0,1,0]))
+    S.add_box(B.offset([0,45,   1]), (100,3), 3, Material.source())
+    S.add_box(B.offset([0,40.5, 0]), (100,1), 4, Material.barrier(), (Material.diffzone(), [0,0,0,1]))
 
-    S.add_box([ 19, 30,0],(62,20),1,0,grass)
-    S.add_box([-35, 14,0],(30,52),1,0,grass)
-    S.add_box([-19,-35,0],(62,30),1,0,grass)
-    S.add_box([ 35,-19,0],(30,62),1,0,grass)
+    S.add_box(B.offset([  0,  0,0]), (40,40), 1, Material.concrete())
 
-    S.add_box([0,0,0],(20,20),40,30,brick,(diffzone,[0,0,0,0,1,1,1,1,1,1,1,1]))
+    S.add_box(B.offset([ 19, 30,0]), (62,20), 1, Material.grass())
+    S.add_box(B.offset([-35, 14,0]), (30,52), 1, Material.grass())
+    S.add_box(B.offset([-19,-35,0]), (62,30), 1, Material.grass())
+    S.add_box(B.offset([ 35,-19,0]), (30,62), 1, Material.grass())
+
+    S.add_box(B.offset([ 16,-35,0]), (8,30), 1, Material.concrete())
+    S.add_box(B.offset([-35,-16,0]), (30,8), 1, Material.concrete())
+    S.add_box(B.offset([ 35, 16,0]), (30,8), 1, Material.concrete())
+    S.add_box(B.offset([-16, 30,0]), (8,20), 1, Material.concrete())
+
+    S.add_box(B.rotate_k(-30,[0,0,1]), (20,20), 40, Material.brick(), (Material.diffzone(), [1,1,0,1]))
 
     # Add a receiver
-    receiver = S.make_receiver([-20,30,5],2,darkzone)
+    l_ear, r_ear = S.make_receiver(B.rotate_k(90, [-20,30,5]), 2, Material.darkzone())
 
 elif case == 2:
     S.add_box(S.offset([0,0,-1]), (100,100), 1, Material.concrete())
 
     S.add_box(S.rotate_k(45, [0,45,1]), (10,10), 10, Material.source())
 
-    S.add_box(S.rotate_k(30), (20,20), 40, Material.brick(), (Material.diffzone(),[5,5,5,5]))
+    S.add_box(S.rotate_k(30), (20,20), 40, Material.brick(), (Material.diffzone(), [5,5,5,5]))
 
     S.add_tree(S.offset([20,20,0]), 2, 5, 3)
     S.add_tree(S.offset([30,15,0]), 2, 5, 2)
