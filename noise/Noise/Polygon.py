@@ -100,6 +100,7 @@ class Polygon(object):
         if count < 3:
             verts = None
             count = 0
+            # print('tidy: count < 3')
             return verts, count
 
         # remove vertices that are too close to their next neighbour
@@ -113,6 +114,7 @@ class Polygon(object):
 
             if Basis.separation(verts[i1], verts[i2]) == 0:
                 if count < 4:
+                    # print('tidy: vertices too close')
                     verts = None
                     count = 0
                 else:
@@ -145,6 +147,7 @@ class Polygon(object):
 
             if Basis.is_positive(np.dot(v2 - v1, Bj)):
                 if count < 4:
+                    # print('tidy: not convex')
                     verts = None
                     count = 0
                 else:

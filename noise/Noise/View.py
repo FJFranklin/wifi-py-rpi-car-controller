@@ -44,6 +44,10 @@ class View(object):
             pp = self.region.window.project_and_crop(self.region.origin, p)
             if pp is not None:
                 poly, proj = pp
+                if poly is None:
+                    print('Error: No window')
+                if proj is None:
+                    print('Error: No target')
                 if space is not None:
                     proj.props['offset'] = proj.plane.normal()
                     proj.props['ill_only'] = True
@@ -153,12 +157,18 @@ class View(object):
         view = self.copy()
 
         self.region.window = self.region.window.split(v1_best, v2_best)
-        self.__refine_visibles()
-        subviews.append(self)
+        if self.region.window is None:
+            print('Warning: Split failed (self)')
+        else:
+            self.__refine_visibles()
+            subviews.append(self)
 
         view.region.window = view.region.window.split(v2_best, v1_best)
-        view.__refine_visibles()
-        subviews.append(view)
+        if view.region.window is None:
+            print('Warning: Split failed (view)')
+        else:
+            view.__refine_visibles()
+            subviews.append(view)
 
         return subviews, resolved
 

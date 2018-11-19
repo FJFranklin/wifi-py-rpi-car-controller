@@ -1,0 +1,150 @@
+from vispy import scene
+from vispy.scene.cameras.turntable import TurntableCamera
+
+import numpy as np
+
+import xlwings as xw
+
+from Noise.Space import Space
+from Noise.Material import Material
+
+# Setup the spreadsheet
+
+wb = xw.Book()
+
+gs = wb.sheets.add('Ground')
+gs[0,0].value = 'Vehicle Position'
+gs[0,1].value = 'Left Ear'
+gs[0,2].value = 'Right Ear'
+
+ws = wb.sheets.add('Window')
+ws[0,0].value = 'Vehicle Position'
+ws[0,1].value = 'Left Ear'
+ws[0,2].value = 'Right Ear'
+
+wb.save('test.xlsx')
+
+row = 1
+
+# Make the source-materials
+
+hvac = Material((0,0,1,1))
+hvac.make_source(0,60)
+
+wheel = Material((0.75,0.75,0.75,1))
+wheel.make_source(0,60)
+
+rail = Material((0.25,0.25,0.25,1))
+rail.make_source(0,60)
+
+sf = 120 # scale factor for final view
+
+search_iterations = 6
+drop_if = 0.999
+show_projections = True
+
+# Make the scene
+
+for x in range(-6, 39):
+    S = Space()
+
+    B = S.offset([0,-30,0])
+
+    S.add_box(B.offset([ 0,44.5,-1]), (100,9), 1, Material.concrete())
+    S.add_box(B.offset([20,40.5, 0]), ( 60,1), 4, Material.barrier(), (Material.diffzone(), [0,0,0,1]))
+
+    S.add_box(B.offset([  0,  0,0]), (40,40), 1, Material.concrete())
+
+    S.add_box(B.offset([ 19, 30,0]), (62,20), 1, Material.grass())
+    S.add_box(B.offset([-35, 14,0]), (30,52), 1, Material.grass())
+    S.add_box(B.offset([-19,-35,0]), (62,30), 1, Material.grass())
+    S.add_box(B.offset([ 35,-19,0]), (30,62), 1, Material.grass())
+
+    S.add_box(B.offset([ 16,-35,0]), (8,30), 1, Material.concrete())
+    S.add_box(B.offset([-35,-16,0]), (30,8), 1, Material.concrete())
+    S.add_box(B.offset([ 35, 16,0]), (30,8), 1, Material.concrete())
+    S.add_box(B.offset([-16, 30,0]), (8,20), 1, Material.concrete())
+
+    S.add_box(B.rotate_k(-30,[0,0,1]), (20,20), 40, Material.brick(), (Material.diffzone(), [1,1,0,1]))
+
+    V = B.offset([x,46,0])
+
+    S.add_box(V.offset([ 0,   0,    1    ]), (20,   3   ), 3,    Material.glass())
+    S.add_box(V.offset([ 0,   0,    4    ]), ( 2,   2   ), 0.25, hvac)
+    S.add_box(V.offset([-8,  -0.75, 0    ]), ( 8,   0.25), 0.25, rail)
+    S.add_box(V.offset([-8,   0.75, 0    ]), ( 8,   0.25), 0.25, rail)
+    S.add_box(V.offset([ 8,  -0.75, 0    ]), ( 8,   0.25), 0.25, rail)
+    S.add_box(V.offset([ 8,   0.75, 0    ]), ( 8,   0.25), 0.25, rail)
+    S.add_box(V.offset([-9.5,-0.75, 0.25 ]), ( 0.75,0.25), 0.75, wheel)
+    S.add_box(V.offset([-6.5,-0.75, 0.25 ]), ( 0.75,0.25), 0.75, wheel)
+    S.add_box(V.offset([-9.5, 0.75, 0.25 ]), ( 0.75,0.25), 0.75, wheel)
+    S.add_box(V.offset([-6.5, 0.75, 0.25 ]), ( 0.75,0.25), 0.75, wheel)
+    S.add_box(V.offset([ 9.5,-0.75, 0.25 ]), ( 0.75,0.25), 0.75, wheel)
+    S.add_box(V.offset([ 6.5,-0.75, 0.25 ]), ( 0.75,0.25), 0.75, wheel)
+    S.add_box(V.offset([ 9.5, 0.75, 0.25 ]), ( 0.75,0.25), 0.75, wheel)
+    S.add_box(V.offset([ 6.5, 0.75, 0.25 ]), ( 0.75,0.25), 0.75, wheel)
+
+    # Add receivers
+
+    print('=== Window ===')
+    w_l_ear, w_r_ear = S.make_receiver(B.rotate_k(-30,[0,0,1]).rotate_k(90,[0,10.5,30]), 2)
+    print('Left ear: Searching...')
+    w_l_sources = w_l_ear.search(search_iterations, drop_if, show_projections)
+    print('Right ear: Searching...')
+    w_r_sources = w_r_ear.search(search_iterations, drop_if, show_projections)
+    print('Left ear: Calculating...')
+    w_l_sum = w_l_ear.calc()
+    print('Right ear: Calculating...')
+    w_r_sum = w_r_ear.calc()
+
+    ws[row,0].value = x
+    ws[row,1].value = w_l_sum
+    ws[row,2].value = w_r_sum
+
+    print('=== Ground ===')
+    g_l_ear, g_r_ear = S.make_receiver(B.rotate_k(90, [-20,30,2]), 2)
+    print('Left ear: Searching...')
+    g_l_sources = g_l_ear.search(search_iterations, drop_if, show_projections)
+    print('Right ear: Searching...')
+    g_r_sources = g_r_ear.search(search_iterations, drop_if, show_projections)
+    print('Left ear: Calculating...')
+    g_l_sum = g_l_ear.calc()
+    print('Right ear: Calculating...')
+    g_r_sum = g_r_ear.calc()
+
+    gs[row,0].value = x
+    gs[row,1].value = g_l_sum
+    gs[row,2].value = g_r_sum
+
+    row += 1
+    wb.save()
+
+# Finished collecting data now; close the spreadsheet
+wb.close()
+
+# Display scene
+
+# Normalised vector towards the sun / light-source
+lv_phi = 200 * np.pi / 180
+lv_psi =  60 * np.pi / 180
+lv = [np.cos(lv_phi)*np.cos(lv_psi),np.sin(lv_phi)*np.cos(lv_psi),np.sin(lv_psi)]
+
+# VisPy scene setup
+canvas = scene.SceneCanvas(keys='interactive', size=(1200, 900), show=True)
+
+# Set up a viewbox to display the cube with interactive arcball
+view = canvas.central_widget.add_view()
+view.bgcolor = '#efefef'
+view.camera  = TurntableCamera(scale_factor=sf)
+view.padding = 10
+
+for p in S.polygons:
+    v, c = p.vertices()
+    f, e = p.get_colors(lv, 0.7)
+    if f is not None:
+        scene.visuals.Mesh(vertices=v, faces=range(0,c), color=f, mode='triangle_fan', parent=view.scene)
+    if e is not None:
+        scene.visuals.Mesh(vertices=v, faces=range(0,c), color=e, mode='lines', parent=view.scene)
+
+# & go...
+canvas.app.run()

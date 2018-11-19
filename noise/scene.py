@@ -43,13 +43,13 @@ if case == 1:
 
     S.add_box(B.rotate_k(-30,[0,0,1]), (20,20), 40, Material.brick(), (Material.diffzone(), [1,1,0,1]))
 
-    V = B.offset([-20,46,0])
+    V = B.offset([30,46,0])
     S.add_box(V.offset([ 0,   0,    1    ]), (20,   3   ), 3,    Material.glass())
     S.add_box(V.offset([ 0,   0,    4    ]), ( 2,   2   ), 0.25, hvac)
-    S.add_box(V.offset([-8,  -0.75, 0    ]), ( 4,   0.25), 0.25, rail)
-    S.add_box(V.offset([-8,   0.75, 0    ]), ( 4,   0.25), 0.25, rail)
-    S.add_box(V.offset([ 8,  -0.75, 0    ]), ( 4,   0.25), 0.25, rail)
-    S.add_box(V.offset([ 8,   0.75, 0    ]), ( 4,   0.25), 0.25, rail)
+    S.add_box(V.offset([-8,  -0.75, 0    ]), ( 8,   0.25), 0.25, rail)
+    S.add_box(V.offset([-8,   0.75, 0    ]), ( 8,   0.25), 0.25, rail)
+    S.add_box(V.offset([ 8,  -0.75, 0    ]), ( 8,   0.25), 0.25, rail)
+    S.add_box(V.offset([ 8,   0.75, 0    ]), ( 8,   0.25), 0.25, rail)
     S.add_box(V.offset([-9.5,-0.75, 0.25 ]), ( 0.75,0.25), 0.75, wheel)
     S.add_box(V.offset([-6.5,-0.75, 0.25 ]), ( 0.75,0.25), 0.75, wheel)
     S.add_box(V.offset([-9.5, 0.75, 0.25 ]), ( 0.75,0.25), 0.75, wheel)
@@ -60,7 +60,9 @@ if case == 1:
     S.add_box(V.offset([ 6.5, 0.75, 0.25 ]), ( 0.75,0.25), 0.75, wheel)
 
     # Add a receiver
-    l_ear, r_ear = S.make_receiver(B.rotate_k(90, [-20,30,2]), 2)
+    # l_ear, r_ear = S.make_receiver(B.rotate_k(90, [-20,30,2]), 2)
+
+    l_ear, r_ear = S.make_receiver(B.rotate_k(-30,[0,0,1]).rotate_k(90,[0,10.5,30]), 2)
 
 elif case == 2:
     S.add_box(S.offset([0,0,-1]), (100,100), 1, Material.concrete())
@@ -225,7 +227,7 @@ elif case == 4:
     basis = S.rotate_k(90, [0,-5,2])
     l_ear, r_ear = S.make_receiver(basis, 2)
 
-search_iterations = 5
+search_iterations = 0
 drop_if = 0.999
 show_projections = True
 
