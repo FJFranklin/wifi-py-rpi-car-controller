@@ -8,19 +8,42 @@ import xlwings as xw
 from Noise.Space import Space
 from Noise.Material import Material
 
+def dB_get(totals, label):
+    if label in totals:
+        value = totals[label]
+    else:
+        value = 0
+    return value
+
 # Setup the spreadsheet
 
 wb = xw.Book()
 
 gs = wb.sheets.add('Ground')
-gs[0,0].value = 'Vehicle Position'
-gs[0,1].value = 'Left Ear'
-gs[0,2].value = 'Right Ear'
+gs[0, 0].value = 'Vehicle Position'
+gs[0, 1].value = 'Left Total'
+gs[0, 2].value = 'Engine'
+gs[0, 3].value = 'HVAC'
+gs[0, 4].value = 'Rails'
+gs[0, 5].value = 'Wheels'
+gs[0, 6].value = 'Right Total'
+gs[0, 7].value = 'Engine'
+gs[0, 8].value = 'HVAC'
+gs[0, 9].value = 'Rails'
+gs[0,10].value = 'Wheels'
 
 ws = wb.sheets.add('Window')
-ws[0,0].value = 'Vehicle Position'
-ws[0,1].value = 'Left Ear'
-ws[0,2].value = 'Right Ear'
+ws[0, 0].value = 'Vehicle Position'
+ws[0, 1].value = 'Left Total'
+ws[0, 2].value = 'Engine'
+ws[0, 3].value = 'HVAC'
+ws[0, 4].value = 'Rails'
+ws[0, 5].value = 'Wheels'
+ws[0, 6].value = 'Right Total'
+ws[0, 7].value = 'Engine'
+ws[0, 8].value = 'HVAC'
+ws[0, 9].value = 'Rails'
+ws[0,10].value = 'Wheels'
 
 wb.save('test.xlsx')
 
@@ -28,14 +51,20 @@ row = 1
 
 # Make the source-materials
 
-hvac = Material((0,0,1,1))
-hvac.make_source(0,60)
+engine = Material('Engine', (1,0,0,1))
+engine.make_source(0,80)
 
-wheel = Material((0.75,0.75,0.75,1))
-wheel.make_source(0,60)
+hvac = Material('HVAC', (0,0,1,1))
+hvac.make_source(0,30)
 
-rail = Material((0.25,0.25,0.25,1))
-rail.make_source(0,60)
+wheel = Material('Wheel', (0.75,0.75,0.75,1))
+wheel.make_source(0,50)
+
+rail = Material('Rail', (0.25,0.25,0.25,1))
+rail.make_source(0,50)
+
+# Note: Rolling Noise: Lp = Lp0 + 30 log10 (V / V0), where Lp0 is the noise level at the speed V0
+#       [https://www.southampton.ac.uk/engineering/research/groups/dynamics/rail/rolling_railway_noise.page]
 
 sf = 120 # scale factor for final view
 
@@ -45,7 +74,7 @@ show_projections = True
 
 # Make the scene
 
-for x in range(-6, 39):
+for x in range(-38, 39):
     S = Space()
 
     B = S.offset([0,-30,0])
@@ -71,6 +100,7 @@ for x in range(-6, 39):
 
     S.add_box(V.offset([ 0,   0,    1    ]), (20,   3   ), 3,    Material.glass())
     S.add_box(V.offset([ 0,   0,    4    ]), ( 2,   2   ), 0.25, hvac)
+    S.add_box(V.offset([ 0,   0,    0.5  ]), ( 2,   2   ), 0.5,  engine)
     S.add_box(V.offset([-8,  -0.75, 0    ]), ( 8,   0.25), 0.25, rail)
     S.add_box(V.offset([-8,   0.75, 0    ]), ( 8,   0.25), 0.25, rail)
     S.add_box(V.offset([ 8,  -0.75, 0    ]), ( 8,   0.25), 0.25, rail)
@@ -93,13 +123,23 @@ for x in range(-6, 39):
     print('Right ear: Searching...')
     w_r_sources = w_r_ear.search(search_iterations, drop_if, show_projections)
     print('Left ear: Calculating...')
-    w_l_sum = w_l_ear.calc()
+    w_l_totals = w_l_ear.calc()
     print('Right ear: Calculating...')
-    w_r_sum = w_r_ear.calc()
+    w_r_totals = w_r_ear.calc()
 
-    ws[row,0].value = x
-    ws[row,1].value = w_l_sum
-    ws[row,2].value = w_r_sum
+    ws[row, 0].value = x
+
+    ws[row, 1].value = dB_get(w_l_totals, 'total')
+    ws[row, 2].value = dB_get(w_l_totals, 'Engine')
+    ws[row, 3].value = dB_get(w_l_totals, 'HVAC')
+    ws[row, 4].value = dB_get(w_l_totals, 'Rail')
+    ws[row, 5].value = dB_get(w_l_totals, 'Wheel')
+
+    ws[row, 6].value = dB_get(w_r_totals, 'total')
+    ws[row, 7].value = dB_get(w_r_totals, 'Engine')
+    ws[row, 8].value = dB_get(w_r_totals, 'HVAC')
+    ws[row, 9].value = dB_get(w_r_totals, 'Rail')
+    ws[row,10].value = dB_get(w_r_totals, 'Wheel')
 
     print('=== Ground ===')
     g_l_ear, g_r_ear = S.make_receiver(B.rotate_k(90, [-20,30,2]), 2)
@@ -108,19 +148,29 @@ for x in range(-6, 39):
     print('Right ear: Searching...')
     g_r_sources = g_r_ear.search(search_iterations, drop_if, show_projections)
     print('Left ear: Calculating...')
-    g_l_sum = g_l_ear.calc()
+    g_l_totals = g_l_ear.calc()
     print('Right ear: Calculating...')
-    g_r_sum = g_r_ear.calc()
+    g_r_totals = g_r_ear.calc()
 
-    gs[row,0].value = x
-    gs[row,1].value = g_l_sum
-    gs[row,2].value = g_r_sum
+    gs[row, 0].value = x
+
+    gs[row, 1].value = dB_get(g_l_totals, 'total')
+    gs[row, 2].value = dB_get(g_l_totals, 'Engine')
+    gs[row, 3].value = dB_get(g_l_totals, 'HVAC')
+    gs[row, 4].value = dB_get(g_l_totals, 'Rail')
+    gs[row, 5].value = dB_get(g_l_totals, 'Wheel')
+
+    gs[row, 6].value = dB_get(g_r_totals, 'total')
+    gs[row, 7].value = dB_get(g_r_totals, 'Engine')
+    gs[row, 8].value = dB_get(g_r_totals, 'HVAC')
+    gs[row, 9].value = dB_get(g_r_totals, 'Rail')
+    gs[row,10].value = dB_get(g_r_totals, 'Wheel')
 
     row += 1
-    wb.save()
+    #wb.save()
 
 # Finished collecting data now; close the spreadsheet
-wb.close()
+#wb.close()
 
 # Display scene
 

@@ -6,13 +6,13 @@ import numpy as np
 from Noise.Space import Space
 from Noise.Material import Material
 
-hvac = Material((0,0,1,1))
+hvac = Material('HVAC', (0,0,1,1))
 hvac.make_source(0,60)
 
-wheel = Material((0.75,0.75,0.75,1))
+wheel = Material('Wheel', (0.75,0.75,0.75,1))
 wheel.make_source(0,60)
 
-rail = Material((0.25,0.25,0.25,1))
+rail = Material('Rail', (0.25,0.25,0.25,1))
 rail.make_source(0,60)
 
 # Make the scene

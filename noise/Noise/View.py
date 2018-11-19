@@ -151,6 +151,8 @@ class View(object):
                 print(v.window.verts)
             print('Occlusions:')
             self.__remove_occluded(True) # remove any obviously occluded polygons
+            print('* * * Removing View - Critical Error * * *')
+            return subviews, resolved
 
         # split the window in two and refine the set of self._visibles, etc.
 
@@ -268,9 +270,6 @@ class View(object):
         amplitude = material.amplitude() # reference: dB at 10m, based on 1m2 visible source
         dist_ref = 10 # reference distance = 10m
 
-        area = self.region.target.area()
-        area_loss = 10 * np.log10(area)
-
         absorption = self.region.window.props['absorption'] # very unscientific scaling (??) # FIXME
         if 1 - absorption < 1E-6:
             return 0
@@ -282,6 +281,8 @@ class View(object):
         i3D = np.asarray([center])
         count = 1
 
+        area_scale = None
+
         v = self
         while v:
             v3D = i3D
@@ -289,7 +290,14 @@ class View(object):
 
             distance += np.linalg.norm(v3D[0,:] - i3D[0,:])
 
+            if area_scale is None:
+                incidence_vector = (i3D[0,:] - v3D[0,:]) / np.linalg.norm(v3D[0,:] - i3D[0,:])
+                area_scale = np.dot(incidence_vector, v.region.target.plane.normal())
+
             v = v.parent
+
+        area = self.region.target.area()
+        area_loss = 10 * np.log10(area * area_scale)
 
         attenuation = 10 # [dB/km] Note: very humidity- & frequency-dependent # FIXME
         h2o_loss = -attenuation * distance / 1000 # this is loss through attenuation, not distance effect

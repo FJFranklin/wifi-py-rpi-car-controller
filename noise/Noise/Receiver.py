@@ -60,19 +60,38 @@ class Receiver(object):
             print("Sources (total): " + str(len(self.sources)) + '; views dropped (this iteration): ' + str(dropped))
 
     def calc(self):
+        totals = { }
         total = 0
 
         if self.sources is None:
             print('You need to search() before you can calc()')
-            return total
+            return totals
 
         for s in self.sources:
+            label = s.region.target.props['material'].label()
+
+            if label in totals:
+                l_tot = totals[label]
+            else:
+                l_tot = 0
+
             dB = s.dB_calc()
+            dB_pow = np.power(10, dB / 10)
             # print('  dB: ' + str(dB))
-            total += np.power(10, dB / 10)
+            total += dB_pow
+            l_tot += dB_pow
+
+            totals[label] = l_tot
 
         if total > 0:
             total = 10 * np.log10(total)
             print('Total: '+str(total)+' dB')
 
-        return total
+            for t in totals:
+                subtotal = 10 * np.log10(totals[t])
+                totals[t] = subtotal
+                print(' - '+t+': '+str(subtotal)+' dB')
+
+            totals['total'] = total
+
+        return totals
