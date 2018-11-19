@@ -6,6 +6,15 @@ import numpy as np
 from Noise.Space import Space
 from Noise.Material import Material
 
+hvac = Material((0,0,1,1))
+hvac.make_source(0,60)
+
+wheel = Material((0.75,0.75,0.75,1))
+wheel.make_source(0,60)
+
+rail = Material((0.25,0.25,0.25,1))
+rail.make_source(0,60)
+
 # Make the scene
 
 S = Space()
@@ -17,10 +26,8 @@ case = 1
 if case == 1:
     B = S.offset([0,-30,0])
 
-    S.add_box(B.offset([0,44.5,-1]), (100,9), 1, Material.concrete())
-
-    S.add_box(B.offset([0,45,   1]), (100,3), 3, Material.source())
-    S.add_box(B.offset([0,40.5, 0]), (100,1), 4, Material.barrier(), (Material.diffzone(), [0,0,0,1]))
+    S.add_box(B.offset([ 0,44.5,-1]), (100,9), 1, Material.concrete())
+    S.add_box(B.offset([20,40.5, 0]), ( 60,1), 4, Material.barrier(), (Material.diffzone(), [0,0,0,1]))
 
     S.add_box(B.offset([  0,  0,0]), (40,40), 1, Material.concrete())
 
@@ -36,8 +43,24 @@ if case == 1:
 
     S.add_box(B.rotate_k(-30,[0,0,1]), (20,20), 40, Material.brick(), (Material.diffzone(), [1,1,0,1]))
 
+    V = B.offset([-20,46,0])
+    S.add_box(V.offset([ 0,   0,    1    ]), (20,   3   ), 3,    Material.glass())
+    S.add_box(V.offset([ 0,   0,    4    ]), ( 2,   2   ), 0.25, hvac)
+    S.add_box(V.offset([-8,  -0.75, 0    ]), ( 4,   0.25), 0.25, rail)
+    S.add_box(V.offset([-8,   0.75, 0    ]), ( 4,   0.25), 0.25, rail)
+    S.add_box(V.offset([ 8,  -0.75, 0    ]), ( 4,   0.25), 0.25, rail)
+    S.add_box(V.offset([ 8,   0.75, 0    ]), ( 4,   0.25), 0.25, rail)
+    S.add_box(V.offset([-9.5,-0.75, 0.25 ]), ( 0.75,0.25), 0.75, wheel)
+    S.add_box(V.offset([-6.5,-0.75, 0.25 ]), ( 0.75,0.25), 0.75, wheel)
+    S.add_box(V.offset([-9.5, 0.75, 0.25 ]), ( 0.75,0.25), 0.75, wheel)
+    S.add_box(V.offset([-6.5, 0.75, 0.25 ]), ( 0.75,0.25), 0.75, wheel)
+    S.add_box(V.offset([ 9.5,-0.75, 0.25 ]), ( 0.75,0.25), 0.75, wheel)
+    S.add_box(V.offset([ 6.5,-0.75, 0.25 ]), ( 0.75,0.25), 0.75, wheel)
+    S.add_box(V.offset([ 9.5, 0.75, 0.25 ]), ( 0.75,0.25), 0.75, wheel)
+    S.add_box(V.offset([ 6.5, 0.75, 0.25 ]), ( 0.75,0.25), 0.75, wheel)
+
     # Add a receiver
-    l_ear, r_ear = S.make_receiver(B.rotate_k(90, [-20,30,5]), 2)
+    l_ear, r_ear = S.make_receiver(B.rotate_k(90, [-20,30,2]), 2)
 
 elif case == 2:
     S.add_box(S.offset([0,0,-1]), (100,100), 1, Material.concrete())

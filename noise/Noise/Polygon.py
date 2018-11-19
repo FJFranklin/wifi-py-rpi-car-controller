@@ -61,6 +61,18 @@ class Polygon(object):
     def center(self):
         return self.plane.coordinate(np.mean(self.verts, axis=0))
 
+    def area(self):
+        area = 0
+        xy_0 = np.mean(self.verts, axis=0)
+        for i1 in range(0,self.count):
+            i2 = i1 + 1
+            if i2 == self.count:
+                i2 = 0
+            v1 = self.verts[i1,:] - xy_0
+            v2 = self.verts[i2,:] - xy_0
+            area += v1[0] * v2[1] - v1[1] * v2[0]
+        return area / 2
+
     def set_vertex(self, index, xy):
         x, y = xy
         self.verts[index,:] = [x, y]

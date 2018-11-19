@@ -67,6 +67,12 @@ class Receiver(object):
             return total
 
         for s in self.sources:
-            None # distance, area, amplitude, absorption = s.calc() # TODO: add props to Space.add_box(,,,props,dz=None)
+            dB = s.dB_calc()
+            # print('  dB: ' + str(dB))
+            total += np.power(10, dB / 10)
+
+        if total > 0:
+            total = 10 * np.log10(total)
+            print('Total: '+str(total)+' dB')
 
         return total

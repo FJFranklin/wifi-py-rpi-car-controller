@@ -15,7 +15,7 @@ class Material(object):
     def source():
         if Material.__source is None:
             Material.__source = Material((0,1,0,0.5))
-            Material.__source.make_source(0) # reflection; no absorption
+            Material.__source.make_source(0, 10) # pure reflection; amplitude 10dB at 10m
         return Material.__source
 
     @staticmethod
@@ -116,18 +116,23 @@ class Material(object):
     def is_source(self):
         return self._source
 
-    def make_source(self, absorption):     # 1 = total absorption
+    def make_source(self, absorption, amplitude): # 1 = total absorption; amplitude reference dB at 10m
         self._source = True
+        self._amplitude = amplitude
         self._reflective = True
         self._refractive = False
         self._absorption = absorption
         self._illustrative = False
+
+    def amplitude(self): # amplitude reference dB at 10m
+        return self._amplitude
 
     def is_reflective(self):
         return self._reflective
 
     def make_reflective(self, absorption): # 1 = total absorption
         self._source = False
+        self._amplitude = 0
         self._reflective = True
         self._refractive = False
         self._absorption = absorption
@@ -138,6 +143,7 @@ class Material(object):
 
     def make_refractive(self, absorption): # where absorption=(transmitted,refracted)
         self._source = False
+        self._amplitude = 0
         self._reflective = False
         self._refractive = True
         self._absorption = absorption
@@ -148,6 +154,7 @@ class Material(object):
 
     def make_illustrative(self):
         self._source = False
+        self._amplitude = 0
         self._reflective = False
         self._refractive = False
         self._absorption = 0

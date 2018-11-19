@@ -251,3 +251,46 @@ class View(object):
                 space.add_poly(poly)
 
             v = v.parent
+
+    def dB_calc(self):
+        material = self.region.target.props['material']
+
+        amplitude = material.amplitude() # reference: dB at 10m, based on 1m2 visible source
+        dist_ref = 10 # reference distance = 10m
+
+        area = self.region.target.area()
+        area_loss = 10 * np.log10(area)
+
+        absorption = self.region.window.props['absorption'] # very unscientific scaling (??) # FIXME
+        if 1 - absorption < 1E-6:
+            return 0
+        surf_loss  = 10 * np.log10(1 - absorption)
+
+        # distance:
+        distance = 0
+        center = self.region.target.center()
+        i3D = np.asarray([center])
+        count = 1
+
+        v = self
+        while v:
+            v3D = i3D
+            i3D = v.region.window.intersections_3D(v.region.origin, v3D, count)
+
+            distance += np.linalg.norm(v3D[0,:] - i3D[0,:])
+
+            v = v.parent
+
+        attenuation = 10 # [dB/km] Note: very humidity- & frequency-dependent # FIXME
+        h2o_loss = -attenuation * distance / 1000 # this is loss through attenuation, not distance effect
+
+        # distance effect
+        dist_loss = -20 * np.abs(np.log10(dist_ref / distance))
+
+        #print(str(amplitude)+' (amp) ' +
+        #      str(area_loss)+' (area) '+
+        #      str(surf_loss)+' (surf) '+
+        #      str( h2o_loss)+' (H2O) ' +
+        #      str(dist_loss)+' (dist) [dist='+str(distance)+'; area='+str(area)+']')
+
+        return amplitude + area_loss + surf_loss + h2o_loss + dist_loss
