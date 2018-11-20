@@ -89,8 +89,11 @@ class Receiver(object):
 
             for t in totals:
                 subtotal = 10 * np.log10(totals[t])
-                totals[t] = subtotal
                 print(' - '+t+': '+str(subtotal)+' dB')
+                if subtotal < 0:
+                    print('* * * Error: Negative Sound Level * * *')
+                    subtotal = 0
+                totals[t] = subtotal
 
             totals['total'] = total
 
