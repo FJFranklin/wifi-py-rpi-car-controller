@@ -211,17 +211,18 @@ classdef RTSim < handle
             t_ms = floor (1000 * (cputime - obj.timeStart));
         end
         function set_wheel_speeds (obj, left, right)
-            if (left < -127)
-                left = -127;
-            elseif (left > 127)
-                left = 127;
+            limit = 127; % ~~~~ This is the line to change the maximum speed of the robot ~~~~
+            if (left < -limit)
+                left = -limit;
+            elseif (left > limit)
+                left = limit;
             else
                 left = round (left);
             end
-            if (right < -127)
-                right = -127;
-            elseif (right > 127)
-                right = 127;
+            if (right < -limit)
+                right = -limit;
+            elseif (right > limit)
+                right = limit;
             else
                 right = round (right);
             end

@@ -13,9 +13,14 @@ class RTRobot(RTSim):
     def setup(self):
         # setup() is called once at the beginning
 
-        # This is the Python version of the MEC3014 Courswork 'Matlab Robot':
-        # Replace the number in the following line with your Student ID
-        self.reset_barriers(160000000)
+        # This is the Python version of the MEC3014/8043 Courswork 'Matlab Robot':
+        # Uncomment the following line and replace the number with your Student ID
+        # self.reset_barriers(160000000)
+
+        # You can randomise start & end locations respectively by uncommenting these:
+        # self.new_position()
+        # self.new_target()
+
         self.target = self.get_target()       # where we're trying to get to
 
         # For example:

@@ -19,8 +19,13 @@ classdef RTRobot < RTSim
             % setup() is called once at the beginning
 
             % This is the Matlab version of the MEC3014 Courswork 'Matlab Robot':
-            % Replace the number in the following line with your Student ID
-            obj.reset_barriers (160000000);
+            % Uncomment the following line and replace the number with your Student ID
+            % obj.reset_barriers (160000000);
+
+            % You can randomise start & end locations respectively by uncommenting these:
+            % obj.new_position ();
+            % obj.new_target ();
+
             obj.target = obj.get_target ();       % where we are trying to get to
 
             % For example:

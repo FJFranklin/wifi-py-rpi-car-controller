@@ -44,6 +44,8 @@ The methods available for controlling the robot are:
 
 ### `obj.reset_barriers (seed);`
 Generate map for seed (any positive integer) with random initial and target positions; use this in `setup()`.
+### `obj.new_position ();`
+Sets a random initial position; use this in `setup()`.
 ### `target = obj.new_target ();`
 Sets (and returns) a random target to aim for; use this in `setup()`.
 ### `target = obj.get_target ();`
@@ -78,8 +80,8 @@ os.chdir('H:\\Python')
 
 As with the Arduino, `setup()` runs once at the beginning, and then `loop()` is run repeatedly (until the robot reaches its destination). To start the simulation, just type the following in the Python command window:
 ```python
-import RTRobot
-RTRobot.RTRobot(30)
+from RTRobot import RTRobot
+RTRobot(30)
 ```
 where the ’30’ (or whatever) is how long you want the simulation to last.
 
@@ -87,6 +89,8 @@ The methods available for controlling the robot are:
 
 ### `self.reset_barriers(seed)`
 Generate map for seed (any positive integer) with random initial and target positions; use this in `setup()`.
+### `self.new_position()`
+Sets a random initial position; use this in `setup()`.
 ### `target = self.new_target()`
 Sets (and returns) a random target to aim for; use this in `setup()`.
 ### `target = self.get_target()`

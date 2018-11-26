@@ -155,7 +155,6 @@ elif case == 3:
         S.add_box(S.offset([0,5,0]), ((r-6,angles),4), 7.5, Material.concrete(), (Material.diffzone(), [1,1,0,1]))
         S.add_box(S.offset([0,5,0]), ((r-2,angles),4), 5, Material.concrete())
 
-    if True:
         # Ring 4
         r = 160
         theta_45 = 45 - (6 / (r - 8) * 180 / np.pi) / 2
