@@ -6,8 +6,19 @@
 #include "comms.hh"
 #include "util.hh"
 
-#include <EEPROM.h>
+#ifdef ENABLE_CHANNEL_1_BLE
+#include "Adafruit_BluefruitLE_SPI.h"
 
+#define BLUEFRUIT_SPI_CS               8
+#define BLUEFRUIT_SPI_IRQ              7
+#define BLUEFRUIT_SPI_RST              4
+
+#define BLE_BUFSIZE                 1024
+#endif
+
+#ifndef ARDUINO_SAMD_ZERO
+#include <EEPROM.h>
+#endif
 Channel * channels[CHANNEL_COUNT];
 
 uint8_t local_address;     // Get from EEPROM; shuold be unique & in range 0x01-0x7e
@@ -328,6 +339,218 @@ public:
   }
 };
 
+#ifdef ENABLE_CHANNEL_1_BLE
+
+static Adafruit_BluefruitLE_SPI s_ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
+
+static bool s_ble_connected = false;
+
+static bool s_ble_check (Adafruit_BluefruitLE_SPI & ble) {
+  if (s_ble_connected) {
+    if (!ble.isConnected ()) { // we've lost the connection
+      s_ble_connected = false;
+
+      ble.sendCommandCheckOK ("AT+HWModeLED=MODE");
+    }
+  } else {
+    if (ble.isConnected ()) { // we've just established a connection
+      s_ble_connected = true;
+
+      ble.sendCommandCheckOK ("AT+HWModeLED=DISABLE");
+    }
+  }
+  return s_ble_connected;
+}
+
+class BLEWriter : public Writer {
+private:
+  Adafruit_BluefruitLE_SPI & m_ble;
+
+public:
+  BLEWriter (Adafruit_BluefruitLE_SPI & ble, uint8_t channel_number) :
+    Writer(channel_number),
+    m_ble(ble)
+  {
+    // ...
+  }
+
+  ~BLEWriter () {
+    // ...
+  }
+
+  virtual int available () {
+    int count = 0;
+
+    if (s_ble_check (m_ble)) {
+      m_ble.println ("AT+BLEUARTFIFO=TX");
+
+      long bytes = m_ble.readline_parseInt ();
+
+      if (bytes > 200) // limit single transaction length // AT commands limited to 240 bytes?? - check
+	count = 200;
+      else if (bytes > 0)
+	count = (int) bytes - 1;
+    }
+    return count;
+  }
+
+  virtual int write (uint8_t * buffer, int length) {
+    if (!buffer || (length < 1)) return -1; // error
+
+    int nbytes = available ();
+
+    uint8_t * ptr = buffer;
+
+    if (nbytes > 1) {
+      m_ble.print ("AT+BLEUARTTX=");
+
+      while (length && (nbytes > 1)) {
+	if (*ptr == '\n') {
+	  --length;
+	  ++ptr;
+	  continue;
+	}
+	if (*ptr == '\r') {
+	  m_ble.print ('\\');
+	  m_ble.print ('n');
+	  --nbytes;
+	} else {
+	  m_ble.write (*ptr);
+	}
+	--nbytes;
+	--length;
+	++ptr;
+      }
+      m_ble.println ();
+    }
+    return ptr - buffer;
+  }
+};
+
+class BLEReader : public Reader {
+private:
+  char m_buffer[BLE_BUFSIZE];
+
+  Message m_input;
+
+  Adafruit_BluefruitLE_SPI & m_ble;
+
+public:
+  BLEReader (Adafruit_BluefruitLE_SPI & ble, uint8_t channel_number) :
+    Reader(channel_number),
+    m_input(0,0,Message::Text_Command), // Message addresses & type to be fixed later
+    m_ble(ble)
+  {
+    // ...
+  }
+
+  ~BLEReader () {
+    // ...
+  }
+private:
+  void push_encoded (uint8_t c) {
+    //    Serial.write (c);
+    if (m_input.decode (c) == Message::cobs_HavePacket) { // we have a valid response
+      s_net.message_received (m_channel_number, m_input);
+
+      m_input.clear ();
+    }
+  }
+  void push_console (uint8_t c) {
+    if (c == 0) { // looks like an encoded stream
+      // error
+      m_input.clear ();
+    } else if ((c == 10) || (c == 13)) { // newline || carriage return
+      if (strcmp (m_input.c_str (), "OK") == 0) {
+	m_input.clear ();
+      } else if (m_input.get_length ()) {
+	m_input.set_address_src (input_default);
+	m_input.set_address_dest (local_address);
+	m_input.set_type (Message::Text_Command);
+
+	s_net.message_received (m_channel_number, m_input);
+
+	m_input.clear ();
+      }
+    } else if ((c >= 32) && (c < 127)) {
+      if (m_input.get_length () < MESSAGE_MAXSIZE) { // otherwise just ignore
+	m_input += c;
+      }
+    }
+  }
+  void send_raw () {
+    m_input.set_address_src (input_default);
+    m_input.set_address_dest (local_address);
+    m_input.set_type (Message::Raw_Data);
+
+    if (m_handler) {
+      m_handler->message_received (m_input);
+    }
+    m_input.clear ();
+  }
+  void push_raw (uint8_t c) {
+    m_input += c;
+
+    if (m_input.get_length () == MESSAGE_MAXSIZE) {
+      send_raw ();
+    }
+  }
+  int get_bytes () {
+    int count = 0;
+
+    if (s_ble_check (m_ble)) {
+      m_ble.println ("AT+BLEUARTFIFO=RX");
+
+      long bytes = m_ble.readline_parseInt ();
+
+      if (bytes > 1023) // limit is 1024
+	count = 0;
+      else {
+	count = 1023 - (int) bytes;
+      }
+    }
+    if (count) {
+      m_ble.println ("AT+BLEUARTRX");
+
+      count = m_ble.readline (m_buffer, BLE_BUFSIZE - 1, true);
+      m_buffer[count] = 0;
+
+      if (strcmp (m_buffer, "OK")) {
+	m_ble.waitForOK ();
+      } else {
+	count = 0;
+	m_buffer[0] = 0;
+      }
+    }
+    return count;
+  }
+public:
+  virtual void update () {
+    while (get_bytes ()) {
+      const char * ptr = m_buffer;
+
+      while (*ptr) {
+	uint8_t c = *ptr++;
+
+	if (encoded ()) {
+	  push_encoded (c);
+	} else if (console ()) {
+	  push_console (c);
+	} else {
+	  push_raw (c);
+	}
+      }
+    }
+    if (!encoded () && !console ()) { // for raw data, send everything we've got
+      if (m_input.get_length ()) {        // if we have anything, that is
+	send_raw ();
+      }
+    }
+  }
+};
+
+#endif /* ENABLE_CHANNEL_1_BLE */
+
 #ifdef ENABLE_CHANNEL_0
 static SerialWriter SW_0(Serial,0);
 static SerialReader SR_0(Serial,0);
@@ -364,16 +587,29 @@ static SerialReader SR_6(Serial6,6);
 static Channel s_channel_6(&SW_6, &SR_6);
 #endif
 
+#ifdef ENABLE_CHANNEL_1_BLE
+static BLEWriter BW_1(s_ble, 1);
+static BLEReader BR_1(s_ble, 1);
+static Channel s_channel_1(&BW_1, &BR_1);
+#endif
+
 void set_local_address (uint8_t address) { // Program a new address in EEPROM; use with caution
+#ifndef ARDUINO_SAMD_ZERO
   if ((address > 0) && (address < 0x7f)) {
     EEPROM.write (0, address);
   }
   local_address = EEPROM.read (0);
+#else
+  local_address = address;
+#endif
 }
 
 void Channel::init_all () {
+#ifndef ARDUINO_SAMD_ZERO
   local_address = EEPROM.read (0);
-
+#else
+  local_address = *((volatile uint8_t *) 0x0080A040);
+#endif
   if ((local_address == 0) || (local_address >= 0x7f)) { // oops - not set properly?
     local_address = 0x7f;
   }
@@ -411,6 +647,12 @@ void Channel::init_all () {
 #ifdef ENABLE_CHANNEL_6
   channels[6] = &s_channel_6;
   Serial6.begin (CHANNEL_6_BAUD);
+#endif
+
+#ifdef ENABLE_CHANNEL_1_BLE
+  if (s_ble.begin ()) {
+    channels[1] = &s_channel_1;
+  }
 #endif
 }
 

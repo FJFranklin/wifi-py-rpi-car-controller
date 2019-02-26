@@ -18,6 +18,9 @@ static const char s_hello[] PROGMEM = "This is a simple 'hello' program. Just sa
 #define LOOPTIME_100ms (1<<2)
 #define LOOPTIME_1s    (1<<3)
 
+#ifdef PM
+#undef PM
+#endif
 PinManager * PM = 0;
 
 unsigned long last_millis;
@@ -132,10 +135,20 @@ void setup () {
 
   last_millis = millis ();
 
-  if (channels[1]) channels[1]->set_encoded (true); // Add serials 1-4 to the network
-  if (channels[2]) channels[2]->set_encoded (true);
-  if (channels[3]) channels[3]->set_encoded (true);
-  if (channels[4]) channels[4]->set_encoded (true);
+  /* Channels default to non-encoded console. Change them to serial network.
+   */
+#ifndef ENABLE_CHANNEL_1_BLE
+  if (channels[1]) {
+    channels[1]->set_console (false);
+    channels[1]->set_encoded (true);
+  }
+#endif
+  for (int c = 2; c < CHANNEL_COUNT; c++) {
+    if (channels[c]) {
+      channels[c]->set_console (false);
+      channels[c]->set_encoded (true);
+    }
+  }
 }
 
 void notification (int pin_no, bool bDigital) { // passes pin no. & clears notification

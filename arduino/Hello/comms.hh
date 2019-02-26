@@ -11,8 +11,15 @@
 #include "message.hh"
 
 #define ENABLE_CHANNEL_0 // for Serial or, equivalently, SerialUSB
-#define ENABLE_CHANNEL_1
+
+#ifdef ADAFRUIT_FEATHER_M0
+/* Assume (for now) we have the bluetooth version of the feather:
+ */
+#define ENABLE_CHANNEL_1_BLE
+#endif /* ADAFRUIT_FEATHER_M0 */
+
 #ifdef CORE_TEENSY
+#define ENABLE_CHANNEL_1
 #define ENABLE_CHANNEL_2
 #define ENABLE_CHANNEL_3
 // #define ENABLE_CHANNEL_4 // Not available for Teensy 3.2
