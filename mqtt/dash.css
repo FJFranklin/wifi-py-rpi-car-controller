@@ -1,0 +1,97 @@
+rect.gauge {
+    fill: #111;
+}
+g.dial rect {
+    fill: white;
+}
+g.dial rect.dial_needle {
+    fill: red;
+}
+circle.dial_pivot {
+    fill: black;
+    stroke: red;
+}
+text.label {
+    fill: white;
+    font-size: 24px;
+}
+
+text {
+    font-size: 18px;
+}
+.name {
+    font-weight: bold;
+    fill: blue;
+}
+.value {
+    fill: white;
+}
+#stick {
+    margin-left: auto;
+    margin-right: auto;
+    display: block;
+}
+body {
+    background-color: black;
+}
+#power_opt_background {
+    fill: black;
+    stroke: red;
+    stroke-width: 4;
+}
+rect.power_opt_button {
+    fill: red;
+    stroke: yellow;
+}
+text.power_opt_button {
+    fill: black;
+    font-size: 30px;
+    font-weight: bold;
+}
+#power_button {
+    fill: black;
+    stroke: red;
+    stroke-width: 4;
+}
+#power_arc {
+    fill: black;
+    stroke: yellow;
+    stroke-width: 4;
+}
+#power_line {
+    fill: yellow;
+    stroke: black;
+    stroke-width: 4;
+}
+#background {
+    fill: black;
+    stroke: yellow;
+    stroke-width: 8;
+}
+#foreground {
+    fill: black;
+    fill-opacity: 0.01;
+}
+#circle_red {
+    fill: none;
+    stroke: red;
+    stroke-width: 4;
+}
+#circle_blue {
+    fill: #aaa;
+    stroke: blue;
+    stroke-width: 4;
+}
+.decoration {
+    stroke: white;
+    stroke-width: 2;
+}
+.nq_good {
+    fill: white;
+}
+.nq_none {
+    fill: #111;
+}
+.nq_bad {
+    fill: red;
+}

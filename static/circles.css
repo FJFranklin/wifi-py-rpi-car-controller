@@ -1,0 +1,57 @@
+text {
+    font-size: 35;
+}
+.name {
+    font-weight: bold;
+    fill: blue;
+}
+.value {
+    fill: white;
+}
+#stick {
+    margin-left: auto;
+    margin-right: auto;
+    display: block;
+}
+body {
+    background-color: black;
+}
+#background {
+    fill: black;
+    stroke: yellow;
+    stroke-width: 8;
+}
+#foreground {
+    fill: black;
+    fill-opacity: 0.01;
+}
+#circle_red {
+    fill: none;
+    stroke: red;
+    stroke-width: 4;
+}
+#circle_blue {
+    fill: #aaa;
+    stroke: blue;
+    stroke-width: 4;
+}
+.decoration {
+    stroke: white;
+    stroke-width: 2;
+}
+.gauge {
+    fill: #111;
+}
+.pivot {
+    fill: black;
+    stroke: red;
+}
+.nq_good {
+    fill: white;
+}
+.nq_none {
+    fill: #111;
+}
+.nq_bad {
+    fill: red;
+}

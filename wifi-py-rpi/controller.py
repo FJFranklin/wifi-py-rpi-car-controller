@@ -1,7 +1,7 @@
 import paho.mqtt.client as mqtt
 import sys
 
-mqtt_server_host = "127.0.0.1"
+mqtt_server_host = "192.168.99.234"
 mqtt_server_port = 1883
 
 addr_sys_exit = "/wifi-py-rpi-car-controller/system/exit"

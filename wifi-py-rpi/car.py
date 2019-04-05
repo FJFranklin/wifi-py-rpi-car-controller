@@ -5,7 +5,7 @@ import ticktock
 # MQTT constants
 
 # local implementation dependent
-mqtt_server_host = "127.0.0.1"
+mqtt_server_host = "192.168.99.234"
 # default port for MQTT
 mqtt_server_port = 1883
 
@@ -55,8 +55,8 @@ class car_controller (object):
 
 # MQTT callbacks
 
-def on_connect (client, car, flags, rc):
-    print ("MQTT: on_connect: response code = " + str (rc) + ", flags = " + str (flags))
+def on_connect (client, car, rc):
+    print ("MQTT: on_connect: response code = " + str (rc))
     client.subscribe (addr_sys_exit)
     client.subscribe (addr_dash_xy)
 

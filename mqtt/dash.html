@@ -1,0 +1,62 @@
+<!doctype html>
+<html>
+  <head>
+    <title>wifi-py-rpi-car-controller: Dash</title>
+    <link rel="stylesheet" type="text/css" href="dash.css" />
+    <script type="text/javascript" src="paho/mqttws31.js"></script>
+    <script type="text/javascript" src="svg.js"></script>
+    <script type="text/javascript" src="dash.js"></script>
+  </head>
+  <body ondragstart="return false;" ondrop="return false;">
+    <svg id="stick" width="800" height="800">
+      <!-- background --->
+      <rect id="background" x="0" y="0" width="100%" height="100%" rx="50" ry="50" />
+
+      <!-- user input zone --->
+      <g id="control" transform="matrix(1,0,0,-1,500,500)">
+        <rect id="input_zone" class="decoration" x="-250" y="-250" width="500" height="500" />
+        <line id="x_axis"     class="decoration" x1="-250" x2="250" y1="0" y2="0" />
+        <line id="y_axis"     class="decoration" y1="-250" y2="250" x1="0" x2="0" />
+
+        <circle id="circle_red"  cx="0"  cy="0"  r="60" />
+        <circle id="circle_blue" cx="50" cy="50" r="40" />
+
+        <!-- Finally: Add a transparent overlay to simplfy event handling --->
+        <rect id="foreground" x="-250" y="-250" width="500" height="500" />
+      </g>
+
+      <!-- feedback zone --->
+      <g id="g1_main" transform="matrix(1,0,0,1,50,50)">
+	<rect id="g1_gauge" class="gauge" x="0"  y="0" width="200" height="100" />
+	<text               class="name"  x="20" y="30">X:</text>
+	<text id="value_x"  class="value" x="60" y="30">+0</text>
+	<text               class="name"  x="20" y="60">Y:</text>
+	<text id="value_y"  class="value" x="60" y="60">+0</text>
+	<text               class="name"  x="20" y="90">Host:</text>
+	<text id="val_host" class="value" x="90" y="90">0.0.0.0</text>
+	<text               class="name"  x="20" y="120">Port:</text>
+	<text id="val_port" class="value" x="90" y="120">0</text>
+	<text               class="name"  x="20" y="150">MQTT:</text>
+	<text id="val_mqtt" class="value" x="90" y="150">...</text>
+      </g>
+      <g id="g2_main" transform="matrix(1,0,0,1,50,200)">
+	<rect id="g2_gauge" class="gauge" x="0" y="0" width="200" height="100" />
+      </g>
+
+      <g transform="matrix(0.8,0,0,-0.8,38,38)">
+	<circle onclick="power()" id="power_button" cx="0" cy="0" r="45" />
+	<circle onclick="power()" id="power_arc" cx="0" cy="0" r="25" />
+	<rect   onclick="power()" id="power_line" x="-4" y="0" width="8" height="35" />
+      </g>
+      <g id="power_options">
+	<rect id="power_opt_background" x="20" y="100" width="400" height="100" />
+	<rect class="power_opt_button"  x="30" y="110" width="380" height="35" onclick="power_car()" />
+	<rect class="power_opt_button"  x="30" y="155" width="380" height="35" onclick="power_controller()" />
+	<text class="power_opt_button"  x="40" y="140" onclick="power_car()">STOP CAR</text>
+	<text class="power_opt_button"  x="40" y="185" onclick="power_controller()">STOP CONTROLLER</text>
+      </g>
+
+    </svg>
+    <p style="display:none;"><a href="/">Return to main page.</a></p>
+  </body>
+</html>
