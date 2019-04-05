@@ -364,6 +364,8 @@ function get_started () {
     fg.addEventListener ("touchend",    e_t_end,    false);
     fg.addEventListener ("touchmove",   e_t_move,   false);
 
+    window.addEventListener ('touchmove', function (event) { event.preventDefault () }, false);
+
     /* finish creating the web interface ...
      */
     power ();
