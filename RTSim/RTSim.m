@@ -50,6 +50,10 @@ classdef RTSim < handle
         barriers     % list of rectangles making barriers
         target       % where to aim for to complete the course
         sim_fig      % the plotting window
+        watch_place  % x-coordinates for gap-pass
+        watch_timer  % note times at gaps & end
+        barrier_no   % seed used to generate barrier
+        trial_type   % start-end trial type
     end
     methods (Abstract)
         setup (obj)
@@ -57,22 +61,56 @@ classdef RTSim < handle
         ping_receive (obj, range_to_target)
     end
     methods
-        function obj = RTSim (seconds)
-            obj.barriers = [
-                -5.05, -5.00,  0.05, 10;
-                -5.00,  5.00, 10,     0.05;
-                -5.00, -5.05, 10,     0.05;
-                 5.00, -5.00,  0.05, 10;
-                -3.00, -3.00,  0.05,  8;
-                 2.95, -5.00,  0.05,  8;
-                -1.00, -0.10,  2.00,  0.2
-                ];
-            obj.sim_fig = figure(1);
-
-            obj.timeStart = cputime;
-            obj.timeCurrent = 0;
+        function obj = RTSim (seconds, test_name, id_number)
+            obj.barrier_no = id_number;
+            obj.trial_type = test_name;
 
             obj.position = zeros (2, 3);
+
+            obj.watch_place = [-2.75, 3.20];
+            obj.watch_timer = [0, 0, 0];
+
+            disp(obj.trial_type)
+            if strcmp(obj.trial_type, 'default')
+                obj.barriers = [
+                    -5.05, -5.00,  0.05, 10;
+                    -5.00,  5.00, 10,     0.05;
+                    -5.00, -5.05, 10,     0.05;
+                     5.00, -5.00,  0.05, 10;
+                    -3.00, -3.00,  0.05,  8;
+                     2.95, -5.00,  0.05,  8;
+                    -1.00, -0.10,  2.00,  0.2
+                    ];
+                % Start in the top-left, facing up
+                obj.position(1,3)   = 0;
+                obj.position(1,1:2) = [-4.5, 4.5];
+                obj.target          = [ 4.5,-4.5];
+            elseif strcmp(obj.trial_type, 'random')
+                obj.reset_barriers(cputime)
+                par = rand (1, 5);
+                obj.position(1,3)   = 359 * par(3);
+                obj.position(1,1:2) = -4.75 + [0.5,9.5] .* par(1:2);
+                obj.target          =  4.75 - [0.5,9.5] .* par(4:5);
+            else
+                obj.reset_barriers(obj.barrier_no)
+                if strcmp(obj.trial_type, 'TNT') % Top-North-Top
+                    obj.position(1,3)   = 0;
+                    obj.position(1,1:2) = [-4.5, 4.5];
+                    obj.target          = [ 4.5, 4.5];
+                elseif strcmp(obj.trial_type, 'CWC') % Center-West-Center
+                    obj.position(1,3)   = 270;
+                    obj.position(1,1:2) = [-4.5, 0];
+                    obj.target          = [ 4.5, 0];
+                else % if strcmp(obj.trial_type, 'BSB') % Bottom-South-Bottom
+                    obj.position(1,3)   = 180;
+                    obj.position(1,1:2) = [-4.5,-4.5];
+                    obj.target          = [ 4.5,-4.5];
+                end
+            end
+            obj.update_position ();
+
+            obj.sim_fig = figure(1);
+
             obj.speed = zeros (3, 2);
             obj.pingTime = -100 * ones (1, 2);
             obj.pingAngle = zeros (1, 3);
@@ -81,19 +119,18 @@ classdef RTSim < handle
             obj.posPoints = zeros (100, 2);
             obj.posCount = 0;
 
-            obj.target = [4.5, -4.5];
-
             lastMicros = 0;
             lastMillis = 0;
             lastSecond = 0;
             count_ms = 0;
             count_20 = 0;
 
-            % Start in the top-left
-            obj.position(1,1:2) = [-4.5,4.5];
-            obj.position(2,1:2) = obj.position(1,1:2);
+            obj.timeStart = cputime;
+            obj.timeCurrent = 0;
 
-            obj.update_figure ();
+            if ishandle (obj.sim_fig)
+                obj.update_figure ();
+            end
 
             obj.setup ();
 
@@ -106,7 +143,6 @@ classdef RTSim < handle
 
                 if (obj.pingTime(1) > obj.pingTime(2))
                     if (thisTime - obj.pingTime(1) > 0.04) % 40ms after send
-                        % disp(['pong, pingTime=',num2str(obj.pingTime(1)),', time=',num2str(thisTime)]);
                         obj.pingTime(2) = thisTime;
                         obj.ping_calculate ();
                     end
@@ -116,8 +152,28 @@ classdef RTSim < handle
                 if (lastMicros < thisMicros)
                     lastMicros = thisMicros;
                     obj.update_motion ();
+                    
+                    if obj.position(1,1) > obj.watch_place(1)
+                        if obj.watch_timer(1) == 0
+                            obj.watch_timer(1) = thisTime;
+                            disp(['Passed Gap 1 at ',num2str(thisTime),'s'])
+                        end
+                    end
+                    if obj.position(1,1) > obj.watch_place(2)
+                        if obj.watch_timer(2) == 0
+                            obj.watch_timer(2) = thisTime;
+                            disp(['Passed Gap 2 at ',num2str(thisTime),'s'])
+                        end
+                    end
                 end
 
+                if ishandle (obj.sim_fig)
+                    if ~ishandle (obj.sim_fig)
+                        disp('Oops! Early exit...')
+                        break
+                    end
+                end
+                
                 thisMillis = obj.millis ();
                 if (lastMillis < thisMillis)
                     count_ms = count_ms + (thisMillis - lastMillis);
@@ -134,7 +190,9 @@ classdef RTSim < handle
 
                         if (count_20 >= 25)
                             count_20 = count_20 - 25;
-                            obj.update_figure (); % update figure every 0.5s
+                            if ishandle (obj.sim_fig)
+                                obj.update_figure (); % update figure every 0.5s
+                            end
                         end
                     end
                 end
@@ -151,7 +209,21 @@ classdef RTSim < handle
             end
             if (norm (obj.position(1,1:2) - obj.target) <= 0.5)
                 disp(['Success! Course completed in ',num2str(obj.millis()/1000),'s'])
+                obj.watch_timer(3) = obj.millis()/1000;
             end
+        end
+        function [name,seed,trial,times] = get_result(obj, bNameFromCampusID)
+            if bNameFromCampusID
+                [~, name] = system("whoami");
+                name = split(name);
+                name = split(name{1},'\');
+                name = name{2};
+            else % name from directory
+                [~,name,~] = fileparts(pwd);
+            end
+            seed  = obj.barrier_no;
+            trial = obj.trial_type;
+            times = obj.watch_timer;
         end
         function pos = get_target (obj)
             pos = obj.target;
@@ -197,12 +269,7 @@ classdef RTSim < handle
                  b3x1,  b3y+0.05, 0.05,  2;
                  b3x1,  b3y,   (b3x2-b3x1),  0.2
                 ];
-            rng (cputime);
-            par = rand (1, 3);
-            obj.position(1,3) = 359 * par(3);
-            obj.position(1,2) = -4.5 + 9 * par(1);
-            obj.target(1,2)   = -4.5 + 9 * par(2);
-            obj.update_position ();
+            obj.watch_place = [b1x + 0.25, b2x + 0.25];
         end
         function t_us = micros (obj)
             t_us = floor (1000000 * (cputime - obj.timeStart));
@@ -351,8 +418,8 @@ classdef RTSim < handle
                 rectangle('Position',obj.barriers(c,:),'FaceColor',[0 .5 .5])
             end
             % the target
-            target = [obj.target(1,1:2)-0.3,0.6,0.6];
-            rectangle('Position',target,'Curvature',[1 1],'EdgeColor',[1 0.5 0.5])
+            tgt = [obj.target(1,1:2)-0.3,0.6,0.6];
+            rectangle('Position',tgt,'Curvature',[1 1],'EdgeColor',[1 0.5 0.5])
             % the robot
             bot = [obj.position(1,1:2)-0.2,0.4,0.4];
             rectangle('Position',bot,'Curvature',[1 1],'FaceColor',[1 0.5 0.5])
@@ -561,4 +628,3 @@ classdef RTSim < handle
     end
     
 end
-

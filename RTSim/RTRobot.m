@@ -12,20 +12,21 @@ classdef RTRobot < RTSim
     end
     
     methods
-        function obj = RTRobot (seconds)
-            obj@RTSim (seconds);
-        end
-        function setup (obj)
-            % setup() is called once at the beginning
-
+        function obj = RTRobot (seconds, test_name)
             % This is the Matlab version of the MEC3014 Courswork 'Matlab Robot':
-            % Uncomment the following line and replace the number with your Student ID
-            % obj.reset_barriers (160000000);
+            % In the following line, replace the number with your Student ID
+            id_number = 170000000;
 
-            % You can randomise start & end locations respectively by uncommenting these:
-            % obj.new_position ();
-            % obj.new_target ();
-
+            if (nargin() < 1) % default to 180s (3 minutes)
+                seconds = 180;
+            end
+            if (nargin() < 2) % default to simple layout
+                test_name = 'default';
+                % other options are: 'random', 'TNT', 'CWC' & 'BSB'
+            end
+            obj@RTSim (seconds, test_name, id_number);
+        end
+        function setup (obj) % setup() is called once at the beginning
             obj.target = obj.get_target ();       % where we are trying to get to
 
             % For example:
