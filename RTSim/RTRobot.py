@@ -10,7 +10,7 @@ class RTRobot(RTSim):
         # usage: RTRobot (seconds, test_name)
         # where test_name is one of 'default', 'random', 'TNT', 'CWC' or 'BSB'
 
-        # This is the Python version of the courswork 'Matlab Robot':
+        # This is the Python version of the coursework 'Matlab Robot':
         # In the following line, replace the number with your Student ID
         id_number = 170000000;
 
@@ -19,20 +19,13 @@ class RTRobot(RTSim):
     def setup(self):
         # setup() is called once at the beginning
 
-        # This is the Python version of the MEC3014/8043 Courswork 'Matlab Robot':
-        # Uncomment the following line and replace the number with your Student ID
-        # self.reset_barriers(160000000)
-
-        # You can randomise start & end locations respectively by uncommenting these:
-        # self.new_position()
-        # self.new_target()
-
         self.target = self.get_target()       # where we're trying to get to
 
         # For example:
         self.last_ping_time = 0               # see ping_receive()
         self.last_ping_distance = -1
 
+        # To work out which of the trials we're running:
         results_so_far = self.get_result()
         test_name = results_so_far['Trial']
         print('This trial is:', test_name)

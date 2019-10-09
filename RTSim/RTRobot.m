@@ -13,7 +13,7 @@ classdef RTRobot < RTSim
     
     methods
         function obj = RTRobot (seconds, test_name)
-            % This is the Matlab version of the MEC3014 Courswork 'Matlab Robot':
+            % This is the Matlab version of the coursework 'Matlab Robot':
             % In the following line, replace the number with your Student ID
             id_number = 170000000;
 
