@@ -6,9 +6,15 @@ class RTRobot(RTSim):
     https://github.com/FJFranklin/wifi-py-rpi-car-controller/tree/master/RTSim
     """
 
-    def __init__(self, seconds):
-        # usage: RTRobot (seconds)
-        RTSim.__init__(self, seconds)
+    def __init__(self, seconds=180, test_name='default'):
+        # usage: RTRobot (seconds, test_name)
+        # where test_name is one of 'default', 'random', 'TNT', 'CWC' or 'BSB'
+
+        # This is the Python version of the courswork 'Matlab Robot':
+        # In the following line, replace the number with your Student ID
+        id_number = 170000000;
+
+        RTSim.__init__(self, seconds, test_name, id_number)
 
     def setup(self):
         # setup() is called once at the beginning
@@ -26,6 +32,10 @@ class RTRobot(RTSim):
         # For example:
         self.last_ping_time = 0               # see ping_receive()
         self.last_ping_distance = -1
+
+        results_so_far = self.get_result()
+        test_name = results_so_far['Trial']
+        print('This trial is:', test_name)
 
     def loop(self):
         # loop() is called repeatedly
@@ -50,4 +60,19 @@ class RTRobot(RTSim):
         self.last_ping_distance = distance   # distance measured (-ve if no echo)
 
         if distance >= 0:                    # a -ve distance implies nothing seen
-            print('position=(', self.position[0], ',', self.position[1], '),orientation=', self.orientation, '; distance=', distance, sep='')
+            print('position=(', self.position[0], ',', self.position[1], '), orientation=', self.orientation, '; distance=', distance, sep='')
+
+if __name__ == "__main__":
+    # Option to run from command line
+
+    import argparse
+
+    parser = argparse.ArgumentParser(description="RTRobot Coursework - Guide a two-wheeled robot round the map.")
+
+    parser.add_argument('--duration', help='How many iterations to do [100].', default=180, type=int)
+    parser.add_argument('--trial',    help='Specify map type [default].',      default='default', choices=['default', 'random', 'TNT', 'CWC', 'BSB'])
+
+    args = parser.parse_args()
+
+    R = RTRobot(args.duration, args.trial)
+    print(R.get_result())

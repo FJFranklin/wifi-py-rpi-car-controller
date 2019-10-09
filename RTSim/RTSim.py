@@ -12,12 +12,20 @@ class RTSim(object):
 
     # Public Methods:
 
-    def __init__(self, seconds):
+    def __init__(self, seconds, test_name, id_number):
+        self.__result = {}
+        self.__result['ID']    = id_number
+        self.__result['Trial'] = test_name
+
+        self.__barrier_no = id_number
+        self.__trial_type = test_name
+
         self.__timeStart = None
         self.__timeCurrent = 0
 
         self.__position   = np.zeros((2, 3))
         self.__speed      = np.zeros((3, 2))
+        self.__target     = np.zeros(2)
 
         self.__pingTime   = np.ones((2)) * -100
         self.__pingAngle  = np.zeros((3))
@@ -32,23 +40,49 @@ class RTSim(object):
         self.__posCount   = 0
         self.__posMax     = 100
 
-        # Default barriers
-        self.__barriers = (
-            ( -5.05, -5.00,  0.05, 10    ),
-            ( -5.00,  5.00, 10,     0.05 ),
-            ( -5.00, -5.05, 10,     0.05 ),
-            (  5.00, -5.00,  0.05, 10    ),
-            ( -3.00, -3.00,  0.05,  8    ),
-            (  2.95, -5.00,  0.05,  8    ),
-            ( -1.00, -0.10,  2.00,  0.2  )
-        )
+        self.__watchGapX  = [-2.75, 3.20]
 
-        # Default start (top-left)
-        self.__position[0,0:2] = [-4.5, 4.5]
-        self.__position[1,0:2] = self.__position[0,0:2]
+        print(self.__trial_type)
+        if self.__trial_type == 'default':
+            # Default barriers
+            self.__barriers = (
+                ( -5.05, -5.00,  0.05, 10    ),
+                ( -5.00,  5.00, 10,     0.05 ),
+                ( -5.00, -5.05, 10,     0.05 ),
+                (  5.00, -5.00,  0.05, 10    ),
+                ( -3.00, -3.00,  0.05,  8    ),
+                (  2.95, -5.00,  0.05,  8    ),
+                ( -1.00, -0.10,  2.00,  0.2  )
+            )
+            # Default start (top-left), looking North
+            self.__position[0,0:2] = [-4.5, 4.5]
+            self.__position[0,2]   = 0
+            # Default end (bottom-right)
+            self.__target[0:2]     = [ 4.5,-4.5]
 
-        # Default end (bottom-right)
-        self.__target = np.asarray((4.5, -4.5))
+        elif self.__trial_type == 'random':
+            self.reset_barriers()
+            par = np.random.uniform(0,1,(4))
+            self.__position[0,2]   = float(np.random.randint(360))
+            self.__position[0,0:2] = -4.75 + [0.5,9.5] * par[0:2]
+            self.__target[0:2]     =  4.75 - [0.5,9.5] * par[2:4]
+
+        else:
+            self.reset_barriers(self.__barrier_no)
+            if self.__trial_type == 'TNT':      # Top-North-Top
+                self.__position[0,2]   = 0
+                self.__position[0,0:2] = [-4.5, 4.5]
+                self.__target[0:2]     = [ 4.5, 4.5]
+            elif self.__trial_type == 'CWC':    # Center-West-Center
+                self.__position[0,2]   = 270
+                self.__position[0,0:2] = [-4.5, 0]
+                self.__target[0:2]     = [ 4.5, 0]
+            else: # self.__trial_type == 'BSB': # Bottom-South-Bottom
+                self.__position[0,2]   = 180
+                self.__position[0,0:2] = [-4.5,-4.5]
+                self.__target[0:2]     = [ 4.5,-4.5]
+
+        self.__update_position()
 
         self.__create_figure()
         self.__update_figure()
@@ -77,6 +111,15 @@ class RTSim(object):
                 lastMicros = thisMicros
                 self.__update_motion()
 
+                if self.__position[0,0] > self.__watchGapX[0]:
+                    if 'Gap 1' not in self.__result:
+                        self.__result['Gap 1'] = thisTime
+                        print('Gap 1 passed @', thisTime)
+                if self.__position[0,0] > self.__watchGapX[1]:
+                    if 'Gap 2' not in self.__result:
+                        self.__result['Gap 2'] = thisTime
+                        print('Gap 2 passed @', thisTime)
+
             if self.__pingTime[0] > self.__pingTime[1]:
                 if thisTime - self.__pingTime[0] > 0.04: # % 40ms after send
                     self.__pingTime[1] = thisTime
@@ -97,7 +140,8 @@ class RTSim(object):
 
                     if count_20 >= 5:
                         count_20 = count_20 - 5
-                        self.__update_figure() # update figure every 0.1s
+                        if self.__fig is not None:
+                            self.__update_figure() # update figure every 0.1s
 
             if lastSecond < int(thisTime): # update measured position
                 lastSecond = int(thisTime)
@@ -113,7 +157,9 @@ class RTSim(object):
 
         # Check to see if we're here because the course completed:
         if LA.norm(self.__position[0,0:2] - self.__target) <= 0.5:
-            print('Success! Course completed in ', self.millis() / 1000, 's', sep='')
+            thisTime = self.millis() / 1000
+            print('Success! Course completed in ', thisTime, 's', sep='')
+            self.__result['Time'] = thisTime
 
     def get_target(self):
         return np.copy(self.__target)
@@ -132,9 +178,15 @@ class RTSim(object):
             self.__position[0,2] = 359 * par[2]
         self.__update_position()
 
-    def reset_barriers(self, seed):
-        # Reset random number generator from seed provided
-        np.random.seed(seed)
+    def reset_barriers(self, seed=None):
+        if seed is not None:
+            # Reset random number generator from seed provided
+            np.random.seed(seed)
+        else:
+            # Reset random number generator from system clock
+            t = datetime.datetime.now()
+            np.random.seed(t.microsecond)
+
         # Generate a set of barriers
         par  = np.random.uniform(0,1,(7))
         b1x  = -3.5 + par[0]
@@ -159,19 +211,6 @@ class RTSim(object):
             ( b3x1,      b3y+0.2, 0.05,      2),
             ( b3x1,      b3y,     b3x2-b3x1, 0.2)
         )
-        # Reset random number generator from system clock
-        t = datetime.datetime.now()
-        np.random.seed(t.microsecond)
-        # Reset initial position
-        par = np.random.uniform(0, 1, (3))
-        self.__position[0,2] = 359 * par[0]
-        self.__position[0,1] = -4.5 + 9 * par[1]
-        self.__position[0,0] = -4.5
-        self.__position[1,:] = self.__position[0,:]
-        # Reset target
-        self.__target[0] =  4.5
-        self.__target[1] = -4.5 + 9 * par[2]
-        self.__update_position()
 
     def micros(self):
         ut = 0
@@ -219,6 +258,12 @@ class RTSim(object):
 
     def get_compass(self):
         return self.__position[1,2]
+
+    def get_compass(self):
+        return self.__position[1,2]
+
+    def get_result(self):
+        return self.__result
 
     # Private Methods:
 
@@ -304,11 +349,15 @@ class RTSim(object):
 
                 steps = steps - 1
 
+    def __call__(self, event): # sometimes helps - FIXME
+        self.__fig = None
+
     def __create_figure(self):
         xsize = 1500
         ysize = 1500
         dpi_osx = 192 # Something very illogical here.
         self.__fig = plt.figure(figsize=(xsize / dpi_osx, ysize / dpi_osx), dpi=(dpi_osx/2))
+        self.__fig.canvas.mpl_connect('close_event', self)
 
         self.__ax = self.__fig.add_subplot(111)
         self.__ax.set_position([0.07, 0.06, 0.90, 0.90])
