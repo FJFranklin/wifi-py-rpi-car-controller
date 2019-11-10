@@ -18,19 +18,19 @@ function power () {
 }
 
 function power_car () {
-    message = new Paho.MQTT.Message ("car");
+    message = new Paho.Message ("car");
     message.destinationName = "/wifi-py-rpi-car-controller/system/exit";
     client.send (message);
 }
 
 function power_controller () {
-    message = new Paho.MQTT.Message ("controller");
+    message = new Paho.Message ("controller");
     message.destinationName = "/wifi-py-rpi-car-controller/system/exit";
     client.send (message);
 }
 
 function mqtt_send_XY (x, y) {
-    message = new Paho.MQTT.Message (x.toFixed (3) + " " + y.toFixed (3));
+    message = new Paho.Message (x.toFixed (3) + " " + y.toFixed (3));
     message.destinationName = "/wifi-py-rpi-car-controller/dash/XY";
     client.send (message);
 }
@@ -323,7 +323,7 @@ function onMessageArrived (message) {
 
 function get_started () {
     var mosquitto_host = window.location.hostname;
-    var mosquitto_port = window.location.port;
+    var mosquitto_port = 80; // window.location.port;
 
     var val_host = document.getElementById ("val_host");
     var val_port = document.getElementById ("val_port");
@@ -335,7 +335,7 @@ function get_started () {
 
     // Create a client instance
     var client_id = "web-dash-" + Math.random().toString ();    
-    client = new Paho.MQTT.Client (mosquitto_host, Number (mosquitto_port), client_id);
+    client = new Paho.Client (mosquitto_host, Number (mosquitto_port), client_id);
 
     // set callback handlers
     client.onConnectionLost = onConnectionLost;
