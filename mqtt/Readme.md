@@ -4,3 +4,6 @@ served by an MQTT server with websockets functionality.
 Downloadable Debian Jessie builds of mosquitto will not work;
 get the latest libwebsockets and mosquitto, and build from
 source.
+
+Update: As of Buster, the Raspberry Pi's standard repository
+has a working websockets-enabled mosquitto.

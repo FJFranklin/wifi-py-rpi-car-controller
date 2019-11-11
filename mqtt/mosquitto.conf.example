@@ -1,0 +1,5 @@
+port 1883
+listener 80
+protocol websockets
+http_dir /home/pi/www
+log_type websockets
