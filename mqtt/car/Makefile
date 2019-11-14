@@ -1,9 +1,11 @@
 HEADERS = \
 	Ticker.hh \
+	Serial.hh \
 	Client.hh
 
 SOURCES = \
 	Ticker.cc \
+	Serial.cc \
 	Client.cc \
 	car.cc
 
