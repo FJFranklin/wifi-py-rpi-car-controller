@@ -81,9 +81,15 @@ void Serial::read() {
 	m_length = 0;
       }
     } else if (byte == ',') {
-      m_buffer[m_length] = 0;
-      if (m_C) {
-	m_C->serial_command(m_buffer[0], strtoul(m_buffer+1, 0, 10));
+      if (m_length > 1) {
+	m_buffer[m_length] = 0;
+	if (m_C) {
+	  m_C->serial_command(m_buffer[0], strtoul(m_buffer+1, 0, 10));
+	}
+      } else if (m_length == 1) {
+	if (m_C) {
+	  m_C->serial_command(m_buffer[0], 0);
+	}
       }
       m_length = 0;
     } else {
