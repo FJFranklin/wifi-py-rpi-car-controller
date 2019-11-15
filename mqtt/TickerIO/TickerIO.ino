@@ -1,3 +1,5 @@
+#define RangeCheck(x,L) ((x) > (L)) ? (L) : (((x) < -(L)) ? -(L) : (x))
+
 void send_command(char code, unsigned long value = 0);
 bool have_command(char & code, unsigned long & value);
 
@@ -22,7 +24,7 @@ void setup() {
   previous_time = millis();
 }
 
-float byte_to_norm(unsigned long value) { // convert integer in range 0..254 to floating point number in range -1..1
+static inline float byte_to_norm(unsigned long value) { // convert integer in range 0..254 to floating point number in range -1..1
   float f = 0;
 
   if (value < 255) {
@@ -31,10 +33,10 @@ float byte_to_norm(unsigned long value) { // convert integer in range 0..254 to 
   return f;
 }
 
-unsigned long norm_to_byte(float value) { // convert floating point number in range -1..1 to integer in range 0..254
-  int ival = 127 + (int) round(127 * value);
+static inline unsigned long norm_to_byte(float value) { // convert floating point number in range -1..1 to integer in range 0..254
+  int ival = (int) round(127 * value);
 
-  return (unsigned long) ((ival < 0) ? 0 : ((ival > 254) ? 254 : ival));
+  return (unsigned long) (127 + RangeCheck(ival, 127));
 }
 
 float eff_div_v(float v) { // motor efficiency divided by velocity fraction, i.e., v in [0..1]
@@ -78,8 +80,8 @@ void fake_car(bool bPrint = false) { // mimic a car to create a feedback loop
     target_v1 = target_vy + target_vy * target_vx - target_vx;
     target_v2 = target_vy - target_vy * target_vx + target_vx;
   } else {
-    target_v1 = target_vy + target_vy * target_vx + target_vx;
-    target_v2 = target_vy - target_vy * target_vx - target_vx;
+    target_v1 = target_vy - target_vy * target_vx - target_vx;
+    target_v2 = target_vy + target_vy * target_vx + target_vx;
   }
 
   // v. clumsy control system:
@@ -89,8 +91,8 @@ void fake_car(bool bPrint = false) { // mimic a car to create a feedback loop
   slip_right = T1 / slip_T;
   slip_left  = T2 / slip_T;
 
-  T1 = (T1 > slip_T) ? slip_T : ((T1 < -slip_T) ? (-slip_T) : T1); // traction limit because of friction / slip
-  T2 = (T2 > slip_T) ? slip_T : ((T2 < -slip_T) ? (-slip_T) : T2);
+  T1 = RangeCheck(T1, slip_T); // traction limit because of friction / slip
+  T2 = RangeCheck(T2, slip_T); // limit traction to range [-slip_T..slip_T]
 
   float a = (T1 + T2) / mass;
   float alpha = (T1 - T2) * (gauge / 2) / inertia;
@@ -123,14 +125,17 @@ void fake_car(bool bPrint = false) { // mimic a car to create a feedback loop
   v1 += dv + domega * gauge / 1.414; // assumes square-ish vehicle
   v2 += dv - domega * gauge / 1.414;
 
-  v1 = (v1 > 1) ? 1 : ((v1 < -1) ? -1 : v1); // range check
-  v2 = (v2 > 1) ? 1 : ((v2 < -1) ? -1 : v2);
+  v1 = RangeCheck(v1, 1); // limit v1 to range [-1..1]
+  v2 = RangeCheck(v2, 1);
 
   actual_vy = (v1 + v2) / 2;
-  if (actual_vy >= 0) {
-    actual_vx = (v2 - v1) / (2 * (1 - actual_vy));
+
+  float dy = (actual_vy >= 0) ? (1 - actual_vy) : (1 + actual_vy);
+  if (dy > 0) {
+    actual_vx = (v2 - v1) / (2 * dy);
+    actual_vx = RangeCheck(actual_vx, 1); // limit actual_vx to range [-1..1]
   } else {
-    actual_vx = (v1 - v2) / (2 * (1 + actual_vy));
+    actual_vx = 0; // doesn't actually matter; may look odd on the screen, though
   }
 }
 
