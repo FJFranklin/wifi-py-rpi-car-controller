@@ -25,11 +25,12 @@
 #include <cstring>
 
 #include "Client.hh"
+#include "Serial.hh"
 
-class Car : public Client {
+class Car : public Client, public Serial::Command {
 private:
-  float x_target;
-  float y_target;
+  Serial m_S;
+
   float x_actual;
   float y_actual;
 
@@ -40,8 +41,7 @@ private:
 public:
   Car() :
     Client("car"),
-    x_target(0),
-    y_target(0),
+    m_S(this, "/dev/ttyACM0", true),
     x_actual(0),
     y_actual(0)
   {
@@ -50,6 +50,38 @@ public:
   }
   virtual ~Car() {
     // ...
+  }
+  virtual void serial_connect() {
+    fprintf(stdout, "car: connected to Arduino\n");
+  }
+  virtual void serial_disconnect() {
+    fprintf(stdout, "car: disconnected from Arduino\n");
+  }
+  virtual void serial_command(char command, unsigned long value) {
+    switch(command) {
+    case 'x':
+      {
+	x_actual = (-127 + (float) value) / 127;
+      }
+      break;
+    case 'y':
+      {
+	y_actual = (-127 + (float) value) / 127;
+      }
+      break;
+    case 'l':
+      {
+	// TODO
+      }
+      break;
+    case 'r':
+      {
+	// TODO
+      }
+      break;
+    default:
+      break;
+    }
   }
   virtual void tick() { // every millisecond
     static unsigned count = 0;
@@ -61,23 +93,9 @@ public:
       publish("/wifi-py-rpi-car-controller/car/XY", buffer);
     }
 
-    float a = 0.001;
+    Client::tick(); // network update
 
-    if (x_target - x_actual > a) {
-      x_actual += a;
-    } else if (x_target - x_actual < -a) {
-      x_actual -= a;
-    } else {
-      x_actual = x_target;
-    }
-    if (y_target - y_actual > a) {
-      y_actual += a;
-    } else if (y_target - y_actual < -a) {
-      y_actual -= a;
-    } else {
-      y_actual = y_target;
-    }
-    Client::tick();
+    m_S.read(); // serial update
   }
   virtual void setup() {
     if (!subscribe(m_pattern)) {
@@ -108,8 +126,12 @@ public:
     } else if (strcmp(topic, "dash/XY") == 0) {
       float x, y;
       if (sscanf(message, "%f %f", &x, &y) == 2) {
-	x_target = x;
-	y_target = y;
+	int ix = (int) ((1 + x) * 127);
+	int iy = (int) ((1 + y) * 127);
+	ix = (ix < 0) ? 0 : ((ix > 254) ? 254 : ix);
+	iy = (iy < 0) ? 0 : ((iy > 254) ? 254 : iy);
+	m_S.write('x', (unsigned long) ix);
+	m_S.write('y', (unsigned long) iy);
       }
     }
   }
