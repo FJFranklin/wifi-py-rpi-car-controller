@@ -3,11 +3,16 @@ bool have_command(char & code, unsigned long & value);
 
 unsigned long previous_time = 0;
 
-int target_vx = 0; // command-requested velocity vector components [-127..127]
-int target_vy = 0; // where vx=-127 is left, vx=127 is right, vx=0 is straight
+float target_vx = 0; // command-requested velocity vector components [-1..1]
+float target_vy = 0; // where vx=-1 is left, vx=1 is right, vx=0 is straight
 
-int actual_vx = 0; // actual velocity vector components [-127..127]
-int actual_vy = 0; // i.e., calculated from encoders
+float actual_vx = 0; // actual velocity vector components [-1..1]
+float actual_vy = 0; // e.g., calculated from encoders
+
+float slip_left = 0; // traction to slip-threshold ratio
+float slip_right = 0;
+
+bool bEnableSafetyStop = true;
 
 void setup() {
   Serial.begin(115200);
@@ -17,7 +22,22 @@ void setup() {
   previous_time = millis();
 }
 
-float eff_div_v(float v) {
+float byte_to_norm(unsigned long value) { // convert integer in range 0..254 to floating point number in range -1..1
+  float f = 0;
+
+  if (value < 255) {
+    f = (-127.0 +(float) value) / 127.0;
+  }
+  return f;
+}
+
+unsigned long norm_to_byte(float value) { // convert floating point number in range -1..1 to integer in range 0..254
+  int ival = 127 + (int) round(127 * value);
+
+  return (unsigned long) ((ival < 0) ? 0 : ((ival > 254) ? 254 : ival));
+}
+
+float eff_div_v(float v) { // motor efficiency divided by velocity fraction, i.e., v in [0..1]
   float edv = 0;
 
   if (v <= 0.5) {
@@ -44,29 +64,33 @@ void fake_car(bool bPrint = false) { // mimic a car to create a feedback loop
   const float motor = 250;          // rating, W
   const float dt = 1E-3;            // s (time step)
   const float gauge = 1.5;          // x-axis separation of wheels
+  const float friction = 0.2;
 
-  const float coefficient = motor / max_speed;
+  const float slip_T = friction * 9.81 * mass / 4;
 
-  float max_T1 = coefficient * eff_div_v(abs(v1));
-  float max_T2 = coefficient * eff_div_v(abs(v2));
-
-  float vx = ((float) target_vx) / 127;
-  float vy = ((float) target_vy) / 127;
+  float max_T1 = eff_div_v(abs(v1)) * motor / max_speed;
+  float max_T2 = eff_div_v(abs(v2)) * motor / max_speed;
 
   float target_v1;
   float target_v2;
 
-  if (target_vx >= 0) {
-    target_v1 = vy + vy * vx - vx;
-    target_v2 = vy - vy * vx + vx;
+  if (target_vy >= 0) {
+    target_v1 = target_vy + target_vy * target_vx - target_vx;
+    target_v2 = target_vy - target_vy * target_vx + target_vx;
   } else {
-    target_v1 = vy + vy * vx + vx;
-    target_v2 = vy - vy * vx - vx;
+    target_v1 = target_vy + target_vy * target_vx + target_vx;
+    target_v2 = target_vy - target_vy * target_vx - target_vx;
   }
 
   // v. clumsy control system:
-  float T1 = max_T1 * ((target_v1 > v1) ? 1 : -1) / 20; // applied tractions
-  float T2 = max_T2 * ((target_v2 > v2) ? 1 : -1) / 20;
+  float T1 = max_T1 * ((target_v1 > v1) ? 1 : -1); // applied tractions
+  float T2 = max_T2 * ((target_v2 > v2) ? 1 : -1);
+
+  slip_right = T1 / slip_T;
+  slip_left  = T2 / slip_T;
+
+  T1 = (T1 > slip_T) ? slip_T : ((T1 < -slip_T) ? (-slip_T) : T1); // traction limit because of friction / slip
+  T2 = (T2 > slip_T) ? slip_T : ((T2 < -slip_T) ? (-slip_T) : T2);
 
   float a = (T1 + T2) / mass;
   float alpha = (T1 - T2) * (gauge / 2) / inertia;
@@ -87,6 +111,8 @@ void fake_car(bool bPrint = false) { // mimic a car to create a feedback loop
     Serial.print(T1);
     Serial.print(", T2=");
     Serial.print(T2);
+    Serial.print(", slip=");
+    Serial.print(slip_T);
     Serial.print("; acc: a=");
     Serial.print(a);
     Serial.print(", alpha=");
@@ -94,20 +120,18 @@ void fake_car(bool bPrint = false) { // mimic a car to create a feedback loop
     Serial.print(" > ");
   }
 
-  v1 += dv + domega * gauge / 1.414;
+  v1 += dv + domega * gauge / 1.414; // assumes square-ish vehicle
   v2 += dv - domega * gauge / 1.414;
 
   v1 = (v1 > 1) ? 1 : ((v1 < -1) ? -1 : v1); // range check
   v2 = (v2 > 1) ? 1 : ((v2 < -1) ? -1 : v2);
 
-  vy = (v1 + v2) / 2;
-  if (vy >= 0) {
-    vx = (v2 - v1) / (2 * (1 - vy));
+  actual_vy = (v1 + v2) / 2;
+  if (actual_vy >= 0) {
+    actual_vx = (v2 - v1) / (2 * (1 - actual_vy));
   } else {
-    vx = (v1 - v2) / (2 * (1 + vy));
+    actual_vx = (v1 - v2) / (2 * (1 + actual_vy));
   }
-  actual_vx = (int) round(127 * vx);
-  actual_vy = (int) round(127 * vy);
 }
 
 void every_milli() { // runs once a millisecond, on average
@@ -119,17 +143,22 @@ void every_milli() { // runs once a millisecond, on average
     // e.g.:
     if (value < 255) {
       if (code == 'x') {
-        target_vx = -127 + (int) value;
+        target_vx = byte_to_norm(value);
       }
       if (code == 'y') {
-        target_vy = -127 + (int) value;
+        target_vy = byte_to_norm(value);
       }
     }
     if (code == 'p') {
       Serial.print(" < ping! > ");
     }
-    if (false && code == 'Q') { // silence on the input line - no connection? suggest an emergency stop...
-      Serial.print(" < stop! > ");
+    if (code == 'q') { // emergency stop...
+      Serial.print(" < command: stop! > ");
+      target_vx = 0;
+      target_vy = 0;
+    }
+    if (code == 'Q') { // silence on the input line - no connection? suggest an emergency stop...
+      Serial.print(" < auto: stop! > ");
       target_vx = 0;
       target_vy = 0;
     }
@@ -141,13 +170,15 @@ void every_milli() { // runs once a millisecond, on average
 void every_tenth(int tenth) { // runs once every tenth of a second, where tenth = 0..9
   digitalWrite(LED_BUILTIN, tenth == 0 || tenth == 8); // double blink per second
 
-  send_command('x', (unsigned long) (127 + actual_vx)); // send latest info on velocity
-  send_command('y', (unsigned long) (127 + actual_vy));
+  send_command('x', norm_to_byte(actual_vx)); // send latest info on velocity
+  send_command('y', norm_to_byte(actual_vy));
+  send_command('l', norm_to_byte(slip_left)); // send latest info on traction / slip
+  send_command('r', norm_to_byte(slip_right));
 }
 
 void every_second() { // runs once every second
   Serial.println(""); // break the line for human readability in the console
-  fake_car(true);
+  // fake_car(true);  // this will print out the values (for debugging purposes)
 }
 
 void loop() {
@@ -191,11 +222,16 @@ bool have_command(char & code, unsigned long & value) {
   static char buffer[16];
 
   if (++count == 1000) { // silence or junk on the input line! (emergency stop support feature)
-    code = 'Q';
-    value = 0;
-    count = 0;
-    return true;
+    count = 0; // reset counter - this triggers once per second if no commands are input
+
+    if (bEnableSafetyStop) {
+      code = 'Q';
+      value = 0;
+      return true;
+    }
+    return false;
   }
+
   while (Serial.available()) {
     char next = (char) Serial.read();
 
