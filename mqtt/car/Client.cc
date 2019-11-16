@@ -29,6 +29,15 @@
 
 #include "Client.hh"
 
+static void s_init() {
+  static bool bFirst = true;
+
+  if (bFirst) {
+    bFirst = false;
+    mosquitto_lib_init();
+  }
+}
+
 Client::Client(const char * client_id, bool verbose) :
   m_cs(cs_NoConnection),
   m_broker("127.0.0.1"),
@@ -39,6 +48,7 @@ Client::Client(const char * client_id, bool verbose) :
   m_retain(false),
   m_verbose(verbose)
 {
+  s_init();
   m_M = mosquitto_new(client_id, true, this);
 }
 
@@ -54,6 +64,7 @@ void Client::s_on_connect(struct mosquitto * M, void * user_data, int rc) {
     if (C->verbose())
       fprintf(stdout, "client: connect: success\n");
     C->m_cs = cs_Connected;
+    C->setup();
   } else {
     if (C->verbose())
       fprintf(stdout, "client: connect: failed (%d)\n", rc);
@@ -152,18 +163,15 @@ void Client::setup() {
 }
 
 void Client::tick() {
-  static bool bConnected = false;
+  mosquitto_loop(m_M, 0, 1);
 
+  Ticker::tick();
+}
+
+void Client::second() {
   if (!connected()) {
-    bConnected = false;
     if (!connecting()) {
       connect();
     }
-  } else {
-    if (!bConnected) {
-      bConnected = true;
-      setup();
-    }
   }
-  mosquitto_loop(m_M, 0, 1);
 }

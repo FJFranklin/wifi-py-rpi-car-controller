@@ -25,17 +25,33 @@
 #define Car_Ticker_hh
 
 class Ticker {
+public:
+  class Sleeper {
+  public:
+    virtual void sleep() = 0;
+
+    virtual ~Sleeper();
+  };
 private:
+  Sleeper * m_S;
+
   bool m_bLoop;
+
+  unsigned m_ms_count;
 
   unsigned long m_time_secs;
   unsigned long m_time_nano;
 
   void get_time(unsigned long & secs, unsigned long & nano);
 
+protected:
+  inline void set_sleeper(Sleeper * S) { m_S = S; }
+
 public:
   Ticker() :
-    m_bLoop(true)
+    m_S(0),
+    m_bLoop(true),
+    m_ms_count(999)
   {
     get_time(m_time_secs, m_time_nano);
   }
@@ -49,6 +65,7 @@ public:
   void loop();
 
   virtual void tick();
+  virtual void second();
 };
 
 #endif /* ! Car_Ticker_hh */

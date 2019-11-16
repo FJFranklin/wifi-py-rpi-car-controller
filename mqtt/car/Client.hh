@@ -94,6 +94,7 @@ public:
 
   virtual void setup();
   virtual void tick();
+  virtual void second();
 };
 
 #endif /* ! Car_Client_hh */

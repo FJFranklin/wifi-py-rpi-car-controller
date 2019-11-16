@@ -27,6 +27,10 @@
 
 #include "Ticker.hh"
 
+Ticker::Sleeper::~Sleeper() {
+  // ...
+}
+
 Ticker::~Ticker() {
   // ...
 }
@@ -66,10 +70,21 @@ void Ticker::loop() {
       ms0 = ms1;
       tick();
     }
-    usleep(1);
+    if (m_S) {
+      m_S->sleep();
+    } else {
+      usleep(1);
+    }
   }
 }
 
 void Ticker::tick() {
+  if (++m_ms_count == 1000) {
+    m_ms_count = 0;
+    second();
+  }
+}
+
+void Ticker::second() {
   // ...
 }

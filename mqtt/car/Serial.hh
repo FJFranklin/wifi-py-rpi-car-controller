@@ -24,7 +24,9 @@
 #ifndef Car_Serial_hh
 #define Car_Serial_hh
 
-class Serial {
+#include "Ticker.hh"
+
+class Serial : public Ticker::Sleeper {
 public:
   // commands have format {A-Za-z}{0-9}*,
   class Command {
@@ -45,20 +47,21 @@ private:
   int m_fd;
 
   bool m_bFixBAUD;
+  bool m_verbose;
 
   char m_buffer[16];
 
 public:
   inline bool connected() const { return m_fd >= 0; }
 
-  Serial(Command * C, const char * device_name, bool bFixBaud = false);
+  Serial(Command * C, const char * device_name, bool bFixBaud, bool verbose);
 
   ~Serial();
 
-  void read();
   void write(char command, unsigned long value);
 
-private:
+  virtual void sleep();
+
   void connect();
   void disconnect();
 };

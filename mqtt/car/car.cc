@@ -33,18 +33,22 @@ private:
 
   float x_actual;
   float y_actual;
+  float slip_l;
+  float slip_r;
 
   const char * m_pattern;
 
   int m_length;
 
 public:
-  Car() :
-    Client("car"),
-    m_S(this, "/dev/ttyACM0", true),
+  Car(const char * serial, bool verbose=false) :
+    Client("car", verbose),
+    m_S(this, serial, true, verbose),
     x_actual(0),
     y_actual(0)
   {
+    set_sleeper(&m_S);
+
     m_pattern = "/wifi-py-rpi-car-controller/#";
     m_length = strlen(m_pattern) - 1;
   }
@@ -71,12 +75,12 @@ public:
       break;
     case 'l':
       {
-	// TODO
+	slip_l = (-127 + (float) value) / 127;
       }
       break;
     case 'r':
       {
-	// TODO
+	slip_r = (-127 + (float) value) / 127;
       }
       break;
     default:
@@ -91,11 +95,17 @@ public:
       count = 0;
       sprintf(buffer, "%.3f %.3f", x_actual, y_actual);
       publish("/wifi-py-rpi-car-controller/car/XY", buffer);
+      sprintf(buffer, "%.3f %.3f", slip_l, slip_r);
+      publish("/wifi-py-rpi-car-controller/car/slip", buffer);
     }
 
     Client::tick(); // network update
-
-    m_S.read(); // serial update
+  }
+  virtual void second() { // every second
+    if (!m_S.connected()) {
+      m_S.connect();
+    }
+    Client::second();
   }
   virtual void setup() {
     if (!subscribe(m_pattern)) {
@@ -138,6 +148,28 @@ public:
 };
 
 int main(int argc, char ** argv) {
-  Car().loop();
+  const char * serial = "/dev/ttyACM0";
+
+  bool verbose = false;
+  
+  for (int arg = 1; arg < argc; arg++) {
+    if (strcmp(argv[arg], "--help") == 0) {
+      fprintf(stderr, "\ncar [--help] [--verbose] [/dev/<ID>]\n\n");
+      fprintf(stderr, "  --help     Display this help.\n");
+      fprintf(stderr, "  --verbose  Print debugging info.\n");
+      fprintf(stderr, "  /dev/<ID>  Connect to /dev/<ID> instead of default [/dev/ttyACM0].\n\n");
+      return 0;
+    }
+    if (strcmp(argv[arg], "--verbose") == 0) {
+      verbose = true;
+    } else if (strncmp(argv[arg], "/dev/", 5) == 0) {
+      serial = argv[arg];
+    } else {
+      fprintf(stderr, "car [--help] [--verbose] [/dev/ID]\n");
+      return -1;
+    }
+  }
+
+  Car(serial, verbose).loop();
   return 0;
 }

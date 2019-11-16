@@ -30,18 +30,22 @@
 #include <errno.h>
 #include <termios.h>
 
+#include <sys/types.h>
+#include <sys/time.h>
+
 #include "Serial.hh"
 
 Serial::Command::~Command() {
   // ...
 }
 
-Serial::Serial(Serial::Command * C, const char * device_name, bool bFixBaud) :
+Serial::Serial(Serial::Command * C, const char * device_name, bool bFixBaud, bool verbose) :
   m_C(C),
   m_device(device_name),
   m_fd(-1),
   m_length(0),
-  m_bFixBAUD(bFixBaud)
+  m_bFixBAUD(bFixBaud),
+  m_verbose(verbose)
 {
   connect();
 }
@@ -50,8 +54,29 @@ Serial::~Serial() {
   disconnect();
 }
 
-void Serial::read() {
+void Serial::sleep() {
   if (m_fd < 0) {
+    usleep(1);
+    return;
+  }
+
+  fd_set set;
+  FD_ZERO(&set);
+  FD_SET(m_fd, &set);
+
+  struct timeval timeout;
+  timeout.tv_sec = 0;
+  timeout.tv_usec = 10;
+
+  int result = select(FD_SETSIZE, &set, 0, 0, &timeout);
+
+  if (result == 0) { // time-out
+    return;
+  }
+  if (result == -1) { // error
+    if (m_verbose)
+      fprintf(stderr, "Serial: device error.\n");
+    disconnect();
     return;
   }
 
@@ -63,7 +88,8 @@ void Serial::read() {
       if (errno == EAGAIN) {
 	break;
       } else {
-	fprintf(stderr, "Serial: Failed to read from device.\n");
+	if (m_verbose)
+	  fprintf(stderr, "Serial: Failed to read from device.\n");
 	disconnect();
 	break;
       }
@@ -119,18 +145,23 @@ void Serial::write(char command, unsigned long value) {
   ssize_t result = ::write(m_fd, buffer, count);
 
   if (result == -1) {
-    fprintf(stderr, "Serial: Failed to write to device\n");
+    if (m_verbose)
+      fprintf(stderr, "Serial: Failed to write to device\n");
     disconnect();
   } else if (result < count) {
-    fprintf(stderr, "Serial: Incomplete write to device: %d bytes of %d written.\n", (int) result, count);
+    if (m_verbose)
+      fprintf(stderr, "Serial: Incomplete write to device: %d bytes of %d written.\n", (int) result, count);
     disconnect();
   }
 }
 
 void Serial::connect() {
+  if (connected()) return;
+
   m_fd = open(m_device, O_RDWR | O_NOCTTY | O_NONBLOCK /* O_NDELAY */);
   if (m_fd == -1) {
-    fprintf(stderr, "Failed to open \"%s\" - exiting.\n", m_device);
+    if (m_verbose)
+      fprintf(stderr, "Failed to open \"%s\" - exiting.\n", m_device);
     return;
   }
 
