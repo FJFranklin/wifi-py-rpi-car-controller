@@ -74,6 +74,9 @@ void Client::s_on_connect(struct mosquitto * M, void * user_data, int rc) {
 
 bool Client::connect() {
   mosquitto_connect_callback_set(m_M, Client::s_on_connect);
+  mosquitto_disconnect_callback_set(m_M, Client::s_on_disconnect);
+  mosquitto_subscribe_callback_set(m_M, Client::s_on_subscribe);
+  mosquitto_message_callback_set(m_M, Client::s_on_message);
 
   if (m_cs != cs_NoConnection) {
     return false;
@@ -102,8 +105,6 @@ void Client::s_on_disconnect(struct mosquitto * M, void * user_data, int rc) {
 }
 
 void Client::disconnect() {
-  mosquitto_disconnect_callback_set(m_M, Client::s_on_disconnect);
-
   m_cs = cs_Disconnecting;
   mosquitto_disconnect(m_M);
 }
@@ -145,17 +146,18 @@ void Client::s_on_subscribe(struct mosquitto * M, void * user_data, int mid, int
 }
 
 bool Client::subscribe(const char * pattern) {
-  mosquitto_subscribe_callback_set(m_M, Client::s_on_subscribe);
-  mosquitto_message_callback_set(m_M, Client::s_on_message);
+  bool success = true;
 
   m_mid = 0;
   if (mosquitto_subscribe(m_M, &m_mid, pattern, m_qos) == MOSQ_ERR_SUCCESS) {
     if (verbose())
-      fprintf(stdout, "client: %d subscribing...\n", m_mid);
-    return true;
+      fprintf(stdout, "Client: %d subscribing...\n", m_mid);
   } else {
-    return false;
+    if (verbose())
+      fprintf(stdout, "Client: %d subscribe failed...\n", m_mid);
+    success = false;
   }
+  return success;
 }
 
 void Client::setup() {

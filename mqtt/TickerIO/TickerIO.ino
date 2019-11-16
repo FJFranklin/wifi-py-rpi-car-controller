@@ -1,9 +1,10 @@
-#define RangeCheck(x,L) ((x) > (L)) ? (L) : (((x) < -(L)) ? -(L) : (x))
+#define RangeCheck(x,L) (((x) > (L)) ? (L) : (((x) < -(L)) ? -(L) : (x)))
 
 void send_command(char code, unsigned long value = 0);
 bool have_command(char & code, unsigned long & value);
 
 unsigned long previous_time = 0;
+unsigned long verbose = 0;
 
 float target_vx = 0; // command-requested velocity vector components [-1..1]
 float target_vy = 0; // where vx=-1 is left, vx=1 is right, vx=0 is straight
@@ -109,17 +110,18 @@ void fake_car(bool bPrint = false) { // mimic a car to create a feedback loop
     Serial.print(target_v1);
     Serial.print(", v2=");
     Serial.print(target_v2);
-    Serial.print("; traction: T1=");
-    Serial.print(T1);
-    Serial.print(", T2=");
-    Serial.print(T2);
-    Serial.print(", slip=");
-    Serial.print(slip_T);
-    Serial.print("; acc: a=");
-    Serial.print(a);
-    Serial.print(", alpha=");
-    Serial.print(alpha);
-    Serial.print(" > ");
+    if (verbose > 1) {
+      Serial.print("; traction: T1=");
+      Serial.print(T1);
+      Serial.print(", T2=");
+      Serial.print(T2);
+      Serial.print(", slip=");
+      Serial.print(slip_T);
+      Serial.print("; acc: a=");
+      Serial.print(a);
+      Serial.print(", alpha=");
+      Serial.print(alpha);
+    }
   }
 
   v1 += dv + domega * gauge / 1.414; // assumes square-ish vehicle
@@ -136,6 +138,17 @@ void fake_car(bool bPrint = false) { // mimic a car to create a feedback loop
     actual_vx = RangeCheck(actual_vx, 1); // limit actual_vx to range [-1..1]
   } else {
     actual_vx = 0; // doesn't actually matter; may look odd on the screen, though
+  }
+  if (bPrint) {
+    Serial.print("; v1=");
+    Serial.print(v1);
+    Serial.print(", v2=");
+    Serial.print(v2);
+    Serial.print("; actual: vx=");
+    Serial.print(actual_vx);
+    Serial.print(", vy=");
+    Serial.print(actual_vy);
+    Serial.print(" > ");
   }
 }
 
@@ -156,6 +169,9 @@ void every_milli() { // runs once a millisecond, on average
     }
     if (code == 'p') {
       Serial.print(" < ping! > ");
+    }
+    if (code == 'v') {
+      verbose = value;
     }
     if (code == 'q') { // emergency stop...
       Serial.print(" < command: stop! > ");
@@ -183,7 +199,8 @@ void every_tenth(int tenth) { // runs once every tenth of a second, where tenth 
 
 void every_second() { // runs once every second
   Serial.println(""); // break the line for human readability in the console
-  // fake_car(true);  // this will print out the values (for debugging purposes)
+  if (verbose)
+    fake_car(true);   // this will print out the values (for debugging purposes)
 }
 
 void loop() {
