@@ -1,0 +1,14 @@
+[Unit]
+Description=MQTT client linking Arduino-controlled car to broker
+After=mosquitto.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=pi
+ExecStart=/home/pi/cariot/car
+
+[Install]
+WantedBy=multi-user.target

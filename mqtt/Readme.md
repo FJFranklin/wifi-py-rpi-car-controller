@@ -4,6 +4,8 @@ The dashboard is a web-browser-based user interface created using web standards 
 
 A second client, the 'car' (or, really, another intermediary), also connects to the broker (using MQTT), receiving commands and sending feedback. This client relays the commands to and feedback from the hardware controller, e.g., an Arduino connected via USB serial.
 
-The Raspberry Pi client (car) and the Arduino (TickerIO) communicate via a very simple protocol: a letter (A-Za-z) followed by 0-10 digits (0-9) and a final comma (,). Thus "x27,y56,l,r0," is a sequence of four packets; "l," is equivalent to "l0,".
+The Raspberry Pi client (car) and the Arduino (cardy) communicate via a very simple protocol: a letter (A-Za-z) followed by 0-10 digits (0-9) and a final comma (,). Thus "x27,y56,l,r0," is a sequence of four packets; "l," is equivalent to "l0,".
 
-TickerIO is intended to mimic a four-wheel vehicle driven by two electric motors.
+The Arduino code, cardy, mimics a four-wheel vehicle driven by two electric motors.
+
+A sample mosquitto.conf is included, along with cariot.service to start as a service during boot.
