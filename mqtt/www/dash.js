@@ -40,13 +40,19 @@ function mqtt_receive_XY (str) {
     x = parseFloat (xy_str[0]);
     y = parseFloat (xy_str[1]);
 
-    var g3_rotate = -60 * y;
+    blue_circle (x, y);
+}
+
+function mqtt_receive_slip (str) {
+    lr_str = str.split (" ");
+    l = parseFloat (lr_str[0]);
+    r = parseFloat (lr_str[1]);
+
+    var g3_rotate = -60 * l;
     svg_dial_needle ("g3", g3_rotate);
 
-    var g4_rotate = -60 * x;
+    var g4_rotate = -60 * r;
     svg_dial_needle ("g4", g4_rotate);
-
-    blue_circle (x, y);
 }
 
 function user_control (x, y) { // -1 <= x,y <= 1
@@ -302,7 +308,7 @@ function onConnect () {
     // Once a connection has been made, make a subscription and send a message.
     mqtt_log_update ("onConnect");
 
-    client.subscribe ("/wifi-py-rpi-car-controller/car/XY");
+    client.subscribe ("/wifi-py-rpi-car-controller/car/#");
 }
 
 // called when the client loses its connection
@@ -318,6 +324,9 @@ function onMessageArrived (message) {
 
     if (message.destinationName == "/wifi-py-rpi-car-controller/car/XY") {
 	mqtt_receive_XY (message.payloadString);
+    }
+    if (message.destinationName == "/wifi-py-rpi-car-controller/car/slip") {
+	mqtt_receive_slip (message.payloadString);
     }
 }
 
