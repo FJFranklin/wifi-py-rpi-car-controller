@@ -245,9 +245,10 @@ class Q2D_Path(object):
             dv.length = (circle.radius**2.0 - cp.length**2.0)**0.5
 
             farside = False
-            if kwargs:
+            if kwargs is not None:
                 if 'farside' in kwargs:
                     farside = kwargs['farside']
+
             if farside:
                 point = midpoint.vector_relative(dv)
             else:
@@ -256,13 +257,115 @@ class Q2D_Path(object):
         return point, cross, tangent
 
     def __append_line_to_arc(self, line, transition, kwargs):
-        if transition is None:
-            self.__append(self.current.circle.tangent_in_direction(line.direction))
+        arc = self.current
+
+        # swap the sense of farside:
+        if 'farside' in kwargs:
+            farside = not kwargs['farside']
         else:
-            None
+            farside = True
+        ikwargs = { 'farside': farside }
+
+        point, cross, tangent = Q2D_Path.__intersect(line, arc.circle, ikwargs)
+        if transition is None:
+            if point is None:
+                print 'Unable to add line without transition'
+            else:
+                print 'Adding line without transition'
+                self.__append(Q2D_Line(point, line.direction))
+        else:
+            if point is not None:
+                print 'point = (', point.x(), point.y(), '); cross =', cross, 'tangent =', tangent
+
+            if tangent:
+                if (cross > 0.0 and not arc.clockwise) or (cross < 0.0 and arc.clockwise):
+                    print 'Adding (tangent) line (without transition)'
+                    self.__append(Q2D_Arc(point, arc.circle))
+                else:
+                    print 'Adding (tangent) line (with counter-sense transition)'
+                    o = Q2D_Circle(arc.circle.center, arc.circle.radius + transition)
+                    if arc.clockwise:
+                        l = line.parallel( transition)
+                    else:
+                        l = line.parallel(-transition)
+                    p, c, t = Q2D_Path.__intersect(l, o, ikwargs)
+                    #print 'point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t
+                    self.__append(Q2D_Arc(arc.circle.project(p), Q2D_Circle(p, transition), clockwise=(not arc.clockwise)))
+                    self.__append(Q2D_Line(line.project(p), line.direction))
+            elif point is None:
+                if (cross > 0.0 and not arc.clockwise) or (cross < 0.0 and arc.clockwise):
+                    if transition > arc.circle.radius:
+                        o = Q2D_Circle(arc.circle.center, transition - arc.circle.radius)
+                        if arc.clockwise:
+                            l = line.parallel(-transition)
+                        else:
+                            l = line.parallel( transition)
+                        p, c, t = Q2D_Path.__intersect(l, o, ikwargs)
+                        if p is not None:
+                            print 'Adding line (with co-sense transition)'
+                            #print 'point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t
+                            self.__append(Q2D_Arc(arc.circle.project(p, True), Q2D_Circle(p, transition), clockwise=arc.clockwise))
+                            self.__append(Q2D_Line(line.project(p), line.direction))
+                        else:
+                            print 'Unable to add line with specified (co-sense) transition; try increasing the transition radius'
+                    else:
+                        print 'Unable to add line with specified (co-sense) transition; require transition radius > arc radius'
+                else:
+                    o = Q2D_Circle(arc.circle.center, arc.circle.radius + transition)
+                    if arc.clockwise:
+                        l = line.parallel( transition)
+                    else:
+                        l = line.parallel(-transition)
+                    p, c, t = Q2D_Path.__intersect(l, o, ikwargs)
+                    if p is not None:
+                        print 'Adding line (with counter-sense transition)'
+                        #print 'point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t
+                        self.__append(Q2D_Arc(arc.circle.project(p), Q2D_Circle(p, transition), clockwise=(not arc.clockwise)))
+                        self.__append(Q2D_Line(line.project(p), line.direction))
+                    else:
+                        print 'Unable to add line with specified (counter-sense) transition'
+            else: # line intersects circle
+                if not farside:
+                    if transition < arc.circle.radius:
+                        o = Q2D_Circle(arc.circle.center, arc.circle.radius - transition)
+                        if arc.clockwise:
+                            l = line.parallel(-transition)
+                        else:
+                            l = line.parallel( transition)
+                        p, c, t = Q2D_Path.__intersect(l, o, ikwargs)
+                        if p is not None:
+                            print 'Adding line (with co-sense transition)'
+                            #print 'point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t
+                            self.__append(Q2D_Arc(arc.circle.project(p), Q2D_Circle(p, transition), clockwise=arc.clockwise))
+                            self.__append(Q2D_Line(line.project(p), line.direction))
+                        else:
+                            print 'Unable to add line with specified (co-sense) transition; try increasing the transition radius'
+                    else:
+                        print 'Unable to add line with specified (co-sense) transition; require transition radius > arc radius'
+                else:
+                    o = Q2D_Circle(arc.circle.center, arc.circle.radius + transition)
+                    if arc.clockwise:
+                        l = line.parallel( transition)
+                    else:
+                        l = line.parallel(-transition)
+                    p, c, t = Q2D_Path.__intersect(l, o, ikwargs)
+                    if p is not None:
+                        print 'Adding (counter-sense) arc (with transition)'
+                        #print 'point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t
+                        self.__append(Q2D_Arc(arc.circle.project(p), Q2D_Circle(p, transition), clockwise=(not arc.clockwise)))
+                        self.__append(Q2D_Line(line.project(p), line.direction))
 
     def __append_arc_to_line(self, arc, transition, kwargs):
-        point, cross, tangent = Q2D_Path.__intersect(self.current, arc.circle, kwargs)
+        line = self.current
+
+        # don't swap the sense of farside:
+        if 'farside' in kwargs:
+            farside = kwargs['farside']
+        else:
+            farside = False
+        ikwargs = { 'farside': farside }
+
+        point, cross, tangent = Q2D_Path.__intersect(line, arc.circle, ikwargs)
         if transition is None:
             if point is None:
                 print 'Unable to add arc without transition'
@@ -280,21 +383,27 @@ class Q2D_Path(object):
                 else:
                     print 'Adding (counter-sense tangent) arc (with transition)'
                     o = Q2D_Circle(arc.circle.center, arc.circle.radius + transition)
-                    l = self.current.parallel(transition)
-                    p, c, t = Q2D_Path.__intersect(l, o)
+                    if arc.clockwise:
+                        l = line.parallel( transition)
+                    else:
+                        l = line.parallel(-transition)
+                    p, c, t = Q2D_Path.__intersect(l, o, ikwargs)
                     #print 'point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t
-                    self.__append(Q2D_Arc(self.current.project(p), Q2D_Circle(p, transition), clockwise=(not arc.clockwise)))
+                    self.__append(Q2D_Arc(line.project(p), Q2D_Circle(p, transition), clockwise=(not arc.clockwise)))
                     self.__append(Q2D_Arc(arc.circle.project(p), arc.circle, clockwise=arc.clockwise))
             elif point is None:
                 if (cross > 0.0 and not arc.clockwise) or (cross < 0.0 and arc.clockwise):
                     if transition > arc.circle.radius:
                         o = Q2D_Circle(arc.circle.center, transition - arc.circle.radius)
-                        l = self.current.parallel(transition)
-                        p, c, t = Q2D_Path.__intersect(l, o)
+                        if arc.clockwise:
+                            l = line.parallel(-transition)
+                        else:
+                            l = line.parallel( transition)
+                        p, c, t = Q2D_Path.__intersect(l, o, ikwargs)
                         if p is not None:
                             print 'Adding (co-sense) arc (with transition)'
                             #print 'point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t
-                            self.__append(Q2D_Arc(self.current.project(p), Q2D_Circle(p, transition), clockwise=arc.clockwise))
+                            self.__append(Q2D_Arc(line.project(p), Q2D_Circle(p, transition), clockwise=arc.clockwise))
                             self.__append(Q2D_Arc(arc.circle.project(p, True), arc.circle, clockwise=arc.clockwise))
                         else:
                             print 'Unable to add (co-sense) arc with specified transition; try increasing the transition radius'
@@ -302,32 +411,31 @@ class Q2D_Path(object):
                         print 'Unable to add (co-sense) arc with specified transition; require transition radius > arc radius'
                 else:
                     o = Q2D_Circle(arc.circle.center, arc.circle.radius + transition)
-                    l = self.current.parallel(transition)
-                    p, c, t = Q2D_Path.__intersect(l, o)
+                    if arc.clockwise:
+                        l = line.parallel( transition)
+                    else:
+                        l = line.parallel(-transition)
+                    p, c, t = Q2D_Path.__intersect(l, o, ikwargs)
                     if p is not None:
                         print 'Adding (counter-sense) arc (with transition)'
                         #print 'point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t
-                        self.__append(Q2D_Arc(self.current.project(p), Q2D_Circle(p, transition), clockwise=(not arc.clockwise)))
+                        self.__append(Q2D_Arc(line.project(p), Q2D_Circle(p, transition), clockwise=(not arc.clockwise)))
                         self.__append(Q2D_Arc(arc.circle.project(p), arc.circle, clockwise=arc.clockwise))
                     else:
                         print 'Unable to add (counter-sense) arc with specified transition'
             else: # line intersects circle
-                if 'farside' in kwargs:
-                    farside = kwargs['farside']
-                else:
-                    farside = False
                 if farside:
                     if transition < arc.circle.radius:
                         o = Q2D_Circle(arc.circle.center, arc.circle.radius - transition)
                         if arc.clockwise:
-                            l = self.current.parallel(-transition)
+                            l = line.parallel(-transition)
                         else:
-                            l = self.current.parallel( transition)
-                        p, c, t = Q2D_Path.__intersect(l, o, kwargs)
+                            l = line.parallel( transition)
+                        p, c, t = Q2D_Path.__intersect(l, o, ikwargs)
                         if p is not None:
                             print 'Adding (co-sense) arc (with transition)'
                             #print 'point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t
-                            self.__append(Q2D_Arc(self.current.project(p), Q2D_Circle(p, transition), clockwise=arc.clockwise))
+                            self.__append(Q2D_Arc(line.project(p), Q2D_Circle(p, transition), clockwise=arc.clockwise))
                             self.__append(Q2D_Arc(arc.circle.project(p), arc.circle, clockwise=arc.clockwise))
                         else:
                             print 'Unable to add (co-sense) arc with specified transition; try increasing the transition radius'
@@ -336,14 +444,14 @@ class Q2D_Path(object):
                 else:
                     o = Q2D_Circle(arc.circle.center, arc.circle.radius + transition)
                     if arc.clockwise:
-                        l = self.current.parallel( transition)
+                        l = line.parallel( transition)
                     else:
-                        l = self.current.parallel(-transition)
-                    p, c, t = Q2D_Path.__intersect(l, o)
+                        l = line.parallel(-transition)
+                    p, c, t = Q2D_Path.__intersect(l, o, ikwargs)
                     if p is not None:
                         print 'Adding (counter-sense) arc (with transition)'
                         #print 'point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t
-                        self.__append(Q2D_Arc(self.current.project(p), Q2D_Circle(p, transition), clockwise=(not arc.clockwise)))
+                        self.__append(Q2D_Arc(line.project(p), Q2D_Circle(p, transition), clockwise=(not arc.clockwise)))
                         self.__append(Q2D_Arc(arc.circle.project(p), arc.circle, clockwise=arc.clockwise))
 
     def __append_arc_to_arc(self, arc, transition, kwargs):
@@ -438,23 +546,55 @@ class Q2D_Plotter(object):
                 self.__draw_point(item)
             item = item.chain
 
-circle = Q2D_Circle(Q2D_Point((3.0, 5.0)), 2.0)
-point = circle.point_on_circumference(DEG(270.0))
-arc = Q2D_Arc(point, circle)
-path = Q2D_Path(arc)
-
 origin = Q2D_Point((0.0, 0.0))
+
+pstart = Q2D_Point((-3.0, 7.5))
+lstart = Q2D_Line(pstart, Q2D_Vector(0.0))
+path = Q2D_Path(lstart)
+
+circle = Q2D_Circle(Q2D_Point((-2.0, 7.0)), 0.4)
+arc = Q2D_Arc(origin, circle, clockwise=False)
+path.append(arc, transition=0.1, farside=False)
+path.append(lstart.parallel(-1.0), transition=0.5, farside=False)
+
+circle = Q2D_Circle(Q2D_Point((-1.0, 6.5)), 0.4)
+arc = Q2D_Arc(origin, circle, clockwise=False)
+path.append(arc, transition=0.1, farside=True)
+path.append(Q2D_Line(Q2D_Point((-0.9, 6.5)), Q2D_Vector(DEG(270.0))), transition=0.1, farside=True)
+
+circle = Q2D_Circle(Q2D_Point((-1.0, 5.0)), 0.4)
+arc = Q2D_Arc(origin, circle, clockwise=False)
+path.append(arc, transition=0.1, farside=True)
+path.append(Q2D_Line(Q2D_Point((-1.0, 6.5)), Q2D_Vector(DEG( 90.0))), transition=0.1, farside=True)
+
+circle = Q2D_Circle(Q2D_Point((-1.0, 6.5)), 0.4)
+arc = Q2D_Arc(origin, circle, clockwise=False)
+path.append(arc, transition=0.1, farside=True)
+path.append(lstart.parallel(-0.9), transition=0.1, farside=True)
+
+circle = Q2D_Circle(Q2D_Point((0.0, 7.0)), 0.4)
+arc = Q2D_Arc(origin, circle, clockwise=True)
+path.append(arc, transition=0.1, farside=False)
+path.append(lstart, transition=0.5, farside=False)
+
+circle = Q2D_Circle(Q2D_Point((3.0, 5.0)), 2.0)
+point0 = circle.point_on_circumference(DEG(270.0))
+arc = Q2D_Arc(point0, circle, clockwise=True)
+path.append(arc, transition=2.35, farside=True)
+
+point1 = Q2D_Point((0.5, 5.0))
 point2 = Q2D_Point((0.0, 2.0))
-path.append(Q2D_Line(origin, Q2D_Vector(DEG(270.0))))
+path.append(Q2D_Line(point1, Q2D_Vector(DEG(270.0))), 0.35, farside=True)
 path.append(Q2D_Line(point2, Q2D_Vector(DEG(150.0))), 1.0)
 path.append(Q2D_Line(origin, Q2D_Vector(DEG(315.0))), 0.5)
 path.append(Q2D_Line(origin, Q2D_Vector(DEG(  0.0))))
 
 circle = Q2D_Circle(Q2D_Point((4.0, 0.5)), 1.5)
-arc = Q2D_Arc(point, circle, clockwise=True)
+arc = Q2D_Arc(point0, circle, clockwise=True)
 path.append(arc, transition=0.5, farside=True)
 
-point3 = Q2D_Point((4.0, 2.0))
+point3 = Q2D_Point((0.0, 2.0))
+path.append(Q2D_Line(point3, Q2D_Vector(DEG(180.0))), 0.25, farside=False)
 path.end_point(point3)
 
 plotter = Q2D_Plotter([-4,6], [-2,8])
