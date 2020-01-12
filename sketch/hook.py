@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.collections import PatchCollection
 
-arc_test=False
+arc_test=2
 
 def DEG(a):
     return math.radians(a)
@@ -133,7 +133,7 @@ class Q2D_Line(Q2D_Object):
 
     def parallel(self, offset, reverse=False):
         if reverse:
-            d = self.direction.reverse()
+            d = self.direction.copy().reverse()
         else:
             d = self.direction
         return Q2D_Line(self.start.cartesian_relative(-offset * self.direction.y(), offset * self.direction.x()), d)
@@ -281,16 +281,21 @@ class Q2D_Path(object):
         arc = self.current
 
         if 'co_sense' in kwargs:
-            sense = kwargs['co_sense']
+            co_sense = kwargs['co_sense']
         else:
-            sense = True
-        if not arc.clockwise:
-            sense = not sense
+            co_sense = True
 
-        trans = arc.clockwise
         if 'farside' in kwargs:
-            if kwargs['farside']:
-                trans = not trans
+            farside = kwargs['farside']
+        else:
+            farside = False
+
+        if not arc.clockwise:
+            sense = not co_sense
+            offset = -transition
+        else:
+            sense = co_sense
+            offset = transition
 
         point, cross, tangent = Q2D_Path.__intersect_line(line, arc.circle, sense)
         if transition is None:
@@ -305,28 +310,36 @@ class Q2D_Path(object):
 
             if tangent:
                 if (cross > 0.0 and not arc.clockwise) or (cross < 0.0 and arc.clockwise):
+                    if not co_sense:
+                        print('Co-sense transition should be used here')
+                else:
+                    if co_sense:
+                        print('Contra-sense transition should be used here')
+
+                if co_sense:
                     print('Adding (tangent) line (without transition)')
-                    self.__append(Q2D_Arc(point, arc.circle))
+                    self.__append(Q2D_Line(line.project(point), line.direction))
                 else:
                     print('Adding (tangent) line (with counter-sense transition)')
                     o = Q2D_Circle(arc.circle.center, arc.circle.radius + transition)
-                    if arc.clockwise:
-                        l = line.parallel( transition)
-                    else:
-                        l = line.parallel(-transition)
-                    p, c, t = Q2D_Path.__intersect_line(l, o, trans)
+                    l = line.parallel(offset)
+                    p, c, t = Q2D_Path.__intersect_line(l, o, not farside)
                     #print 'point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t
                     self.__append(Q2D_Arc(arc.circle.project(p), Q2D_Circle(p, transition), clockwise=(not arc.clockwise)))
                     self.__append(Q2D_Line(line.project(p), line.direction))
             elif point is None:
                 if (cross > 0.0 and not arc.clockwise) or (cross < 0.0 and arc.clockwise):
+                    if not co_sense:
+                        print('Co-sense transition should be used here')
+                else:
+                    if co_sense:
+                        print('Contra-sense transition should be used here')
+
+                if co_sense:
                     if transition > arc.circle.radius:
                         o = Q2D_Circle(arc.circle.center, transition - arc.circle.radius)
-                        if arc.clockwise:
-                            l = line.parallel(-transition)
-                        else:
-                            l = line.parallel( transition)
-                        p, c, t = Q2D_Path.__intersect_line(l, o, not trans)
+                        l = line.parallel(-offset)
+                        p, c, t = Q2D_Path.__intersect_line(l, o, not farside)
                         if p is not None:
                             print('Adding line (with co-sense transition)')
                             #print 'point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t
@@ -341,8 +354,8 @@ class Q2D_Path(object):
                     if arc.clockwise:
                         l = line.parallel( transition)
                     else:
-                        l = line.parallel(-transition)
-                    p, c, t = Q2D_Path.__intersect_line(l, o, trans)
+                        l = line.parallel( transition)
+                    p, c, t = Q2D_Path.__intersect_line(l, o, not farside)
                     if p is not None:
                         print('Adding line (with counter-sense transition)')
                         #print 'point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t
@@ -351,14 +364,11 @@ class Q2D_Path(object):
                     else:
                         print('Unable to add line with specified (counter-sense) transition')
             else: # line intersects circle
-                if not sense:
+                if co_sense:
                     if transition < arc.circle.radius:
                         o = Q2D_Circle(arc.circle.center, arc.circle.radius - transition)
-                        if arc.clockwise:
-                            l = line.parallel(-transition)
-                        else:
-                            l = line.parallel( transition)
-                        p, c, t = Q2D_Path.__intersect_line(l, o, not trans)
+                        l = line.parallel(-offset)
+                        p, c, t = Q2D_Path.__intersect_line(l, o, not farside)
                         if p is not None:
                             print('Adding line (with co-sense transition)')
                             #print 'point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t
@@ -370,11 +380,8 @@ class Q2D_Path(object):
                         print('Unable to add line with specified (co-sense) transition; require transition radius > arc radius')
                 else:
                     o = Q2D_Circle(arc.circle.center, arc.circle.radius + transition)
-                    if arc.clockwise:
-                        l = line.parallel( transition)
-                    else:
-                        l = line.parallel(-transition)
-                    p, c, t = Q2D_Path.__intersect_line(l, o, trans)
+                    l = line.parallel(offset)
+                    p, c, t = Q2D_Path.__intersect_line(l, o, not farside)
                     if p is not None:
                         print('Adding (counter-sense) arc (with transition)')
                         #print('point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t)
@@ -385,11 +392,21 @@ class Q2D_Path(object):
         line = self.current
 
         if 'co_sense' in kwargs:
-            sense = kwargs['co_sense']
+            co_sense = kwargs['co_sense']
         else:
-            sense = True
+            co_sense = True
+
+        if 'farside' in kwargs:
+            farside = kwargs['farside']
+        else:
+            farside = False
+
         if arc.clockwise:
-            sense = not sense
+            sense = not co_sense
+            offset = -transition
+        else:
+            sense = co_sense
+            offset = transition
 
         point, cross, tangent = Q2D_Path.__intersect_line(line, arc.circle, sense)
         if transition is None:
@@ -404,28 +421,36 @@ class Q2D_Path(object):
 
             if tangent:
                 if (cross > 0.0 and not arc.clockwise) or (cross < 0.0 and arc.clockwise):
+                    if not co_sense:
+                        print('Co-sense transition should be used here')
+                else:
+                    if co_sense:
+                        print('Contra-sense transition should be used here')
+
+                if co_sense:
                     print('Adding (tangent) arc (without transition)')
-                    self.__append(Q2D_Arc(point, arc.circle))
+                    self.__append(Q2D_Arc(point, arc.circle, clockwise=arc.clockwise))
                 else:
                     print('Adding (counter-sense tangent) arc (with transition)')
                     o = Q2D_Circle(arc.circle.center, arc.circle.radius + transition)
-                    if arc.clockwise:
-                        l = line.parallel( transition)
-                    else:
-                        l = line.parallel(-transition)
-                    p, c, t = Q2D_Path.__intersect_line(l, o, not arc.clockwise)
+                    l = line.parallel(-offset)
+                    p, c, t = Q2D_Path.__intersect_line(l, o, farside)
                     #print 'point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t
                     self.__append(Q2D_Arc(line.project(p), Q2D_Circle(p, transition), clockwise=(not arc.clockwise)))
                     self.__append(Q2D_Arc(arc.circle.project(p), arc.circle, clockwise=arc.clockwise))
             elif point is None:
                 if (cross > 0.0 and not arc.clockwise) or (cross < 0.0 and arc.clockwise):
+                    if not co_sense:
+                        print('Co-sense transition should be used here')
+                else:
+                    if co_sense:
+                        print('Contra-sense transition should be used here')
+
+                if co_sense:
                     if transition > arc.circle.radius:
                         o = Q2D_Circle(arc.circle.center, transition - arc.circle.radius)
-                        if arc.clockwise:
-                            l = line.parallel(-transition)
-                        else:
-                            l = line.parallel( transition)
-                        p, c, t = Q2D_Path.__intersect_line(l, o, arc.clockwise)
+                        l = line.parallel(offset)
+                        p, c, t = Q2D_Path.__intersect_line(l, o, farside)
                         if p is not None:
                             print('Adding (co-sense) arc (with transition)')
                             #print 'point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t
@@ -437,11 +462,8 @@ class Q2D_Path(object):
                         print('Unable to add (co-sense) arc with specified transition; require transition radius > arc radius')
                 else:
                     o = Q2D_Circle(arc.circle.center, arc.circle.radius + transition)
-                    if arc.clockwise:
-                        l = line.parallel( transition)
-                    else:
-                        l = line.parallel(-transition)
-                    p, c, t = Q2D_Path.__intersect_line(l, o, not arc.clockwise)
+                    l = line.parallel(-offset)
+                    p, c, t = Q2D_Path.__intersect_line(l, o, farside)
                     if p is not None:
                         print('Adding (counter-sense) arc (with transition)')
                         #print('point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t)
@@ -450,14 +472,11 @@ class Q2D_Path(object):
                     else:
                         print('Unable to add (counter-sense) arc with specified transition')
             else: # line intersects circle
-                if sense:
+                if co_sense:
                     if transition < arc.circle.radius:
                         o = Q2D_Circle(arc.circle.center, arc.circle.radius - transition)
-                        if arc.clockwise:
-                            l = line.parallel(-transition)
-                        else:
-                            l = line.parallel( transition)
-                        p, c, t = Q2D_Path.__intersect_line(l, o, arc.clockwise)
+                        l = line.parallel(offset)
+                        p, c, t = Q2D_Path.__intersect_line(l, o, farside)
                         if p is not None:
                             print('Adding (co-sense) arc (with transition)')
                             #print('point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t)
@@ -469,11 +488,8 @@ class Q2D_Path(object):
                         print('Unable to add (co-sense) arc with specified transition; require transition radius > arc radius')
                 else:
                     o = Q2D_Circle(arc.circle.center, arc.circle.radius + transition)
-                    if arc.clockwise:
-                        l = line.parallel( transition)
-                    else:
-                        l = line.parallel(-transition)
-                    p, c, t = Q2D_Path.__intersect_line(l, o, not arc.clockwise)
+                    l = line.parallel(-offset)
+                    p, c, t = Q2D_Path.__intersect_line(l, o, farside)
                     if p is not None:
                         print('Adding (counter-sense) arc (with transition)')
                         #print('point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t)
@@ -591,7 +607,7 @@ class Q2D_Plotter(object):
                 p2 = p2.start
         t1 = math.degrees(math.atan2(p1.start[1] - arc.circle.center.start[1], p1.start[0] - arc.circle.center.start[0]))
         t2 = math.degrees(math.atan2(p2.start[1] - arc.circle.center.start[1], p2.start[0] - arc.circle.center.start[0]))
-        if t2 < t1:
+        if t2 <= t1:
             t2 += 360.0
         x_axis = 2.0 * arc.circle.radius
         y_axis = 2.0 * arc.circle.radius
@@ -620,71 +636,202 @@ class Q2D_Plotter(object):
                 self.__draw_point(item)
             item = item.chain
 
-if arc_test:
-    origin = Q2D_Point((0.0, 0.0))
-
-    pstart = Q2D_Point((-3.0, 7.5))
-    lstart = Q2D_Line(pstart, Q2D_Vector(0.0))
-    path = Q2D_Path(lstart)
-
-    circle = Q2D_Circle(Q2D_Point((-2.0, 7.0)), 0.4)
-    arc = Q2D_Arc(origin, circle, clockwise=False)
-    path.append(arc, transition=0.1, farside=False)
-    path.append(lstart.parallel(-1.0), transition=0.5, farside=False)
-
-    circle = Q2D_Circle(Q2D_Point((-1.0, 6.5)), 0.4)
-    arc = Q2D_Arc(origin, circle, clockwise=False)
-    path.append(arc, transition=0.1, farside=True)
-    path.append(Q2D_Line(Q2D_Point((-0.9, 6.5)), Q2D_Vector(DEG(270.0))), transition=0.1, farside=True)
-
-    circle = Q2D_Circle(Q2D_Point((-1.0, 5.0)), 0.4)
-    arc = Q2D_Arc(origin, circle, clockwise=False)
-    path.append(arc, transition=0.1, farside=True)
-    path.append(Q2D_Line(Q2D_Point((-1.0, 6.5)), Q2D_Vector(DEG( 90.0))), transition=0.1, farside=True)
-
-    circle = Q2D_Circle(Q2D_Point((-1.0, 6.5)), 0.4)
-    arc = Q2D_Arc(origin, circle, clockwise=False)
-    path.append(arc, transition=0.1, farside=True)
-    path.append(lstart.parallel(-0.9), transition=0.1, farside=True)
-
-    circle = Q2D_Circle(Q2D_Point((0.0, 7.0)), 0.4)
-    arc = Q2D_Arc(origin, circle, clockwise=True)
-    path.append(arc, transition=0.1, farside=False)
-    path.append(lstart, transition=0.5, farside=False)
-
-    circle = Q2D_Circle(Q2D_Point((3.0, 5.0)), 2.0)
-    point0 = circle.point_on_circumference(DEG(270.0))
-    arc = Q2D_Arc(point0, circle, clockwise=True)
-    path.append(arc, transition=2.35, farside=True)
-
-    point1 = Q2D_Point((0.5, 5.0))
-    point2 = Q2D_Point((0.0, 2.0))
-    path.append(Q2D_Line(point1, Q2D_Vector(DEG(270.0))), 0.35, farside=True)
-    path.append(Q2D_Line(point2, Q2D_Vector(DEG(150.0))), 1.0)
-    path.append(Q2D_Line(origin, Q2D_Vector(DEG(315.0))), 0.5)
-    path.append(Q2D_Line(origin, Q2D_Vector(DEG(  0.0))))
-
-    circle = Q2D_Circle(Q2D_Point((4.0, 0.5)), 1.5)
-    arc = Q2D_Arc(point0, circle, clockwise=True)
-    path.append(arc, transition=0.5, farside=True)
-
-    point3 = Q2D_Point((0.0, 2.0))
-    path.append(Q2D_Line(point3, Q2D_Vector(DEG(180.0))), 0.25, farside=False)
-    path.end_point(point3)
-
-    plotter = Q2D_Plotter([-4,6], [-2,8])
-    plotter.draw(path)
+if arc_test == 0:
+    plotter = Q2D_Plotter([-8,0], [-2,6])
 
     point = Q2D_Point((-2.0, -1.5))
     arc_1 = Q2D_Arc(point, Q2D_Circle(Q2D_Point((-2.0, -1.0)), 0.5), clockwise=True)
     arc_2 = Q2D_Arc(point, Q2D_Circle(Q2D_Point((-3.0,  4.0)), 0.5), clockwise=True)
     arc_3 = Q2D_Arc(point, Q2D_Circle(Q2D_Point((-3.25, 1.0)), 0.5), clockwise=False)
-    path2 = Q2D_Path(arc_1)
-    path2.append(arc_2, transition=4.5, farside=True,  co_sense=False)
-    path2.append(arc_3, transition=2.5, farside=False, co_sense=True)
-    path2.append(arc_1, transition=3.5, farside=False, co_sense=False)
-    path2.end_point(point)
-    plotter.draw(path2)
+    path = Q2D_Path(arc_1)
+    path.append(arc_2, transition=4.5, farside=True,  co_sense=False)
+    path.append(arc_3, transition=2.5, farside=False, co_sense=True)
+    path.append(arc_1, transition=3.5, farside=False, co_sense=False)
+    path.end_point(point)
+
+    plotter.draw(path)
+    plotter.show()
+
+elif arc_test == 1:
+    plotter = Q2D_Plotter([-4.0,4.0], [-4.0,4.0])
+
+    offset = -0.1
+    radius = 0.5
+    transition = 0.1
+
+    ox = -2.0
+    oy =  2.0
+    clockwise = False
+
+    p_tl = Q2D_Point((ox - 1.0, oy + 1.0))
+    p_tr = Q2D_Point((ox + 1.0, oy + 1.0))
+    p_bl = Q2D_Point((ox - 1.0, oy - 1.0))
+    p_br = Q2D_Point((ox + 1.0, oy - 1.0))
+
+    c_tl = Q2D_Circle(p_tl, radius)
+    c_tr = Q2D_Circle(p_tr, radius)
+    c_bl = Q2D_Circle(p_bl, radius)
+    c_br = Q2D_Circle(p_br, radius)
+
+    a_tl = Q2D_Arc(p_tl, c_tl, clockwise) # start-point is ignored
+    a_tr = Q2D_Arc(p_tr, c_tr, clockwise) # start-point is ignored
+    a_bl = Q2D_Arc(p_bl, c_bl, clockwise) # start-point is ignored
+    a_br = Q2D_Arc(p_br, c_br, clockwise) # start-point is ignored
+
+    m_t = Q2D_Point((ox + 0.0, oy + 1.0 + offset))
+    m_l = Q2D_Point((ox - 1.0 - offset, oy + 0.0))
+    m_b = Q2D_Point((ox + 0.0, oy - 1.0 - offset))
+    m_r = Q2D_Point((ox + 1.0 + offset, oy + 0.0))
+
+    l_t = Q2D_Line(m_t, Q2D_Vector(DEG(180))) # ref-point is ignored - except at very beginning
+    l_l = Q2D_Line(m_l, Q2D_Vector(DEG(270))) # ref-point is ignored
+    l_b = Q2D_Line(m_b, Q2D_Vector(DEG(  0))) # ref-point is ignored
+    l_r = Q2D_Line(m_r, Q2D_Vector(DEG( 90))) # ref-point is ignored
+
+    path = Q2D_Path(l_t)
+    path.append(a_tl, transition=transition, farside=False, co_sense=False)
+    path.append(l_l,  transition=transition, farside=False, co_sense=False)
+    path.append(a_bl, transition=transition, farside=False, co_sense=True)
+    path.append(l_b,  transition=transition, farside=False, co_sense=True)
+    path.append(a_br, transition=transition, farside=True,  co_sense=True)
+    path.append(l_r,  transition=transition, farside=True,  co_sense=True)
+    path.append(a_tr, transition=transition, farside=True,  co_sense=False)
+    path.append(l_t,  transition=transition, farside=True,  co_sense=False)
+    path.end_point(m_t)
+
+    plotter.draw(path)
+
+    ox = 2.0
+    oy = 2.0
+    clockwise = True
+
+    p_tl = Q2D_Point((ox - 1.0, oy + 1.0))
+    p_tr = Q2D_Point((ox + 1.0, oy + 1.0))
+    p_bl = Q2D_Point((ox - 1.0, oy - 1.0))
+    p_br = Q2D_Point((ox + 1.0, oy - 1.0))
+
+    c_tl = Q2D_Circle(p_tl, radius)
+    c_tr = Q2D_Circle(p_tr, radius)
+    c_bl = Q2D_Circle(p_bl, radius)
+    c_br = Q2D_Circle(p_br, radius)
+
+    a_tl = Q2D_Arc(p_tl, c_tl, clockwise) # start-point is ignored
+    a_tr = Q2D_Arc(p_tr, c_tr, clockwise) # start-point is ignored
+    a_bl = Q2D_Arc(p_bl, c_bl, clockwise) # start-point is ignored
+    a_br = Q2D_Arc(p_br, c_br, clockwise) # start-point is ignored
+
+    m_t = Q2D_Point((ox + 0.0, oy + 1.0 + offset))
+    m_l = Q2D_Point((ox - 1.0 - offset, oy + 0.0))
+    m_b = Q2D_Point((ox + 0.0, oy - 1.0 - offset))
+    m_r = Q2D_Point((ox + 1.0 + offset, oy + 0.0))
+
+    l_t = Q2D_Line(m_t, Q2D_Vector(DEG(180))) # ref-point is ignored - except at very beginning
+    l_l = Q2D_Line(m_l, Q2D_Vector(DEG(270))) # ref-point is ignored
+    l_b = Q2D_Line(m_b, Q2D_Vector(DEG(  0))) # ref-point is ignored
+    l_r = Q2D_Line(m_r, Q2D_Vector(DEG( 90))) # ref-point is ignored
+
+    path = Q2D_Path(l_t)
+    path.append(a_tl, transition=transition, farside=False, co_sense=False)
+    path.append(l_l,  transition=transition, farside=False, co_sense=False)
+    path.append(a_bl, transition=transition, farside=False, co_sense=True)
+    path.append(l_b,  transition=transition, farside=False, co_sense=True)
+    path.append(a_br, transition=transition, farside=True,  co_sense=True)
+    path.append(l_r,  transition=transition, farside=True,  co_sense=True)
+    path.append(a_tr, transition=transition, farside=True,  co_sense=False)
+    path.append(l_t,  transition=transition, farside=True,  co_sense=False)
+    path.end_point(m_t)
+
+    plotter.draw(path)
+
+    offset = 0.4
+    radius = 0.3
+    transition = 0.5
+
+    ox = -2.0
+    oy = -2.0
+
+    p_tl = Q2D_Point((ox - 1.0, oy + 1.0))
+    p_tr = Q2D_Point((ox + 1.0, oy + 1.0))
+    p_bl = Q2D_Point((ox - 1.0, oy - 1.0))
+    p_br = Q2D_Point((ox + 1.0, oy - 1.0))
+
+    c_tl = Q2D_Circle(p_tl, radius)
+    c_tr = Q2D_Circle(p_tr, radius)
+    c_bl = Q2D_Circle(p_bl, radius)
+    c_br = Q2D_Circle(p_br, radius)
+
+    a_tl = Q2D_Arc(p_tl, c_tl, True)  # start-point is ignored
+    a_tr = Q2D_Arc(p_tr, c_tr, True)  # start-point is ignored
+    a_bl = Q2D_Arc(p_bl, c_bl, False) # start-point is ignored
+    a_br = Q2D_Arc(p_br, c_br, False) # start-point is ignored
+
+    m_t = Q2D_Point((ox + 0.0, oy + 1.0 + offset))
+    m_l = Q2D_Point((ox - 1.0 - offset, oy + 0.0))
+    m_b = Q2D_Point((ox + 0.0, oy - 1.0 - offset))
+    m_r = Q2D_Point((ox + 1.0 + offset, oy + 0.0))
+
+    l_t = Q2D_Line(m_t, Q2D_Vector(DEG(180))) # ref-point is ignored - except at very beginning
+    l_l = Q2D_Line(m_l, Q2D_Vector(DEG(270))) # ref-point is ignored
+    l_b = Q2D_Line(m_b, Q2D_Vector(DEG(  0))) # ref-point is ignored
+    l_r = Q2D_Line(m_r, Q2D_Vector(DEG( 90))) # ref-point is ignored
+
+    path = Q2D_Path(l_t)
+    path.append(a_tl, transition=transition, farside=False, co_sense=False)
+    path.append(l_l,  transition=transition, farside=False, co_sense=False)
+    path.append(a_bl, transition=transition, farside=False, co_sense=True)
+    path.append(l_b,  transition=transition, farside=False, co_sense=True)
+    path.append(a_br, transition=transition, farside=True,  co_sense=True)
+    path.append(l_r,  transition=transition, farside=True,  co_sense=True)
+    path.append(a_tr, transition=transition, farside=True,  co_sense=False)
+    path.append(l_t,  transition=transition, farside=True,  co_sense=False)
+    path.end_point(m_t)
+
+    plotter.draw(path)
+
+    offset = 0.5
+    radius = 0.5
+    transition = 0.1
+
+    ox =  2.0
+    oy = -2.0
+
+    p_tl = Q2D_Point((ox - 1.0, oy + 1.0))
+    p_tr = Q2D_Point((ox + 0.3, oy + 0.8))
+    p_bl = Q2D_Point((ox - 1.0, oy - 0.5))
+    p_br = Q2D_Point((ox + 1.3, oy - 1.3))
+
+    c_tl = Q2D_Circle(p_tl, radius)
+    c_tr = Q2D_Circle(p_tr, 0.7)
+    c_bl = Q2D_Circle(p_bl, radius)
+    c_br = Q2D_Circle(p_br, 0.3)
+
+    a_tl = Q2D_Arc(p_tl, c_tl, True)  # start-point is ignored
+    a_tr = Q2D_Arc(p_tr, c_tr, True)  # start-point is ignored
+    a_bl = Q2D_Arc(p_bl, c_bl, False) # start-point is ignored
+    a_br = Q2D_Arc(p_br, c_br, True)  # start-point is ignored
+
+    m_t = Q2D_Point((ox + 0.0, oy + 1.0 + offset))
+    m_l = Q2D_Point((ox - 1.0 - offset, oy + 0.0))
+    m_b = Q2D_Point((ox + 0.0, oy - 0.5 - offset))
+    m_r = Q2D_Point((ox + 0.5 + offset, oy + 0.0))
+
+    l_t = Q2D_Line(m_t, Q2D_Vector(DEG(180))) # ref-point is ignored - except at very beginning
+    l_l = Q2D_Line(m_l, Q2D_Vector(DEG(270))) # ref-point is ignored
+    l_b = Q2D_Line(m_b, Q2D_Vector(DEG(  0))) # ref-point is ignored
+    l_r = Q2D_Line(m_r, Q2D_Vector(DEG( 90))) # ref-point is ignored
+
+    path = Q2D_Path(l_t)
+    path.append(a_tl, transition=transition, farside=False, co_sense=False)
+    path.append(l_l,  transition=transition, farside=False, co_sense=False)
+    path.append(a_bl, transition=transition, farside=False, co_sense=True)
+    path.append(l_b,  transition=transition, farside=False, co_sense=True)
+    path.append(a_br, transition=transition, farside=True,  co_sense=True)
+    path.append(l_r,  transition=transition, farside=True,  co_sense=True)
+    path.append(a_tr, transition=0.08,       farside=True,  co_sense=False)
+    path.append(l_t,  transition=0.08,       farside=True,  co_sense=False)
+    path.end_point(m_t)
+
+    plotter.draw(path)
 
     plotter.show()
 
@@ -694,33 +841,51 @@ else: # let's draw a hook
     y_csep = 0.160
 
     neck_t = 0.010 # thickness of neck
-    neck_a = -70.0 # angle of neck (deg)
+    neck_a = -80.0 # angle of neck (deg)
 
     r_top  = 0.016 # outer radius at top
+    r_main = 0.070 # main body radius
 
     # transition radii
     r1 = 0.060
-    r2 = 0.003
+    r2 = 0.01
+
+    plotter = Q2D_Plotter([-0.13,0.13], [-0.07,0.19])
 
     p_seat  = Q2D_Point((0.0, 0.0))
     p_hole  = Q2D_Point((0.0, y_csep))
     p_start = Q2D_Point((0.0, -r_seat))
+    p_main  = Q2D_Point((0.03, 0.02))
 
     c_seat = Q2D_Circle(p_seat, r_seat)                # circle outlining the seat of the hook
     a_seat = Q2D_Arc(p_start, c_seat, clockwise=False) # define arc anti-clockwise from bottom
     c_top  = Q2D_Circle(p_hole, r_top)                 # circle outlining the top of the hook
     a_top  = Q2D_Arc(p_start, c_top, clockwise=True)   # define arc clockwise; start irrelevant
+    c_main = Q2D_Circle(p_main, r_main)                # circle outlining the top of the hook
+    a_main = Q2D_Arc(p_start, c_main, clockwise=True)  # define arc clockwise; start irrelevant
 
     l_neck = Q2D_Line(p_hole, Q2D_Vector(DEG(neck_a))) # neck center-line
 
     path = Q2D_Path(a_seat)
-    path.append(l_neck.parallel( neck_t / 2, True), transition=r1, farside=False, co_sense=True)
+    path.append(l_neck.parallel(-neck_t / 2, True), transition=r1, farside=False, co_sense=True)
     path.append(a_top, transition=r2, farside=False, co_sense=False)
-    path.append(l_neck.parallel(-neck_t / 2, False), transition=r2, farside=False, co_sense=False)
+    path.append(l_neck.parallel( neck_t / 2, False), transition=r2, farside=False, co_sense=False)
+    path.append(a_main, transition=r2, farside=False, co_sense=False)
+    path.append(a_seat, transition=0.01, farside=False, co_sense=True)
     # ...
     path.end_point(p_start)
 
-    plotter = Q2D_Plotter([-0.11,0.15], [-0.06,0.2])
     plotter.draw(path)
+
+    p_start = Q2D_Point((0.0, y_csep - r_hole))
+
+    c_hole = Q2D_Circle(p_hole, r_hole)                # circle outlining the top hole of the hook
+    a_hole = Q2D_Arc(p_start, c_hole, clockwise=True)  # define arc clockwise
+
+    path = Q2D_Path(a_hole)
+    path.end_point(p_start)
+
+    plotter.draw(path)
+
     plotter.show()
     

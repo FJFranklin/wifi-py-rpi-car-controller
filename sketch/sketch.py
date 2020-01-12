@@ -7,7 +7,7 @@ from matplotlib.collections import PatchCollection
 def DEG(a):
     return math.radians(a)
 
-Q2D_Design_Tolerance = 1E-15
+Q2D_Design_Tolerance = 2.5E-15
 
 class Q2D_Vector(object):
 
@@ -128,6 +128,11 @@ class Q2D_Line(Q2D_Object):
         Q2D_Object.__init__(self, "Line")
         self.start = start
         self.direction = direction
+
+    def offset_point(self, offset):
+        dv = self.direction.copy()
+        dv.length = offset
+        return self.start.vector_relative(dv)
 
     def parallel(self, offset):
         return Q2D_Line(self.start.cartesian_relative(-offset * self.direction.y(), offset * self.direction.x()), self.direction)
@@ -614,69 +619,151 @@ class Q2D_Plotter(object):
                 self.__draw_point(item)
             item = item.chain
 
-origin = Q2D_Point((0.0, 0.0))
+if False:
+    origin = Q2D_Point((0.0, 0.0))
 
-pstart = Q2D_Point((-3.0, 7.5))
-lstart = Q2D_Line(pstart, Q2D_Vector(0.0))
-path = Q2D_Path(lstart)
+    pstart = Q2D_Point((-3.0, 7.5))
+    lstart = Q2D_Line(pstart, Q2D_Vector(0.0))
+    path = Q2D_Path(lstart)
 
-circle = Q2D_Circle(Q2D_Point((-2.0, 7.0)), 0.4)
-arc = Q2D_Arc(origin, circle, clockwise=False)
-path.append(arc, transition=0.1, farside=False)
-path.append(lstart.parallel(-1.0), transition=0.5, farside=False)
+    circle = Q2D_Circle(Q2D_Point((-2.0, 7.0)), 0.4)
+    arc = Q2D_Arc(origin, circle, clockwise=False)
+    path.append(arc, transition=0.1, farside=False)
+    path.append(lstart.parallel(-1.0), transition=0.5, farside=False)
 
-circle = Q2D_Circle(Q2D_Point((-1.0, 6.5)), 0.4)
-arc = Q2D_Arc(origin, circle, clockwise=False)
-path.append(arc, transition=0.1, farside=True)
-path.append(Q2D_Line(Q2D_Point((-0.9, 6.5)), Q2D_Vector(DEG(270.0))), transition=0.1, farside=True)
+    circle = Q2D_Circle(Q2D_Point((-1.0, 6.5)), 0.4)
+    arc = Q2D_Arc(origin, circle, clockwise=False)
+    path.append(arc, transition=0.1, farside=True)
+    path.append(Q2D_Line(Q2D_Point((-0.9, 6.5)), Q2D_Vector(DEG(270.0))), transition=0.1, farside=True)
 
-circle = Q2D_Circle(Q2D_Point((-1.0, 5.0)), 0.4)
-arc = Q2D_Arc(origin, circle, clockwise=False)
-path.append(arc, transition=0.1, farside=True)
-path.append(Q2D_Line(Q2D_Point((-1.0, 6.5)), Q2D_Vector(DEG( 90.0))), transition=0.1, farside=True)
+    circle = Q2D_Circle(Q2D_Point((-1.0, 5.0)), 0.4)
+    arc = Q2D_Arc(origin, circle, clockwise=False)
+    path.append(arc, transition=0.1, farside=True)
+    path.append(Q2D_Line(Q2D_Point((-1.0, 6.5)), Q2D_Vector(DEG( 90.0))), transition=0.1, farside=True)
 
-circle = Q2D_Circle(Q2D_Point((-1.0, 6.5)), 0.4)
-arc = Q2D_Arc(origin, circle, clockwise=False)
-path.append(arc, transition=0.1, farside=True)
-path.append(lstart.parallel(-0.9), transition=0.1, farside=True)
+    circle = Q2D_Circle(Q2D_Point((-1.0, 6.5)), 0.4)
+    arc = Q2D_Arc(origin, circle, clockwise=False)
+    path.append(arc, transition=0.1, farside=True)
+    path.append(lstart.parallel(-0.9), transition=0.1, farside=True)
 
-circle = Q2D_Circle(Q2D_Point((0.0, 7.0)), 0.4)
-arc = Q2D_Arc(origin, circle, clockwise=True)
-path.append(arc, transition=0.1, farside=False)
-path.append(lstart, transition=0.5, farside=False)
+    circle = Q2D_Circle(Q2D_Point((0.0, 7.0)), 0.4)
+    arc = Q2D_Arc(origin, circle, clockwise=True)
+    path.append(arc, transition=0.1, farside=False)
+    path.append(lstart, transition=0.5, farside=False)
 
-circle = Q2D_Circle(Q2D_Point((3.0, 5.0)), 2.0)
-point0 = circle.point_on_circumference(DEG(270.0))
-arc = Q2D_Arc(point0, circle, clockwise=True)
-path.append(arc, transition=2.35, farside=True)
+    circle = Q2D_Circle(Q2D_Point((3.0, 5.0)), 2.0)
+    point0 = circle.point_on_circumference(DEG(270.0))
+    arc = Q2D_Arc(point0, circle, clockwise=True)
+    path.append(arc, transition=2.35, farside=True)
 
-point1 = Q2D_Point((0.5, 5.0))
-point2 = Q2D_Point((0.0, 2.0))
-path.append(Q2D_Line(point1, Q2D_Vector(DEG(270.0))), 0.35, farside=True)
-path.append(Q2D_Line(point2, Q2D_Vector(DEG(150.0))), 1.0)
-path.append(Q2D_Line(origin, Q2D_Vector(DEG(315.0))), 0.5)
-path.append(Q2D_Line(origin, Q2D_Vector(DEG(  0.0))))
+    point1 = Q2D_Point((0.5, 5.0))
+    point2 = Q2D_Point((0.0, 2.0))
+    path.append(Q2D_Line(point1, Q2D_Vector(DEG(270.0))), 0.35, farside=True)
+    path.append(Q2D_Line(point2, Q2D_Vector(DEG(150.0))), 1.0)
+    path.append(Q2D_Line(origin, Q2D_Vector(DEG(315.0))), 0.5)
+    path.append(Q2D_Line(origin, Q2D_Vector(DEG(  0.0))))
 
-circle = Q2D_Circle(Q2D_Point((4.0, 0.5)), 1.5)
-arc = Q2D_Arc(point0, circle, clockwise=True)
-path.append(arc, transition=0.5, farside=True)
+    circle = Q2D_Circle(Q2D_Point((4.0, 0.5)), 1.5)
+    arc = Q2D_Arc(point0, circle, clockwise=True)
+    path.append(arc, transition=0.5, farside=True)
 
-point3 = Q2D_Point((0.0, 2.0))
-path.append(Q2D_Line(point3, Q2D_Vector(DEG(180.0))), 0.25, farside=False)
-path.end_point(point3)
+    point3 = Q2D_Point((0.0, 2.0))
+    path.append(Q2D_Line(point3, Q2D_Vector(DEG(180.0))), 0.25, farside=False)
+    path.end_point(point3)
 
-plotter = Q2D_Plotter([-4,6], [-2,8])
-plotter.draw(path)
+    plotter = Q2D_Plotter([-4,6], [-2,8])
+    plotter.draw(path)
 
-point = Q2D_Point((-2.0, -1.5))
-arc_1 = Q2D_Arc(point, Q2D_Circle(Q2D_Point((-2.0, -1.0)), 0.5), clockwise=True)
-arc_2 = Q2D_Arc(point, Q2D_Circle(Q2D_Point((-3.0,  4.0)), 0.5), clockwise=True)
-arc_3 = Q2D_Arc(point, Q2D_Circle(Q2D_Point((-3.25, 1.0)), 0.5), clockwise=False)
-path2 = Q2D_Path(arc_1)
-path2.append(arc_2, transition=4.5, farside=True,  co_sense=False)
-path2.append(arc_3, transition=2.5, farside=False, co_sense=True)
-path2.append(arc_1, transition=3.5, farside=False, co_sense=False)
-path2.end_point(point)
-plotter.draw(path2)
+    point = Q2D_Point((-2.0, -1.5))
+    arc_1 = Q2D_Arc(point, Q2D_Circle(Q2D_Point((-2.0, -1.0)), 0.5), clockwise=True)
+    arc_2 = Q2D_Arc(point, Q2D_Circle(Q2D_Point((-3.0,  4.0)), 0.5), clockwise=True)
+    arc_3 = Q2D_Arc(point, Q2D_Circle(Q2D_Point((-3.25, 1.0)), 0.5), clockwise=False)
+    path2 = Q2D_Path(arc_1)
+    path2.append(arc_2, transition=4.5, farside=True,  co_sense=False)
+    path2.append(arc_3, transition=2.5, farside=False, co_sense=True)
+    path2.append(arc_1, transition=3.5, farside=False, co_sense=False)
+    path2.end_point(point)
+    plotter.draw(path2)
+    plotter.show()
 
-plotter.show()
+if True:
+    box_t =     7.0  # boundary
+    box_b =    -7.0
+    box_l =   -23.5
+    box_r =    23.5
+    thick =     2.0  # thickness
+    angle_c =  98.0  # central incline, degrees
+    angle_0 =  11.7  # initial incline, degrees
+    angle_f = -62.0  # final incline, degrees
+    origin   = (0.0, 0.0)
+    center_1 = (box_r - 8.0, box_b - 13.2)
+    radius_1 = 25.0  # (outer) initial radius
+    radius_2 =  8.7  # (outer) radius (transition)
+    radius_3 =  5.4  # (outer) radius of lower right corner
+    center_3 = (box_r - radius_3, box_b + radius_3)
+    radius_4 =  5.7  # (outer) radius of central bends
+    radius_5 =  5.8  # (outer) radius of upper left corner
+    center_5 = (box_l + radius_5, box_t - radius_5)
+    radius_6 =  4.0  # (outer) radius (transition)
+    radius_7 =  3.65 # (outer) radius (transition)
+    center_7 = (box_l + 10.0, box_t - 10.85)
+    tail_len =  1.41 # straight length of tail end
+
+    circle_1o = Q2D_Circle(Q2D_Point(center_1), radius_1)
+    circle_3o = Q2D_Circle(Q2D_Point(center_3), radius_3)
+    circle_5o = Q2D_Circle(Q2D_Point(center_5), radius_5)
+    circle_7o = Q2D_Circle(Q2D_Point(center_7), radius_7)
+
+    circle_1i = Q2D_Circle(Q2D_Point(center_1), radius_1 - thick)
+    circle_3i = Q2D_Circle(Q2D_Point(center_3), radius_3 - thick)
+    circle_5i = Q2D_Circle(Q2D_Point(center_5), radius_5 - thick)
+    circle_7i = Q2D_Circle(Q2D_Point(center_7), radius_7 - thick)
+
+    line_t = Q2D_Line(Q2D_Point((0.0, box_t)), Q2D_Vector(DEG(180.0)))
+    line_b = Q2D_Line(Q2D_Point((0.0, box_b)), Q2D_Vector(DEG(180.0)))
+    line_0 = Q2D_Line(Q2D_Point(origin), Q2D_Vector(DEG(angle_c)))
+
+    line_fi = Q2D_Line(circle_7i.point_on_circumference(DEG(90.0 + angle_f)), Q2D_Vector(DEG(angle_f)))
+    line_fo = Q2D_Line(circle_7o.point_on_circumference(DEG(90.0 + angle_f)), Q2D_Vector(DEG(angle_f)))
+
+    point_0i = circle_1i.point_on_circumference(DEG(90.0 + angle_0))
+    point_0o = circle_1o.point_on_circumference(DEG(90.0 + angle_0))
+
+    point_fi = line_fi.offset_point(tail_len)
+    point_fo = line_fo.offset_point(tail_len)
+
+    line_capi = Q2D_Line(point_0i, Q2D_Point.from_to(point_0i, point_0o))
+    line_capf = Q2D_Line(point_fi, Q2D_Point.from_to(point_fi, point_fo))
+
+    path1 = Q2D_Path(Q2D_Arc(point_0o, circle_1o, clockwise=True))
+    path1.append(Q2D_Arc(point_0o, circle_3o, clockwise=True), transition=radius_2, farside=True, co_sense=True)
+    path1.append(line_b)
+    path1.append(line_0.parallel(thick / 2.0), transition=radius_4)
+    path1.append(line_t.parallel(thick), transition=(radius_4 - thick))
+    path1.append(Q2D_Arc(point_0o, circle_5i, clockwise=False), farside=False)
+    path1.append(Q2D_Arc(point_0o, circle_7o, clockwise=True), transition=(radius_6 - thick), farside=False, co_sense=True)
+    path1.append(line_fo)
+    path1.end_point(point_fo)
+
+    path2 = Q2D_Path(Q2D_Arc(point_0i, circle_1i, clockwise=True))
+    path2.append(Q2D_Arc(point_0i, circle_3i, clockwise=True), transition=(radius_2 - thick), farside=True, co_sense=True)
+    path2.append(line_b.parallel(-thick))
+    path2.append(line_0.parallel(-thick / 2.0), transition=(radius_4 - thick))
+    path2.append(line_t, transition=radius_4)
+    path2.append(Q2D_Arc(point_0i, circle_5o, clockwise=False), farside=False)
+    path2.append(Q2D_Arc(point_0i, circle_7i, clockwise=True), transition=radius_6, farside=False, co_sense=True)
+    path2.append(line_fi)
+    path2.end_point(point_fi)
+
+    path3 = Q2D_Path(line_capi)
+    path3.end_point(point_0o)
+
+    path4 = Q2D_Path(line_capf)
+    path4.end_point(point_fo)
+
+    plotter = Q2D_Plotter([box_l-1.0,box_r+1.0], [box_b-1.0,box_t+1.0])
+    plotter.draw(path1)
+    plotter.draw(path2)
+    plotter.draw(path3)
+    plotter.draw(path4)
+    plotter.show()
