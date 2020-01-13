@@ -1,22 +1,34 @@
 # -*- indent-tabs-mode: t; tab-width: 4 -*-
 
-arc_test = 2 # 0: arc-arc test; 1: arc-line test; 2: hook
+arc_test = 2 # 0: arc-arc test; 1: arc-line test; 2: hook; 3: SpaceClaim 3D-NURBS
+
+# ==== Preliminary setup: Are we using SpaceClaim? ==== #
+
+import math
 
 Q2D_Design_Tolerance = 1E-15 # tolerance for numerical errors
 
 if 'DEG' in dir():
 	Q2D_SpaceClaim = True
+
+	# SpaceClaim uses IronPython, which integrates with Microsoft's .Net framework
+	from System import Array, Double
+	from SpaceClaim.Api.V16.Geometry import ControlPoint, Knot, NurbsData, NurbsSurface
+
+	# A parameter used solely for convenience; changing GeometrySequence re-runs the script.
+	GeometrySequence = Parameters.GeometrySequence
+
 else:
 	Q2D_SpaceClaim = False
 	# Okay, we're not using SpaceClaim; let's plot the paths with MatPlotLib instead
-
-	import math
 
 	import matplotlib.pyplot as plt
 	import matplotlib.patches as mpatches
 
 	def DEG(a):
 		return math.radians(a)
+
+# ==== Q2D Arc-Line sketch path classes ==== #
 
 class Q2D_Vector(object):
 
@@ -109,12 +121,18 @@ class Q2D_Point(Q2D_Object):
 	def __init__(self, xy):
 		Q2D_Object.__init__(self, "Point")
 		self.start = xy
+		self.__point = None
 
 	def x(self):
 		return self.start[0]
 
 	def y(self):
 		return self.start[1]
+
+	def point(self):
+		if self.__point is None:
+			self.__point = Point2D.Create(self.start[0], self.start[1])
+		return self.__point
 
 	def cartesian_relative(self, dx, dy): # new point displaced from self; cartesian components
 		return Q2D_Point((self.start[0] + dx, self.start[1] + dy))
@@ -269,11 +287,11 @@ class Q2D_Path(object):
 		cross = cp.cross(line.direction)
 
 		if abs(cp.length - circle.radius) < Q2D_Design_Tolerance:
-			print("tangent: error =", cp.length - circle.radius)
+			print("tangent: error = {e}".format(e=(cp.length - circle.radius)))
 			point = midpoint
 			tangent = True # check sense
 		elif cp.length > circle.radius:
-			print("line does not intersect circle; missed by", cp.length - circle.radius)
+			print("line does not intersect circle; missed by {d}".format(d=(cp.length - circle.radius)))
 		else: # cp.length < circle.radius:
 			print("line intersects circle")
 			dv = line.direction.copy()
@@ -315,7 +333,7 @@ class Q2D_Path(object):
 				self.__append(Q2D_Line(point, line.direction))
 		else:
 			if point is not None:
-				print('point = (', point.x(), point.y(), '); cross =', cross, 'tangent =', tangent)
+				print('point = ({x}, {y}); cross={c}; tangent={t}'.format(x=point.x(), y=point.y(), c=cross, t=tangent))
 
 			if tangent:
 				if (cross > 0.0 and not arc.clockwise) or (cross < 0.0 and arc.clockwise):
@@ -426,7 +444,7 @@ class Q2D_Path(object):
 				self.__append(Q2D_Arc(point, arc.circle))
 		else:
 			if point is not None:
-				print('point = (', point.x(), point.y(), '); cross =', cross, 'tangent =', tangent)
+				print('point = ({x}, {y}); cross={c}; tangent={t}'.format(x=point.x(), y=point.y(), c=cross, t=tangent))
 
 			if tangent:
 				if (cross > 0.0 and not arc.clockwise) or (cross < 0.0 and arc.clockwise):
@@ -655,13 +673,363 @@ class Q2D_Plotter(object):
 		elif path.name == "Circle":
 			self.__draw_circle(path, False)
 
+class Q2D_Sketcher(object):
+
+	def __init__(self, plane): # where plane is a SpaceClaim sketch plane - see, e.g., sketch_reset()
+		self.plane = plane
+		self.curves = []
+		self.shapes = []
+
+	def __draw_circle(self, circle):
+		result = SketchCircle.Create(circle.center.point(), circle.radius)
+		self.curves.append(result.CreatedCurve)
+		self.shapes.append(result.CreatedCurve[0].Shape)
+
+	def __draw_arc(self, arc):
+		origin = arc.circle.center.point()
+		if arc.clockwise:
+			p1 = arc.chain
+			if p1.name != "Point":
+				p1 = p1.start
+			p2 = arc.start
+		else:
+			p1 = arc.start
+			p2 = arc.chain
+			if p2.name != "Point":
+				p2 = p2.start
+		result = SketchArc.Create(origin, p1.point(), p2.point())
+		self.curves.append(result.CreatedCurve)
+		self.shapes.append(result.CreatedCurve[0].Shape)
+
+	def __draw_line(self, line):
+		p1 = line.start
+		p2 = line.chain
+		if p2.name != "Point":
+			p2 = p2.start
+		result = SketchLine.Create(p1.point(), p2.point())
+		self.curves.append(result.CreatedCurve)
+		self.shapes.append(result.CreatedCurve[0].Shape)
+
+	def draw(self, path):
+		if path.name == "Path":
+			item = path.chain
+
+			while item is not None:
+				if item.name == "Line":
+					self.__draw_line(item)
+				elif item.name == "Arc":
+					self.__draw_arc(item)
+				item = item.chain
+
+		elif path.name == "Circle":
+			self.__draw_circle(path)
+
+	def create_surface_and_clear(self, name):
+		shapes = Array[ITrimmedCurve](self.shapes)
+		surface = PlanarBody.Create(self.plane, shapes, None, name)
+		
+		for c in self.curves:
+			s = Selection.Create(c)
+			Delete.Execute(s)		
+
+# ==== General SpaceClaim convenience functions ==== #
+
+def remove_all_bodies():
+	while GetRootPart().Bodies.Count > 0:
+		GetRootPart().Bodies[0].Delete()
+
+def remove_all_curves():
+	while GetRootPart().Curves.Count > 0:
+		GetRootPart().Curves[0].Delete()
+
+def named_object_select(name):
+	s = Selection.CreateByNames(name)
+	if len(s.Items) == 0:
+		s = None
+		print('Named selection failed: ' + name)
+	return s
+
+def named_object_delete(name):
+	s = named_object_select(name)
+	if s is not None:
+		Delete.Execute(s)
+
+def named_object_rename(name, new_name):
+	s = named_object_select(name)
+	if s is not None:
+		RenameObject.Execute(s, new_name)
+
+def named_object_rotate(name, angle):
+	s = named_object_select(name)
+	if s is not None:
+		frame = Frame.Create(Point.Create(0, 0, 0), Direction.Create(0, -1, 0), Direction.Create(1, 0, 0))
+		options = MoveOptions()
+		options.CreatePatterns = False
+		options.DetachFirst = False
+		options.MaintainOrientation = False
+		options.MaintainMirrorRelationships = True
+		options.MaintainConnectivity = True
+		options.MaintainOffsetRelationships = True
+		options.Copy = False
+		Move.Execute(s, frame, TransformType.RotateY, angle, options)
+
+def named_object_extrude(name, thickness, direction, cut=False):
+	s = named_object_select(name)
+	if s is not None:
+		face = Selection.Create(s.Items[0].Faces[0])
+		options = ExtrudeFaceOptions()
+		options.KeepMirror = True
+		options.KeepLayoutSurfaces = False
+		options.KeepCompositeFaceRelationships = True
+		options.PullSymmetric = False
+		options.OffsetMode = OffsetMode.IgnoreRelationships
+		options.Copy = False
+		options.ForceDoAsExtrude = False
+		if cut:
+			options.ExtrudeType = ExtrudeType.Cut
+		else:
+			options.ExtrudeType = ExtrudeType.Add
+		ExtrudeFaces.Execute(face, direction, thickness, options)
+
+def write_parameters(filename, pars):
+	with open(filename, 'w') as f:
+		for p in pars:
+			f.write(p + ' ' + str(opars[p]) + '\n')
+
+def read_parameters(filename):
+	par = {}
+	with open(filename, 'r') as f:
+		for line in f:
+			pair = line.split()
+			par[pair[0]] = float(pair[1])
+	return par
+
+def volume_of_named_solid(name):
+	v = 0
+	s = named_object_select(name)
+	if s is not None:
+		v = s.Items[0].MassProperties.Mass
+	return v
+
+def area_of_named_surface(name):
+	return volume_of_named_solid(name)
+
+def face_area_of_named_solid(name, number):
+	a = 0
+	s = named_object_select(name)
+	if s is not None:
+		if number < len(s.Items[0].Faces):
+			f = Selection.Create(s.Items[0].Faces[number])
+			a = f.Items[0].Area
+		else:
+			print('Number out of range for faces')
+	return a
+
+def shell_face_of_named_solid(name, number, thickness):
+	s = named_object_select(name)
+	if s is not None:
+		if number < len(s.Items[0].Faces):
+			f = Selection.Create(s.Items[0].Faces[number])
+			Shell.RemoveFaces(f, -thickness)
+		else:
+			print('Number out of range for faces')
+
+def CoG_of_named_solid(name):
+	CoG_X = 0
+	CoG_Y = 0
+	CoG_Z = 0
+	s = named_object_select(name)
+	if s is not None:
+		frame = s.Items[0].MassProperties.PrincipleAxes
+		CoG_X = frame.Origin.X
+		CoG_Y = frame.Origin.Y
+		CoG_Z = frame.Origin.Z
+	return CoG_X, CoG_Y, CoG_Z
+
+def sketch_reset(orientation='XY', origin=(0,0,0)):
+	O = Point.Create(*origin)
+
+	if orientation == 'YX':
+		B1 = Direction.Create(0,1,0)
+		B2 = Direction.Create(1,0,0)
+	elif orientation == 'YZ':
+		B1 = Direction.Create(0,1,0)
+		B2 = Direction.Create(0,0,1)
+	elif orientation == 'ZY':
+		B1 = Direction.Create(0,0,1)
+		B2 = Direction.Create(0,1,0)
+	elif orientation == 'XZ':
+		B1 = Direction.Create(1,0,0)
+		B2 = Direction.Create(0,0,1)
+	elif orientation == 'ZX':
+		B1 = Direction.Create(0,0,1)
+		B2 = Direction.Create(1,0,0)
+	else: #if orientation == 'XY':
+		B1 = Direction.Create(1,0,0)
+		B2 = Direction.Create(0,1,0)
+
+	plane = Plane.Create(Frame.Create(O, B1, B2))
+	ViewHelper.SetSketchPlane(plane)
+	return plane
+
+# Add a line in the sketch plane
+def sketch_line(p1, p2):
+	start = Point2D.Create(p1[0], p1[1])
+	end   = Point2D.Create(p2[0], p2[1])
+	result = SketchLine.Create(start, end)
+	return result.CreatedCurve
+
+# Add an arc in the sketch plane
+def sketch_arc(p0, p1, p2):
+	origin = Point2D.Create(p0[0], p0[1]) # centre of the circle that the arc follows
+	start  = Point2D.Create(p1[0], p1[1])
+	end    = Point2D.Create(p2[0], p2[1])
+	result = SketchArc.Create(origin, start, end)
+	return result.CreatedCurve
+
+# Add a rectangle in the sketch plane
+def sketch_rect(p0, p1, p2):
+	sp0 = Point2D.Create(p0[0], p0[1])
+	sp1 = Point2D.Create(p1[0], p1[1])
+	sp2 = Point2D.Create(p2[0], p2[1])
+	result = SketchRectangle.Create(sp0, sp1, sp2)
+	return result.CreatedCurve
+
+class Q3D_NURBS(object): # cubic surface
+
+	@staticmethod
+	def default_knots(Ncp):
+		k = [Knot(0, 4)]
+		for ik in range(1, Ncp - 3):
+			k.append(Knot(ik, 1))
+		k.append(Knot(Ncp - 3, 4))
+		return k
+
+	@staticmethod
+	def default_range(Ncp):
+		return Ncp - 3
+
+	def __init__(self, Nu, Nv):
+		self.Nu = Nu
+		self.Nv = Nv
+		self.uu = Interval.Create(0, Q3D_NURBS.default_range(Nu))
+		self.vv = Interval.Create(0, Q3D_NURBS.default_range(Nv))
+		self.ku = Array[Knot](Q3D_NURBS.default_knots(Nu))
+		self.kv = Array[Knot](Q3D_NURBS.default_knots(Nv))
+		self.cp = Array.CreateInstance(ControlPoint, Nu, Nv) # control points
+
+	def set_control_point(self, u, v, xyz):
+		self.cp[u,v] = ControlPoint(Point.Create(xyz[0], xyz[1], xyz[2]), 1)
+
+	def add_controlpoints_to_sketch(self):
+		for iv in range(0, self.Nv):
+			for iu in range(0, self.Nu):
+				SketchPoint.Create(self.cp[iu,iv].Position)
+
+	def add_nurbscurves_to_sketch(self):
+		d = NurbsData(4, False, False, self.ku)
+		for iv in range(0, self.Nv):
+			c = Array.CreateInstance(ControlPoint, self.Nu)
+			for iu in range(0, self.Nu):
+				c[iu] = self.cp[iu,iv]
+			SketchNurbs.Create(NurbsCurve.CreateFromControlPoints(d, c))
+
+		d = NurbsData(4, False, False, self.kv)
+		for iu in range(0, self.Nu):
+			c = Array.CreateInstance(ControlPoint, self.Nv)
+			for iv in range(0, self.Nv):
+				c[iv] = self.cp[iu,iv]
+			SketchNurbs.Create(NurbsCurve.CreateFromControlPoints(d, c))
+
+	def create_nurbs_surface(self, name):
+		named_object_delete(name)
+
+		surf_ud = NurbsData(4, False, False, self.ku)
+		surf_vd = NurbsData(4, False, False, self.kv)
+		surf_pt = NurbsSurface.Create(surf_ud, surf_vd, self.cp)
+
+		bbox = BoxUV.Create(self.uu, self.vv)
+		SurfaceBody.Create(surf_pt, bbox, None, name)
+
+	@staticmethod
+	def example(name, Nu, Nv): # points on a unit sphere
+		NS = Q3D_NURBS(Nu, Nv)
+		for iv in range(0, Nv):
+			v = math.pi * (0.5 + float(iv)) / float(Nv)
+			for iu in range(0, Nu):
+				u = 2.0 * math.pi * (0.5 + float(iu)) / float(Nu)
+				xyz = (math.cos(u) * math.sin(v), math.sin(u) * math.sin(v), math.cos(v))
+				NS.set_control_point(iu, iv, xyz)
+
+		NS.create_nurbs_surface(name)
+		NS.add_nurbscurves_to_sketch()
+		NS.add_controlpoints_to_sketch()
+		return NS
+
+# Helix starting at (0,radius,0) and winding along z-axis
+# Nrotations must be a positive integer
+# kappa is the curvature of the helix centreline in the yz-plane
+def add_helix_to_sketch(radius, pitch, Nrotations=7, kappa=0):
+	Ncps = 1 + 6 * Nrotations
+	Narc = 3 * Nrotations
+	knots = [Knot(0, 3)]
+	for a in range(1, Narc):
+		knots.append(Knot(a, 2))
+	knots.append(Knot(Narc, 3))
+	knarr = Array[Knot](knots)
+	d = NurbsData(3, False, False, knarr)
+	c = Array.CreateInstance(ControlPoint, Ncps)
+	rt3 = 3.0**0.5
+	eqp = [(0.0, 1.0), (rt3, 1.0), (rt3/2, -0.5), (0.0, -2.0), (-rt3/2, -0.5), (-rt3, 1.0)]
+	cpi = 0
+	if kappa > 0:
+		theta = 0.0
+	else:
+		z = 0.0
+	for r in range(0, Nrotations):
+		for p in range(0, 6):
+			x, y = eqp[p]
+			x = x * radius
+			y = y * radius
+			if kappa > 0:
+				z = (1.0 / kappa + y) * math.sin(theta)
+				y = (1.0 / kappa + y) * math.cos(theta) - 1.0 / kappa
+			if p % 2 == 0:
+				wt = 1.0
+			else:
+				wt = 0.5
+			c[cpi] = ControlPoint(Point.Create(x, y, z), wt)
+			cpi = cpi + 1
+			if kappa > 0:
+				theta = theta + pitch * kappa / 6.0
+			else:
+				z = z + pitch / 6.0
+	x, y = eqp[0]
+	x = x * radius
+	y = y * radius
+	if kappa > 0:
+		z = (1.0 / kappa + y) * math.sin(theta)
+		y = (1.0 / kappa + y) * math.cos(theta) - 1.0 / kappa
+	c[cpi] = ControlPoint(Point.Create(x, y, z), 1)
+	SketchNurbs.Create(NurbsCurve.CreateFromControlPoints(d, c))
+
+# ==== Q2D examples ==== #
+
+if Q2D_SpaceClaim:
+	# Let's start afresh:
+	remove_all_bodies()
+	remove_all_curves()
+
 if arc_test == 0:
-	plotter = Q2D_Plotter([-8,0], [-2,6])
+	if Q2D_SpaceClaim:
+		plotter = Q2D_Sketcher(sketch_reset())
+	else:
+		plotter = Q2D_Plotter([-8,0], [-2,6])
 
 	point = Q2D_Point((-2.0, -1.5))
 	arc_1 = Q2D_Arc(point, Q2D_Circle(Q2D_Point((-2.0, -1.0)), 0.5), clockwise=True)
 	arc_2 = Q2D_Arc(point, Q2D_Circle(Q2D_Point((-3.0,  4.0)), 0.5), clockwise=True)
-	arc_3 = Q2D_Arc(point, Q2D_Circle(Q2D_Point((-3.25, 1.0)), 0.5), clockwise=False)
+	arc_3 = Q2D_Arc(point, Q2D_Circle(Q2D_Point((-1.5,  1.0)), 0.5), clockwise=False)
 	path = Q2D_Path(arc_1)
 	path.append(arc_2, transition=4.5, farside=True,  co_sense=False)
 	path.append(arc_3, transition=2.5, farside=False, co_sense=True)
@@ -669,10 +1037,17 @@ if arc_test == 0:
 	path.end_point(point)
 
 	plotter.draw(path)
-	plotter.show()
+
+	if Q2D_SpaceClaim:
+		plotter.create_surface_and_clear("Trio")
+	else:
+		plotter.show()
 
 elif arc_test == 1:
-	plotter = Q2D_Plotter([-4.0,4.0], [-4.0,4.0])
+	if Q2D_SpaceClaim:
+		plotter = Q2D_Sketcher(sketch_reset())
+	else:
+		plotter = Q2D_Plotter([-4.0,4.0], [-4.0,4.0])
 
 	offset = -0.1
 	radius = 0.5
@@ -846,15 +1221,18 @@ elif arc_test == 1:
 	path.append(l_b,  transition=transition, farside=False, co_sense=True)
 	path.append(a_br, transition=transition, farside=True,  co_sense=True)
 	path.append(l_r,  transition=transition, farside=True,  co_sense=True)
-	path.append(a_tr, transition=0.08,	   farside=True,  co_sense=False)
-	path.append(l_t,  transition=0.08,	   farside=True,  co_sense=False)
+	path.append(a_tr, transition=0.08,       farside=True,  co_sense=False)
+	path.append(l_t,  transition=0.08,       farside=True,  co_sense=False)
 	path.end_point(m_t)
 
 	plotter.draw(path)
 
-	plotter.show()
+	if Q2D_SpaceClaim:
+		print("Attempting to create a surface will fail; however, switching to solid view will let SpaceClaim identify bounded regions...")
+	else:
+		plotter.show()
 
-else: # let's draw a hook
+elif arc_test == 2: # let's draw a hook
 
 	# Fixed Parameters
 	r_seat = 0.015 # loading pin has 30mm diameter
@@ -876,7 +1254,9 @@ else: # let's draw a hook
 	rb = 0.01
 
 	# Let's draw the hook
-	if not Q2D_SpaceClaim:
+	if Q2D_SpaceClaim:
+		plotter = Q2D_Sketcher(sketch_reset())
+	else:
 		plotter = Q2D_Plotter([-0.13,0.13], [-0.07,0.19])
 
 	p_start = Q2D_Point((0.0, -r_seat))	# start/end point of path
@@ -906,5 +1286,16 @@ else: # let's draw a hook
 
 	plotter.draw(Q2D_Circle(p_hole, r_hole)) # circle outlining the top hole of the hook
 
-	if not Q2D_SpaceClaim:
+	if Q2D_SpaceClaim:
+		plotter.create_surface_and_clear("Hook")
+		named_object_extrude('Hook', 0.008, Direction.Create(0, 0, 1), False)
+	else:
 		plotter.show()
+
+elif arc_test == 3:
+	if Q2D_SpaceClaim:
+		Q3D_NURBS.example('sphere', 12, 8)
+
+if Q2D_SpaceClaim:
+	# Finally, switch to solid-modelling mode
+	ViewHelper.SetViewMode(InteractionMode.Solid)
