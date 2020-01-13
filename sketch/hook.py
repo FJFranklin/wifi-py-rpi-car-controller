@@ -1,3 +1,4 @@
+# Python Script, API Version = V16
 # -*- indent-tabs-mode: t; tab-width: 4 -*-
 
 arc_test = 2 # 0: arc-arc test; 1: arc-line test; 2: hook; 3: SpaceClaim 3D-NURBS
@@ -724,13 +725,64 @@ class Q2D_Sketcher(object):
 		elif path.name == "Circle":
 			self.__draw_circle(path)
 
-	def create_surface_and_clear(self, name):
+	def create_surface(self, name):
 		shapes = Array[ITrimmedCurve](self.shapes)
 		surface = PlanarBody.Create(self.plane, shapes, None, name)
-		
+
+	def match_curves(self, body_name):
+		front = None
+		back = None
+		sides = []
+
+		s = named_object_select(body_name)
+		if s is not None:
+			for f in s.Items[0].Faces:
+				match_count = 0
+				
+				for c in self.curves:
+					curve = c[0].Shape.Geometry
+					
+					for e in f.Edges:
+						if e.Shape.Geometry.IsCoincident(curve):
+							match_count += 1
+							break
+				
+				if match_count == len(self.curves):
+					#print("back: count={c}".format(c=match_count))
+					back = f
+				elif match_count == 0:
+					#print("front: count={c}".format(c=match_count))
+					front = f
+				else:
+					#print("side: count={c}".format(c=match_count))
+					sides.append(f)
+			
+			order = []
+			for c in self.curves:
+				curve = c[0].Shape.Geometry
+				
+				for f in sides:
+					matched = False
+					for e in f.Edges:
+						if e.Shape.Geometry.IsCoincident(curve):
+							matched = True
+							break
+					if matched:
+						order.append(f)
+						break
+
+			sides = order
+
+		return front, back, sides
+
+	def clear_curves(self):
 		for c in self.curves:
 			s = Selection.Create(c)
 			Delete.Execute(s)		
+
+	def create_surface_and_clear(self, name):
+		self.create_surface(name)
+		self.clear_curves()
 
 # ==== General SpaceClaim convenience functions ==== #
 
@@ -773,8 +825,8 @@ def named_object_rotate(name, angle):
 		options.Copy = False
 		Move.Execute(s, frame, TransformType.RotateY, angle, options)
 
-def named_object_extrude(name, thickness, direction, cut=False):
-	s = named_object_select(name)
+def named_object_extrude(face_name, body_name, thickness, direction, cut=False):
+	s = named_object_select(face_name)
 	if s is not None:
 		face = Selection.Create(s.Items[0].Faces[0])
 		options = ExtrudeFaceOptions()
@@ -789,7 +841,9 @@ def named_object_extrude(name, thickness, direction, cut=False):
 			options.ExtrudeType = ExtrudeType.Cut
 		else:
 			options.ExtrudeType = ExtrudeType.Add
-		ExtrudeFaces.Execute(face, direction, thickness, options)
+		result = ExtrudeFaces.Execute(face, direction, thickness, options)
+		body = Selection.Create(result.CreatedBody)
+		RenameObject.Execute(body, body_name)
 
 def write_parameters(filename, pars):
 	with open(filename, 'w') as f:
@@ -1287,8 +1341,23 @@ elif arc_test == 2: # let's draw a hook
 	plotter.draw(Q2D_Circle(p_hole, r_hole)) # circle outlining the top hole of the hook
 
 	if Q2D_SpaceClaim:
-		plotter.create_surface_and_clear("Hook")
-		named_object_extrude('Hook', 0.008, Direction.Create(0, 0, 1), False)
+		plotter.create_surface('hook_profile')
+		named_object_extrude('hook_profile', 'Hook', 0.008, Direction.Create(0, 0, 1), False)
+		# The result is a solid hook with 13 faces
+		#  10 have  4 edges - the outside faces
+		#   1 has   2 edges - the hole
+		#   2 have 11 edges - the front and back faces
+		front, back, sides = plotter.match_curves('Hook')
+		# sides actually matches the initial set of curves, so in this particular case:
+		#  sides[0] == sides[10] - the seat
+		#  sides[1 .. 9]         - clockwise around the hook
+		#  sides[11]             - the top hole
+		Selection.Create(sides[0]).CreateAGroup('Seat')
+		Selection.Create(sides[11]).CreateAGroup('Hole')
+		Selection.Create(front).CreateAGroup('Front')
+		Selection.Create(back).CreateAGroup('Back')
+
+		plotter.clear_curves()
 	else:
 		plotter.show()
 
