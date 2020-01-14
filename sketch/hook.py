@@ -1,4 +1,3 @@
-# Python Script, API Version = V16
 # -*- indent-tabs-mode: t; tab-width: 4 -*-
 
 arc_test = 2 # 0: arc-arc test; 1: arc-line test; 2: hook; 3: SpaceClaim 3D-NURBS
@@ -28,6 +27,177 @@ else:
 
 	def DEG(a):
 		return math.radians(a)
+
+# ==== General SpaceClaim convenience functions ==== #
+
+def remove_all_bodies():
+	while GetRootPart().Bodies.Count > 0:
+		GetRootPart().Bodies[0].Delete()
+
+def remove_all_curves():
+	while GetRootPart().Curves.Count > 0:
+		GetRootPart().Curves[0].Delete()
+
+def named_object_select(name):
+	s = Selection.CreateByNames(name)
+	if len(s.Items) == 0:
+		s = None
+		print('Named selection failed: ' + name)
+	return s
+
+def named_object_delete(name):
+	s = named_object_select(name)
+	if s is not None:
+		Delete.Execute(s)
+
+def named_object_rename(name, new_name):
+	s = named_object_select(name)
+	if s is not None:
+		RenameObject.Execute(s, new_name)
+
+def named_object_rotate(name, angle):
+	s = named_object_select(name)
+	if s is not None:
+		frame = Frame.Create(Point.Create(0, 0, 0), Direction.Create(0, -1, 0), Direction.Create(1, 0, 0))
+		options = MoveOptions()
+		options.CreatePatterns = False
+		options.DetachFirst = False
+		options.MaintainOrientation = False
+		options.MaintainMirrorRelationships = True
+		options.MaintainConnectivity = True
+		options.MaintainOffsetRelationships = True
+		options.Copy = False
+		Move.Execute(s, frame, TransformType.RotateY, angle, options)
+
+def named_object_extrude(face_name, body_name, thickness, direction, cut=False):
+	s = named_object_select(face_name)
+	if s is not None:
+		face = Selection.Create(s.Items[0].Faces[0])
+		options = ExtrudeFaceOptions()
+		options.KeepMirror = True
+		options.KeepLayoutSurfaces = False
+		options.KeepCompositeFaceRelationships = True
+		options.PullSymmetric = False
+		options.OffsetMode = OffsetMode.IgnoreRelationships
+		options.Copy = False
+		options.ForceDoAsExtrude = False
+		if cut:
+			options.ExtrudeType = ExtrudeType.Cut
+		else:
+			options.ExtrudeType = ExtrudeType.Add
+		result = ExtrudeFaces.Execute(face, direction, thickness, options)
+		body = Selection.Create(result.CreatedBody)
+		RenameObject.Execute(body, body_name)
+
+def write_parameters(filename, pars):
+	with open(filename, 'w') as f:
+		for p in pars:
+			f.write(p + ' ' + str(opars[p]) + '\n')
+
+def read_parameters(filename):
+	par = {}
+	with open(filename, 'r') as f:
+		for line in f:
+			pair = line.split()
+			par[pair[0]] = float(pair[1])
+	return par
+
+def volume_of_named_solid(name):
+	v = 0
+	s = named_object_select(name)
+	if s is not None:
+		v = s.Items[0].MassProperties.Mass
+	return v
+
+def area_of_named_surface(name):
+	return volume_of_named_solid(name)
+
+def face_area_of_named_solid(name, number):
+	a = 0
+	s = named_object_select(name)
+	if s is not None:
+		if number < len(s.Items[0].Faces):
+			f = Selection.Create(s.Items[0].Faces[number])
+			a = f.Items[0].Area
+		else:
+			print('Number out of range for faces')
+	return a
+
+def shell_face_of_named_solid(name, number, thickness):
+	s = named_object_select(name)
+	if s is not None:
+		if number < len(s.Items[0].Faces):
+			f = Selection.Create(s.Items[0].Faces[number])
+			Shell.RemoveFaces(f, -thickness)
+		else:
+			print('Number out of range for faces')
+
+def CoG_of_named_solid(name):
+	CoG_X = 0
+	CoG_Y = 0
+	CoG_Z = 0
+	s = named_object_select(name)
+	if s is not None:
+		frame = s.Items[0].MassProperties.PrincipleAxes
+		CoG_X = frame.Origin.X
+		CoG_Y = frame.Origin.Y
+		CoG_Z = frame.Origin.Z
+	return CoG_X, CoG_Y, CoG_Z
+
+def sketch_reset(orientation='XY', origin=(0,0,0)):
+	O = Point.Create(*origin)
+
+	if orientation == 'YX':
+		B1 = Direction.Create( 0, 1, 0)
+		B2 = Direction.Create( 1, 0, 0)
+		B3 = Direction.Create( 0, 0,-1)
+	elif orientation == 'YZ':
+		B1 = Direction.Create( 0, 1, 0)
+		B2 = Direction.Create( 0, 0, 1)
+		B3 = Direction.Create( 1, 0, 0)
+	elif orientation == 'ZY':
+		B1 = Direction.Create( 0, 0, 1)
+		B2 = Direction.Create( 0, 1, 0)
+		B3 = Direction.Create(-1, 0, 0)
+	elif orientation == 'XZ':
+		B1 = Direction.Create( 1, 0, 0)
+		B2 = Direction.Create( 0, 0, 1)
+		B3 = Direction.Create( 0,-1, 0)
+	elif orientation == 'ZX':
+		B1 = Direction.Create( 0, 0, 1)
+		B2 = Direction.Create( 1, 0, 0)
+		B3 = Direction.Create( 0, 1, 0)
+	else: #if orientation == 'XY':
+		B1 = Direction.Create( 1, 0, 0)
+		B2 = Direction.Create( 0, 1, 0)
+		B3 = Direction.Create( 0, 0, 1)
+
+	plane = Plane.Create(Frame.Create(O, B1, B2))
+	ViewHelper.SetSketchPlane(plane)
+	return plane, B3
+
+# Add a line in the sketch plane
+def sketch_line(p1, p2):
+	start = Point2D.Create(p1[0], p1[1])
+	end   = Point2D.Create(p2[0], p2[1])
+	result = SketchLine.Create(start, end)
+	return result.CreatedCurve
+
+# Add an arc in the sketch plane
+def sketch_arc(p0, p1, p2):
+	origin = Point2D.Create(p0[0], p0[1]) # centre of the circle that the arc follows
+	start  = Point2D.Create(p1[0], p1[1])
+	end    = Point2D.Create(p2[0], p2[1])
+	result = SketchArc.Create(origin, start, end)
+	return result.CreatedCurve
+
+# Add a rectangle in the sketch plane
+def sketch_rect(p0, p1, p2):
+	sp0 = Point2D.Create(p0[0], p0[1])
+	sp1 = Point2D.Create(p1[0], p1[1])
+	sp2 = Point2D.Create(p2[0], p2[1])
+	result = SketchRectangle.Create(sp0, sp1, sp2)
+	return result.CreatedCurve
 
 # ==== Q2D Arc-Line sketch path classes ==== #
 
@@ -725,14 +895,31 @@ class Q2D_Sketcher(object):
 		elif path.name == "Circle":
 			self.__draw_circle(path)
 
-	def create_surface(self, name):
+	def _create_surface(self, name):
 		shapes = Array[ITrimmedCurve](self.shapes)
 		surface = PlanarBody.Create(self.plane, shapes, None, name)
 
-	def match_curves(self, body_name):
-		front = None
-		back = None
-		sides = []
+	def _clear_curves(self):
+		for c in self.curves:
+			s = Selection.Create(c)
+			Delete.Execute(s)		
+
+	def create_surface_and_clear(self, name):
+		self._create_surface(name)
+		self._clear_curves()
+
+class Q2D_Extrusion(Q2D_Sketcher):
+
+	def __init__(self, plane): # where plane is a SpaceClaim sketch plane - see, e.g., sketch_reset()
+		Q2D_Sketcher.__init__(self, plane)
+		self.front = None
+		self.back = None
+		self.sides = []
+
+	def __match_curves(self, body_name): # FIXME: this won't work if extruding a circle as a cylinder
+		self.front = None
+		self.back = None
+		self.sides = []
 
 		s = named_object_select(body_name)
 		if s is not None:
@@ -749,19 +936,19 @@ class Q2D_Sketcher(object):
 				
 				if match_count == len(self.curves):
 					#print("back: count={c}".format(c=match_count))
-					back = f
+					self.back = f
 				elif match_count == 0:
 					#print("front: count={c}".format(c=match_count))
-					front = f
+					self.front = f
 				else:
 					#print("side: count={c}".format(c=match_count))
-					sides.append(f)
+					self.sides.append(f)
 			
 			order = []
 			for c in self.curves:
 				curve = c[0].Shape.Geometry
 				
-				for f in sides:
+				for f in self.sides:
 					matched = False
 					for e in f.Edges:
 						if e.Shape.Geometry.IsCoincident(curve):
@@ -771,183 +958,13 @@ class Q2D_Sketcher(object):
 						order.append(f)
 						break
 
-			sides = order
+			self.sides = order
 
-		return front, back, sides
-
-	def clear_curves(self):
-		for c in self.curves:
-			s = Selection.Create(c)
-			Delete.Execute(s)		
-
-	def create_surface_and_clear(self, name):
-		self.create_surface(name)
-		self.clear_curves()
-
-# ==== General SpaceClaim convenience functions ==== #
-
-def remove_all_bodies():
-	while GetRootPart().Bodies.Count > 0:
-		GetRootPart().Bodies[0].Delete()
-
-def remove_all_curves():
-	while GetRootPart().Curves.Count > 0:
-		GetRootPart().Curves[0].Delete()
-
-def named_object_select(name):
-	s = Selection.CreateByNames(name)
-	if len(s.Items) == 0:
-		s = None
-		print('Named selection failed: ' + name)
-	return s
-
-def named_object_delete(name):
-	s = named_object_select(name)
-	if s is not None:
-		Delete.Execute(s)
-
-def named_object_rename(name, new_name):
-	s = named_object_select(name)
-	if s is not None:
-		RenameObject.Execute(s, new_name)
-
-def named_object_rotate(name, angle):
-	s = named_object_select(name)
-	if s is not None:
-		frame = Frame.Create(Point.Create(0, 0, 0), Direction.Create(0, -1, 0), Direction.Create(1, 0, 0))
-		options = MoveOptions()
-		options.CreatePatterns = False
-		options.DetachFirst = False
-		options.MaintainOrientation = False
-		options.MaintainMirrorRelationships = True
-		options.MaintainConnectivity = True
-		options.MaintainOffsetRelationships = True
-		options.Copy = False
-		Move.Execute(s, frame, TransformType.RotateY, angle, options)
-
-def named_object_extrude(face_name, body_name, thickness, direction, cut=False):
-	s = named_object_select(face_name)
-	if s is not None:
-		face = Selection.Create(s.Items[0].Faces[0])
-		options = ExtrudeFaceOptions()
-		options.KeepMirror = True
-		options.KeepLayoutSurfaces = False
-		options.KeepCompositeFaceRelationships = True
-		options.PullSymmetric = False
-		options.OffsetMode = OffsetMode.IgnoreRelationships
-		options.Copy = False
-		options.ForceDoAsExtrude = False
-		if cut:
-			options.ExtrudeType = ExtrudeType.Cut
-		else:
-			options.ExtrudeType = ExtrudeType.Add
-		result = ExtrudeFaces.Execute(face, direction, thickness, options)
-		body = Selection.Create(result.CreatedBody)
-		RenameObject.Execute(body, body_name)
-
-def write_parameters(filename, pars):
-	with open(filename, 'w') as f:
-		for p in pars:
-			f.write(p + ' ' + str(opars[p]) + '\n')
-
-def read_parameters(filename):
-	par = {}
-	with open(filename, 'r') as f:
-		for line in f:
-			pair = line.split()
-			par[pair[0]] = float(pair[1])
-	return par
-
-def volume_of_named_solid(name):
-	v = 0
-	s = named_object_select(name)
-	if s is not None:
-		v = s.Items[0].MassProperties.Mass
-	return v
-
-def area_of_named_surface(name):
-	return volume_of_named_solid(name)
-
-def face_area_of_named_solid(name, number):
-	a = 0
-	s = named_object_select(name)
-	if s is not None:
-		if number < len(s.Items[0].Faces):
-			f = Selection.Create(s.Items[0].Faces[number])
-			a = f.Items[0].Area
-		else:
-			print('Number out of range for faces')
-	return a
-
-def shell_face_of_named_solid(name, number, thickness):
-	s = named_object_select(name)
-	if s is not None:
-		if number < len(s.Items[0].Faces):
-			f = Selection.Create(s.Items[0].Faces[number])
-			Shell.RemoveFaces(f, -thickness)
-		else:
-			print('Number out of range for faces')
-
-def CoG_of_named_solid(name):
-	CoG_X = 0
-	CoG_Y = 0
-	CoG_Z = 0
-	s = named_object_select(name)
-	if s is not None:
-		frame = s.Items[0].MassProperties.PrincipleAxes
-		CoG_X = frame.Origin.X
-		CoG_Y = frame.Origin.Y
-		CoG_Z = frame.Origin.Z
-	return CoG_X, CoG_Y, CoG_Z
-
-def sketch_reset(orientation='XY', origin=(0,0,0)):
-	O = Point.Create(*origin)
-
-	if orientation == 'YX':
-		B1 = Direction.Create(0,1,0)
-		B2 = Direction.Create(1,0,0)
-	elif orientation == 'YZ':
-		B1 = Direction.Create(0,1,0)
-		B2 = Direction.Create(0,0,1)
-	elif orientation == 'ZY':
-		B1 = Direction.Create(0,0,1)
-		B2 = Direction.Create(0,1,0)
-	elif orientation == 'XZ':
-		B1 = Direction.Create(1,0,0)
-		B2 = Direction.Create(0,0,1)
-	elif orientation == 'ZX':
-		B1 = Direction.Create(0,0,1)
-		B2 = Direction.Create(1,0,0)
-	else: #if orientation == 'XY':
-		B1 = Direction.Create(1,0,0)
-		B2 = Direction.Create(0,1,0)
-
-	plane = Plane.Create(Frame.Create(O, B1, B2))
-	ViewHelper.SetSketchPlane(plane)
-	return plane
-
-# Add a line in the sketch plane
-def sketch_line(p1, p2):
-	start = Point2D.Create(p1[0], p1[1])
-	end   = Point2D.Create(p2[0], p2[1])
-	result = SketchLine.Create(start, end)
-	return result.CreatedCurve
-
-# Add an arc in the sketch plane
-def sketch_arc(p0, p1, p2):
-	origin = Point2D.Create(p0[0], p0[1]) # centre of the circle that the arc follows
-	start  = Point2D.Create(p1[0], p1[1])
-	end    = Point2D.Create(p2[0], p2[1])
-	result = SketchArc.Create(origin, start, end)
-	return result.CreatedCurve
-
-# Add a rectangle in the sketch plane
-def sketch_rect(p0, p1, p2):
-	sp0 = Point2D.Create(p0[0], p0[1])
-	sp1 = Point2D.Create(p1[0], p1[1])
-	sp2 = Point2D.Create(p2[0], p2[1])
-	result = SketchRectangle.Create(sp0, sp1, sp2)
-	return result.CreatedCurve
+	def extrude_and_clear(self, name, direction, thickness):
+		self._create_surface(name)
+		named_object_extrude(name, name, thickness, direction, False)
+		self.__match_curves(name)
+		self._clear_curves()
 
 class Q3D_NURBS(object): # cubic surface
 
@@ -1076,30 +1093,82 @@ if Q2D_SpaceClaim:
 
 if arc_test == 0:
 	if Q2D_SpaceClaim:
-		plotter = Q2D_Sketcher(sketch_reset())
+		plane, normal = sketch_reset()
+		plotter = Q2D_Sketcher(plane)
 	else:
-		plotter = Q2D_Plotter([-8,0], [-2,6])
+		plotter = Q2D_Plotter([-4,4], [-3,3])
 
-	point = Q2D_Point((-2.0, -1.5))
-	arc_1 = Q2D_Arc(point, Q2D_Circle(Q2D_Point((-2.0, -1.0)), 0.5), clockwise=True)
-	arc_2 = Q2D_Arc(point, Q2D_Circle(Q2D_Point((-3.0,  4.0)), 0.5), clockwise=True)
-	arc_3 = Q2D_Arc(point, Q2D_Circle(Q2D_Point((-1.5,  1.0)), 0.5), clockwise=False)
-	path = Q2D_Path(arc_1)
-	path.append(arc_2, transition=4.5, farside=True,  co_sense=False)
-	path.append(arc_3, transition=2.5, farside=False, co_sense=True)
-	path.append(arc_1, transition=3.5, farside=False, co_sense=False)
-	path.end_point(point)
+	offset = -0.1
+	radius = 0.5
+	transition = 0.1
+
+	ox = -2.5
+	oy =  0.0
+	clockwise = False
+
+	p_tl = Q2D_Point((ox - 1.0, oy + 1.0))
+	p_tr = Q2D_Point((ox + 1.0, oy + 1.0))
+	p_bl = Q2D_Point((ox - 1.0, oy - 1.0))
+	p_br = Q2D_Point((ox + 1.0, oy - 1.0))
+
+	l_t = Q2D_Line(p_tr, Q2D_Vector(DEG(180))) # ref-point is ignored - except at very beginning
+	l_l = Q2D_Line(p_tl, Q2D_Vector(DEG(270))) # ref-point is ignored
+	l_b = Q2D_Line(p_bl, Q2D_Vector(DEG(  0))) # ref-point is ignored
+	l_r = Q2D_Line(p_br, Q2D_Vector(DEG( 90))) # ref-point is ignored
+
+	path = Q2D_Path(l_t)
+	path.append(l_l,  transition=0.25)
+	path.append(l_b,  )
+	path.append(l_r,  transition=0.75)
+	path.end_point(p_tr)
+
+	plotter.draw(path)
+
+	offset = -0.1
+	radius = 0.5
+	transition = 0.1
+
+	ox =  1.5
+	oy =  0.0
+
+	p_or = Q2D_Point((ox - 0.0, oy - radius))
+	p_oo = Q2D_Point((ox - 0.0, oy + 0.0))
+	p_tl = Q2D_Point((ox - 1.0, oy + 1.0))
+	p_tr = Q2D_Point((ox + 1.0, oy + 1.0))
+	p_bl = Q2D_Point((ox - 1.0, oy - 1.0))
+	p_br = Q2D_Point((ox + 1.0, oy - 1.0))
+
+	c_oo = Q2D_Circle(p_oo, radius)
+	c_tl = Q2D_Circle(p_tl, radius)
+	c_tr = Q2D_Circle(p_tr, radius)
+	c_bl = Q2D_Circle(p_bl, radius)
+	c_br = Q2D_Circle(p_br, radius)
+
+	a_oo = Q2D_Arc(p_or, c_oo, False)
+	a_tl = Q2D_Arc(None, c_tl, False)
+	a_tr = Q2D_Arc(None, c_tr, False)
+	a_bl = Q2D_Arc(None, c_bl, True)
+	a_br = Q2D_Arc(None, c_br, True)
+
+	path = Q2D_Path(a_oo)
+	path.append(a_tl, transition=1.0, farside=False, co_sense=False)
+	path.append(a_bl, transition=2.0, farside=True, co_sense=True)
+	path.append(a_br, transition=2.0, farside=False, co_sense=True)
+	path.append(a_tr, transition=2.0, farside=True, co_sense=False)
+	path.append(a_oo, transition=1.0, farside=False, co_sense=False)
+	path.end_point(p_or)
 
 	plotter.draw(path)
 
 	if Q2D_SpaceClaim:
-		plotter.create_surface_and_clear("Trio")
+		print("Attempting to create a surface will fail; however, switching to solid view will let SpaceClaim identify bounded regions...")
 	else:
 		plotter.show()
 
 elif arc_test == 1:
 	if Q2D_SpaceClaim:
-		plotter = Q2D_Sketcher(sketch_reset())
+		plane, normal = sketch_reset()
+		plotter = Q2D_Sketcher(plane)
 	else:
 		plotter = Q2D_Plotter([-4.0,4.0], [-4.0,4.0])
 
@@ -1309,7 +1378,8 @@ elif arc_test == 2: # let's draw a hook
 
 	# Let's draw the hook
 	if Q2D_SpaceClaim:
-		plotter = Q2D_Sketcher(sketch_reset())
+		plane, normal = sketch_reset()
+		plotter = Q2D_Extrusion(plane)
 	else:
 		plotter = Q2D_Plotter([-0.13,0.13], [-0.07,0.19])
 
@@ -1319,14 +1389,14 @@ elif arc_test == 2: # let's draw a hook
 	p_hole  = Q2D_Point((0.0, y_csep))
 	p_main  = Q2D_Point((x_main, y_main))
 
-	c_seat = Q2D_Circle(p_seat, r_seat)					# circle outlining the seat of the hook
-	a_seat = Q2D_Arc(p_start, c_seat, clockwise=False)	# define arc anti-clockwise from bottom
-	c_top  = Q2D_Circle(p_hole, r_top)					# circle outlining the top of the hook
-	a_top  = Q2D_Arc(None, c_top, clockwise=True)		# define arc clockwise; start irrelevant
-	c_main = Q2D_Circle(p_main, r_main)					# circle outlining the top of the hook
-	a_main = Q2D_Arc(None, c_main, clockwise=True)		# define arc clockwise; start irrelevant
+	c_seat = Q2D_Circle(p_seat, r_seat)                 # circle outlining the seat of the hook
+	a_seat = Q2D_Arc(p_start, c_seat, clockwise=False)  # define arc anti-clockwise from bottom
+	c_top  = Q2D_Circle(p_hole, r_top)                  # circle outlining the top of the hook
+	a_top  = Q2D_Arc(None, c_top, clockwise=True)       # define arc clockwise; start irrelevant
+	c_main = Q2D_Circle(p_main, r_main)	   	            # circle outlining the top of the hook
+	a_main = Q2D_Arc(None, c_main, clockwise=True)      # define arc clockwise; start irrelevant
 
-	l_neck = Q2D_Line(p_hole, Q2D_Vector(DEG(neck_a)))	# neck center-line
+	l_neck = Q2D_Line(p_hole, Q2D_Vector(DEG(neck_a)))  # neck center-line
 
 	path = Q2D_Path(a_seat)
 	path.append(l_neck.parallel(-neck_t / 2, True), transition=r1, farside=False, co_sense=True)
@@ -1341,23 +1411,19 @@ elif arc_test == 2: # let's draw a hook
 	plotter.draw(Q2D_Circle(p_hole, r_hole)) # circle outlining the top hole of the hook
 
 	if Q2D_SpaceClaim:
-		plotter.create_surface('hook_profile')
-		named_object_extrude('hook_profile', 'Hook', 0.008, Direction.Create(0, 0, 1), False)
+		plotter.extrude_and_clear('Hook', normal, 0.008)
 		# The result is a solid hook with 13 faces
 		#  10 have  4 edges - the outside faces
 		#   1 has   2 edges - the hole
 		#   2 have 11 edges - the front and back faces
-		front, back, sides = plotter.match_curves('Hook')
 		# sides actually matches the initial set of curves, so in this particular case:
 		#  sides[0] == sides[10] - the seat
 		#  sides[1 .. 9]         - clockwise around the hook
 		#  sides[11]             - the top hole
-		Selection.Create(sides[0]).CreateAGroup('Seat')
-		Selection.Create(sides[11]).CreateAGroup('Hole')
-		Selection.Create(front).CreateAGroup('Front')
-		Selection.Create(back).CreateAGroup('Back')
-
-		plotter.clear_curves()
+		Selection.Create(plotter.sides[0]).CreateAGroup('Seat')
+		Selection.Create(plotter.sides[11]).CreateAGroup('Hole')
+		Selection.Create(plotter.front).CreateAGroup('Front')
+		Selection.Create(plotter.back).CreateAGroup('Back')
 	else:
 		plotter.show()
 
