@@ -55,6 +55,16 @@ def named_object_rename(name, new_name):
 	if s is not None:
 		RenameObject.Execute(s, new_name)
 
+def named_object_lock(name):
+	s = named_object_select(name)
+	if s is not None:
+		ViewHelper.LockBodies(s, True)
+
+def named_object_unlock(name):
+	s = named_object_select(name)
+	if s is not None:
+		ViewHelper.LockBodies(s, False)
+
 def named_object_rotate(name, angle):
 	s = named_object_select(name)
 	if s is not None:
@@ -97,6 +107,10 @@ def named_object_revolve_helix(face_name, body_name, origin, direction, pitch, r
 		taperAngle = 0
 		bothSides = False
 		options = RevolveFaceOptions()
+		if cut:
+			options.ExtrudeType = ExtrudeType.Cut
+		else:
+			options.ExtrudeType = ExtrudeType.Add
 		RevolveHelixFaces.Execute(face, axis, direction, revolutions * pitch, pitch, taperAngle, righthanded, bothSides, options)
 		named_object_rename('Solid', body_name)
 
@@ -1013,11 +1027,13 @@ class Q2D_Helix(Q2D_Sketcher):
 		self.pitch = helix_pitch
 		self.righthanded = righthanded
 
-	def revolve_and_clear(self, name, revolutions):
+	def revolve_and_clear(self, name, revolutions, cut=False, match=True, clear=True):
 		self._create_surface(name)
-		named_object_revolve_helix(name, name, self.origin, self.axis, self.pitch, revolutions, self.righthanded, False)
-		self._match_curves(name)
-		self._clear_curves()
+		named_object_revolve_helix(name, name, self.origin, self.axis, self.pitch, revolutions, self.righthanded, cut)
+		if match:
+			self._match_curves(name)
+		if clear:
+			self._clear_curves()
 
 class Q3D_NURBS(object): # cubic surface
 
@@ -1485,65 +1501,104 @@ elif arc_test == 3:
 		Q3D_NURBS.example('sphere', 12, 8)
 
 elif arc_test == 4:
+	def make_conduit_profile(P):
+		oy = 0.0136
+
+		p_0l = Q2D_Point((0.000, oy - 0.018))
+		p_tr = Q2D_Point((0.030, oy + 0.000))
+		p_cc = Q2D_Point((0.015, oy - 0.015))
+
+		pc_l = Q2D_Point((0.005, oy + 0.000))
+		pc_r = Q2D_Point((0.025, oy + 0.000))
+
+		cl_o = Q2D_Circle(pc_l, 0.020)
+		cl_i = Q2D_Circle(pc_l, 0.018)
+		cr_o = Q2D_Circle(pc_r, 0.017)
+		cr_i = Q2D_Circle(pc_r, 0.015)
+
+		l_l = Q2D_Line(p_0l, Q2D_Vector(DEG(270.0)))
+		l_r = Q2D_Line(p_tr, Q2D_Vector(DEG( 90.0)))
+		l_c = Q2D_Line(p_cc, Q2D_Vector(DEG( 30.0)))
+
+		al_o = Q2D_Arc(None, cl_o, False)
+		al_i = Q2D_Arc(None, cl_i, True)
+		ar_o = Q2D_Arc(None, cr_o, False)
+		ar_i = Q2D_Arc(None, cr_i, True)
+
+		path = Q2D_Path(l_l)
+		path.append(al_o, farside=True)
+		path.append(l_c.parallel(-0.001), transition=0.007, co_sense=True, farside=True)
+		path.append(ar_o, transition=0.005, co_sense=False, farside=False)
+		path.append(l_r, farside=True)
+		path.append(ar_i)
+		path.append(l_c.parallel(0.001, True), transition=0.007, co_sense=False, farside=False)
+		path.append(al_i, transition=0.005, co_sense=True, farside=True)
+		path.append(l_l)
+		path.end_point(p_0l)
+
+		P.draw(path)
+
 	if Q2D_SpaceClaim:
 		h_radius = 0.05
 		h_pitch  = 0.02
-		plotter = Q2D_Helix(h_radius, h_pitch, (0,0,0), (0,0,1), (0,1,0), (1,0,0))
-	else:
-		plotter = Q2D_Plotter([-0.01,0.04], [-0.01,0.01])
 
-	oy = 0.0136
+		plotter = Q2D_Helix(h_radius, h_pitch, (0,0,-2.5*h_pitch), (0,0,1), (0,1,0), (1,0,0))
+		make_conduit_profile(plotter)
+		plotter.revolve_and_clear('Conduit-Left', 2.0)
 
-	p_0l = Q2D_Point((0.000, oy - 0.018))
-	p_tr = Q2D_Point((0.030, oy + 0.000))
-	p_cc = Q2D_Point((0.015, oy - 0.015))
-
-	pc_l = Q2D_Point((0.005, oy + 0.000))
-	pc_r = Q2D_Point((0.025, oy + 0.000))
-
-	cl_o = Q2D_Circle(pc_l, 0.020)
-	cl_i = Q2D_Circle(pc_l, 0.018)
-	cr_o = Q2D_Circle(pc_r, 0.017)
-	cr_i = Q2D_Circle(pc_r, 0.015)
-
-	l_l = Q2D_Line(p_0l, Q2D_Vector(DEG(270.0)))
-	l_r = Q2D_Line(p_tr, Q2D_Vector(DEG( 90.0)))
-	l_c = Q2D_Line(p_cc, Q2D_Vector(DEG( 30.0)))
-
-	al_o = Q2D_Arc(None, cl_o, False)
-	al_i = Q2D_Arc(None, cl_i, True)
-	ar_o = Q2D_Arc(None, cr_o, False)
-	ar_i = Q2D_Arc(None, cr_i, True)
-
-	path = Q2D_Path(l_l)
-	path.append(al_o, farside=True)
-	path.append(l_c.parallel(-0.001), transition=0.007, co_sense=True, farside=True)
-	path.append(ar_o, transition=0.005, co_sense=False, farside=False)
-	path.append(l_r, farside=True)
-	path.append(ar_i)
-	path.append(l_c.parallel(0.001, True), transition=0.007, co_sense=False, farside=False)
-	path.append(al_i, transition=0.005, co_sense=True, farside=True)
-	path.append(l_l)
-	path.end_point(p_0l)
-
-	plotter.draw(path)
-
-	if Q2D_SpaceClaim:
-		revolutions = 5.0
-		plotter.revolve_and_clear('Conduit', revolutions)
-
-		Selection.Create(plotter.front).CreateAGroup('Front')
-		Selection.Create(plotter.back).CreateAGroup('Back')
+		Selection.Create(plotter.front).CreateAGroup('Conduit-Left-Front')
+		Selection.Create(plotter.back).CreateAGroup('Conduit-Left-Back')
 
 		count = len(plotter.sides) - 1  # first and last are the same
 		for s in range(0, count):
 			a = 255
 			r = int(255.0 * s / (count - 1))
-			g = 0
+			g = int(255.0 * (count - 1 - s) / (count - 1))
+			b = 0
+			side = Selection.Create(plotter.sides[s])
+			ColorHelper.SetColor(side, Color.FromArgb(a, r, g, b))
+
+		named_object_lock('Conduit-Left')
+
+		plotter = Q2D_Helix(h_radius, h_pitch, (0,0,-0.5*h_pitch), (0,0,1), (0,1,0), (1,0,0))
+		make_conduit_profile(plotter)
+		plotter.revolve_and_clear('Conduit-Middle', 1.0)
+
+		Selection.Create(plotter.front).CreateAGroup('Conduit-Middle-Front')
+		Selection.Create(plotter.back).CreateAGroup('Conduit-Middle-Back')
+
+		count = len(plotter.sides) - 1  # first and last are the same
+		for s in range(0, count):
+			a = 255
+			r = 0
+			g = int(255.0 * s / (count - 1))
 			b = int(255.0 * (count - 1 - s) / (count - 1))
 			side = Selection.Create(plotter.sides[s])
 			ColorHelper.SetColor(side, Color.FromArgb(a, r, g, b))
+
+		named_object_lock('Conduit-Middle')
+
+		plotter = Q2D_Helix(h_radius, h_pitch, (0,0,0.5*h_pitch), (0,0,1), (0,1,0), (1,0,0))
+		make_conduit_profile(plotter)
+		plotter.revolve_and_clear('Conduit-Right', 2.0)
+
+		Selection.Create(plotter.front).CreateAGroup('Conduit-Right-Front')
+		Selection.Create(plotter.back).CreateAGroup('Conduit-Right-Back')
+
+		count = len(plotter.sides) - 1  # first and last are the same
+		for s in range(0, count):
+			a = 255
+			r = int(255.0 * (count - 1 - s) / (count - 1))
+			g = 0
+			b = int(255.0 * s / (count - 1))
+			side = Selection.Create(plotter.sides[s])
+			ColorHelper.SetColor(side, Color.FromArgb(a, r, g, b))
+
+		named_object_lock('Conduit-Right')
+
 	else:
+		plotter = Q2D_Plotter([-0.01,0.04], [-0.01,0.01])
+		make_conduit_profile(plotter)
 		plotter.show()
 
 if Q2D_SpaceClaim:
