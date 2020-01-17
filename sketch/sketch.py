@@ -1,6 +1,6 @@
 # -*- indent-tabs-mode: t; tab-width: 4 -*-
 
-arc_test = 2 # 0: arc-arc test; 1: arc-line test; 2: hook; 3: SpaceClaim 3D-NURBS
+arc_test = 4 # 0: arc-arc test; 1: arc-line test; 2: hook; 3: SpaceClaim 3D-NURBS
 
 # ==== Preliminary setup: Are we using SpaceClaim? ==== #
 
@@ -89,7 +89,7 @@ def named_object_extrude(face_name, body_name, thickness, direction, cut=False):
 		body = Selection.Create(result.CreatedBody)
 		RenameObject.Execute(body, body_name)
 
-def named_object_revolve(face_name, body_name, origin, direction, pitch, revolutions, righthanded, cut=False):
+def named_object_revolve_helix(face_name, body_name, origin, direction, pitch, revolutions, righthanded, cut=False):
 	s = named_object_select(face_name)
 	if s is not None:
 		face = Selection.Create(s.Items[0].Faces[0])
@@ -871,6 +871,9 @@ class Q2D_Sketcher(object):
 		self.plane = plane
 		self.curves = []
 		self.shapes = []
+		self.front = None
+		self.back = None
+		self.sides = []
 
 	def __draw_circle(self, circle):
 		result = SketchCircle.Create(circle.center.point(), circle.radius)
@@ -929,15 +932,7 @@ class Q2D_Sketcher(object):
 		self._create_surface(name)
 		self._clear_curves()
 
-class Q2D_Extrusion(Q2D_Sketcher):
-
-	def __init__(self, plane): # where plane is a SpaceClaim sketch plane - see, e.g., sketch_reset()
-		Q2D_Sketcher.__init__(self, plane)
-		self.front = None
-		self.back = None
-		self.sides = []
-
-	def __match_curves(self, body_name): # FIXME: this won't work if extruding a circle as a cylinder
+	def _match_curves(self, body_name): # FIXME: this won't work if extruding a circle as a cylinder
 		self.front = None
 		self.back = None
 		self.sides = []
@@ -981,10 +976,15 @@ class Q2D_Extrusion(Q2D_Sketcher):
 
 			self.sides = order
 
+class Q2D_Extrusion(Q2D_Sketcher):
+
+	def __init__(self, plane): # where plane is a SpaceClaim sketch plane - see, e.g., sketch_reset()
+		Q2D_Sketcher.__init__(self, plane)
+
 	def extrude_and_clear(self, name, direction, thickness):
 		self._create_surface(name)
 		named_object_extrude(name, name, thickness, direction, False)
-		self.__match_curves(name)
+		self._match_curves(name)
 		self._clear_curves()
 
 class Q2D_Helix(Q2D_Sketcher):
@@ -1015,8 +1015,9 @@ class Q2D_Helix(Q2D_Sketcher):
 
 	def revolve_and_clear(self, name, revolutions):
 		self._create_surface(name)
-		named_object_revolve(name, name, self.origin, self.axis, self.pitch, revolutions, self.righthanded, False)
-		#self._clear_curves()
+		named_object_revolve_helix(name, name, self.origin, self.axis, self.pitch, revolutions, self.righthanded, False)
+		self._match_curves(name)
+		self._clear_curves()
 
 class Q3D_NURBS(object): # cubic surface
 
@@ -1529,7 +1530,19 @@ elif arc_test == 4:
 
 	if Q2D_SpaceClaim:
 		revolutions = 5.0
-		plotter.revolve_and_clear('Pipe', revolutions)
+		plotter.revolve_and_clear('Conduit', revolutions)
+
+		Selection.Create(plotter.front).CreateAGroup('Front')
+		Selection.Create(plotter.back).CreateAGroup('Back')
+
+		count = len(plotter.sides) - 1  # first and last are the same
+		for s in range(0, count):
+			a = 255
+			r = int(255.0 * s / (count - 1))
+			g = 0
+			b = int(255.0 * (count - 1 - s) / (count - 1))
+			side = Selection.Create(plotter.sides[s])
+			ColorHelper.SetColor(side, Color.FromArgb(a, r, g, b))
 	else:
 		plotter.show()
 
