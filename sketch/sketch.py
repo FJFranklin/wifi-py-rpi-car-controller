@@ -32,11 +32,56 @@ else:
 
 def remove_all_bodies():
 	while GetRootPart().Bodies.Count > 0:
-		GetRootPart().Bodies[0].Delete()
+		b = GetRootPart().Bodies[0]
+		if b.IsLocked:
+			s = Selection.Create(b)
+			ViewHelper.LockBodies(s, False)
+		b.Delete()
 
 def remove_all_curves():
 	while GetRootPart().Curves.Count > 0:
 		GetRootPart().Curves[0].Delete()
+
+class QSC_Select:
+
+	@staticmethod
+	def by_name(name): # get named selection
+		s = Selection.CreateByNames(name)
+		if len(s.Items) == 0:
+			s = None
+			print('Named selection failed: ' + name)
+		return QSC_Select(s)
+
+	def __init__(self, selection):
+		self.selection = selection
+		
+	def delete(self):
+		if self.selection is not None:
+			Delete.Execute(self.selection)
+
+	def rename(self, name):
+		if self.selection is not None:
+			RenameObject.Execute(self.selection, name)
+
+	def lock(self):
+		if self.selection is not None:
+			ViewHelper.LockBodies(self.selection, True)
+
+	def unlock(self):
+		if self.selection is not None:
+			ViewHelper.LockBodies(self.selection, False)
+
+	def show(self):
+		if self.selection is not None:
+			ViewHelper.SetObjectVisibility(self.selection, VisibilityType.Show)
+
+	def hide(self):
+		if self.selection is not None:
+			ViewHelper.SetObjectVisibility(self.selection, VisibilityType.Hide)
+
+	def principal_face(self):
+		if self.selection is not None:
+			return Selection.Create(self.selection.Items[0].Faces[0])
 
 def named_object_select(name):
 	s = Selection.CreateByNames(name)
@@ -416,6 +461,28 @@ class Q2D_Arc(Q2D_Object):
 
 class Q2D_Path(object):
 
+	@staticmethod
+	def polygon(points): # where points = [(x1,y1) .. (xN,yN)], N > 2
+		path = None
+		if len(points) > 2:
+			p0 = Q2D_Point(points[0])
+			p1 = p0
+
+			for i in range(1, len(points)):
+				p2 = Q2D_Point(points[i])
+				line_12 = Q2D_Line(p1, Q2D_Point.from_to(p1, p2))
+				if i == 1:
+					path = Q2D_Path(line_12)
+				else:
+					path.append(line_12)
+				p1 = p2
+
+			line_12 = Q2D_Line(p1, Q2D_Point.from_to(p1, p0))
+			path.append(line_12)
+			path.end_point(p0)
+
+		return path
+
 	def __init__(self, line_or_arc):
 		self.name = "Path"
 		self.chain = line_or_arc
@@ -441,8 +508,11 @@ class Q2D_Path(object):
 		d2 = l2.direction
 
 		pi = l1.intersection(l2, radius)
-		if pi is not None:
+		if pi is None:
+			print('Unable to add line to line - no intersection')
+		else:
 			if radius > 0:
+				print('Adding line to line with transition')
 				p1 = l1.project(pi)
 				p2 = l2.project(pi)
 
@@ -451,6 +521,7 @@ class Q2D_Path(object):
 
 				self.__append(Q2D_Line(p2, d2))
 			else:
+				print('Adding line to line without transition')
 				self.__append(Q2D_Line(pi, d2))
 
 	@staticmethod
@@ -1025,9 +1096,50 @@ class Q2D_Helix(Q2D_Sketcher):
 		self.origin = Point.Create(*origin)
 		self.axis = h_axis
 		self.pitch = helix_pitch
+		self.radius = helix_radius
 		self.righthanded = righthanded
+		self.incline_cos = c
+		self.incline_sin = s
+		self.basis_origin = origin
+		self.basis_e_axis = e_axis
+		self.basis_e_radial = e_radial
+		self.basis_e_transverse = e_transverse
+		self.name = None
+
+	def offset_plane(self, angle):
+		c = math.cos(angle)
+		s = math.sin(angle)
+		e_radial     = ( self.basis_e_radial[0] * c + self.basis_e_transverse[0] * s,  self.basis_e_radial[1] * c + self.basis_e_transverse[1] * s,  self.basis_e_radial[2] * c + self.basis_e_transverse[2] * s)
+		e_transverse = (-self.basis_e_radial[0] * s + self.basis_e_transverse[0] * c, -self.basis_e_radial[1] * s + self.basis_e_transverse[1] * c, -self.basis_e_radial[2] * s + self.basis_e_transverse[2] * c)
+
+		c = self.incline_cos
+		s = self.incline_sin
+		prof_y = Direction.Create(*e_radial)
+		prof_x = Direction.Create(c * self.basis_e_axis[0] + s * e_transverse[0], c * self.basis_e_axis[1] + s * e_transverse[1], c * self.basis_e_axis[2] + s * e_transverse[2])
+		origin = Point.Create(*self.basis_origin)
+		plane  = Plane.Create(Frame.Create(origin, prof_x, prof_y))
+		return plane
+            
+	def split(self, angle, new_body_name):
+		plane = self.offset_plane(angle)
+		ViewHelper.SetSketchPlane(plane)
+		plotter = Q2D_Sketcher(plane)
+
+		occlusion = Q2D_Path.polygon([(-3.0 * self.pitch, 0.0), (3.0 * self.pitch, 0.0), (3.0 * self.pitch, 2.0 * self.radius), (-3.0 * self.pitch, 2.0 * self.radius)])
+		plotter.draw(occlusion)
+		plotter.create_surface_and_clear('Helix-Split-Plane')
+
+		helix = QSC_Select.by_name(self.name)
+		surface = QSC_Select.by_name('Helix-Split-Plane')
+		SplitBody.Execute(helix.selection, surface.principal_face(), False)
+
+		surface.delete()
+
+		new_body = QSC_Select.by_name(self.name + '1')
+		new_body.rename(new_body_name)
 
 	def revolve_and_clear(self, name, revolutions, cut=False, match=True, clear=True):
+		self.name = name
 		self._create_surface(name)
 		named_object_revolve_helix(name, name, self.origin, self.axis, self.pitch, revolutions, self.righthanded, cut)
 		if match:
@@ -1558,7 +1670,8 @@ elif arc_test == 4:
 			side = Selection.Create(plotter.sides[s])
 			ColorHelper.SetColor(side, Color.FromArgb(a, r, g, b))
 
-		named_object_lock('Conduit-Left')
+		Conduit_Left = QSC_Select.by_name('Conduit-Left')
+		Conduit_Left.lock()
 
 		plotter = Q2D_Helix(h_radius, h_pitch, (0,0,-0.5*h_pitch), (0,0,1), (0,1,0), (1,0,0))
 		make_conduit_profile(plotter)
@@ -1576,7 +1689,9 @@ elif arc_test == 4:
 			side = Selection.Create(plotter.sides[s])
 			ColorHelper.SetColor(side, Color.FromArgb(a, r, g, b))
 
-		named_object_lock('Conduit-Middle')
+		Conduit_Middle_Helix = plotter
+		Conduit_Middle = QSC_Select.by_name('Conduit-Middle')
+		Conduit_Middle.lock()
 
 		plotter = Q2D_Helix(h_radius, h_pitch, (0,0,0.5*h_pitch), (0,0,1), (0,1,0), (1,0,0))
 		make_conduit_profile(plotter)
@@ -1594,7 +1709,16 @@ elif arc_test == 4:
 			side = Selection.Create(plotter.sides[s])
 			ColorHelper.SetColor(side, Color.FromArgb(a, r, g, b))
 
-		named_object_lock('Conduit-Right')
+		Conduit_Right = QSC_Select.by_name('Conduit-Right')
+		Conduit_Right.lock()
+
+		Conduit_Left.hide()
+		Conduit_Right.hide()
+		Conduit_Middle.unlock()
+
+		Conduit_Middle_Helix.split(DEG(175.0), 'Conduit-Middle-Right')
+		Conduit_Middle_Helix.split(DEG(185.0), 'Conduit-Middle-Middle')
+		Conduit_Middle.rename('Conduit-Middle-Left')
 
 	else:
 		plotter = Q2D_Plotter([-0.01,0.04], [-0.01,0.01])
