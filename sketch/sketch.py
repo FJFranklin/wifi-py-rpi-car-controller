@@ -42,46 +42,208 @@ def remove_all_curves():
 	while GetRootPart().Curves.Count > 0:
 		GetRootPart().Curves[0].Delete()
 
-class QSC_Select:
+class QSC_Select(object):
 
 	@staticmethod
-	def by_name(name): # get named selection
-		s = Selection.CreateByNames(name)
-		if len(s.Items) == 0:
-			s = None
-			print('Named selection failed: ' + name)
-		return QSC_Select(s)
+	def create(name, selection): # create named selection
+		if len(selection.Items) == 0:
+			print('Cannot name empty selection: ' + name)
+			return None
+		RenameObject.Execute(selection, name)
+		return QSC_Select(name)
 
-	def __init__(self, selection):
-		self.selection = selection
+	def __init__(self, name):
+		self.name = name
+		self.selection = None
 		
+	def select(self): # get named selection
+		success = True
+		self.selection = Selection.CreateByNames(self.name)
+		if len(self.selection.Items) == 0:
+			self.selection = None
+			success = False
+			print('Named selection failed: ' + self.name)
+		return success
+
 	def delete(self):
-		if self.selection is not None:
+		if self.select():
 			Delete.Execute(self.selection)
 
 	def rename(self, name):
-		if self.selection is not None:
+		if self.select():
 			RenameObject.Execute(self.selection, name)
+		self.name = name
 
 	def lock(self):
-		if self.selection is not None:
+		if self.select():
 			ViewHelper.LockBodies(self.selection, True)
 
 	def unlock(self):
-		if self.selection is not None:
+		if self.select():
 			ViewHelper.LockBodies(self.selection, False)
 
 	def show(self):
-		if self.selection is not None:
+		if self.select():
 			ViewHelper.SetObjectVisibility(self.selection, VisibilityType.Show)
 
 	def hide(self):
-		if self.selection is not None:
+		if self.select():
 			ViewHelper.SetObjectVisibility(self.selection, VisibilityType.Hide)
 
+class QSC_Surface(QSC_Select):
+	def __init__(self, name):
+		QSC_Select.__init__(self, name)
+
 	def principal_face(self):
-		if self.selection is not None:
+		if self.select():
 			return Selection.Create(self.selection.Items[0].Faces[0])
+
+class QSC_Body(QSC_Select):
+
+	__counter = 0
+
+	@staticmethod
+	def __name():
+		name = 'body_' + str(QSC_Body.__counter)
+		QSC_Body.__counter += 1
+		return name
+
+	def __init__(self, name=None):
+		if name is None:
+			name = QSC_Body.__name()
+
+		QSC_Select.__init__(self, name)
+		self.front = None
+		self.back = None
+		self.sides = []
+
+	def paint(self, c_front, c_back, c_sides_from, c_sides_to=None):
+		if self.front is not None and c_front is not None:
+			side = Selection.Create(self.front)
+			ColorHelper.SetColor(side, Color.FromArgb(*c_front))
+
+		if self.back is not None and c_front is not None:
+			side = Selection.Create(self.back)
+			ColorHelper.SetColor(side, Color.FromArgb(*c_back))
+
+		if len(self.sides) > 0 and c_sides_from is not None:
+			if len(self.sides) == 1:
+				side = Selection.Create(self.sides[0])
+				ColorHelper.SetColor(side, Color.FromArgb(*c_sides_from))
+			elif c_sides_to is None:
+				for s in self.sides:
+					side = Selection.Create(self.sides[s])
+					ColorHelper.SetColor(side, Color.FromArgb(*c_sides_from))
+			else:
+				count = len(self.sides)
+				if self.sides[0] == self.sides[count-1]: # first and last are the same
+					count -= 1
+
+				for s in range(0, count):
+					a = int(c_sides_from[0] * (count - 1 - s) / (count - 1)) + int(c_sides_to[0] * s / (count - 1))
+					r = int(c_sides_from[1] * (count - 1 - s) / (count - 1)) + int(c_sides_to[1] * s / (count - 1))
+					g = int(c_sides_from[2] * (count - 1 - s) / (count - 1)) + int(c_sides_to[2] * s / (count - 1))
+					b = int(c_sides_from[3] * (count - 1 - s) / (count - 1)) + int(c_sides_to[3] * s / (count - 1))
+					side = Selection.Create(plotter.body.sides[s])
+					ColorHelper.SetColor(side, Color.FromArgb(a, r, g, b))
+
+	def match_curves(self, curves):
+		self.front = None
+		self.back = None
+		self.sides = []
+
+		if self.select():
+			b = self.selection.Items[0]
+
+			for f in b.Faces:
+				match_all = True
+				match_none = True
+
+				for e in f.Edges:
+					match = False
+					for c in curves:
+						curve = c[0].Shape.Geometry
+						if e.Shape.Geometry.IsCoincident(curve):
+							match = True
+							break
+					if match:
+						match_none = False
+					else:
+						match_all = False
+
+				if match_all:
+					self.back = f
+				elif match_none:
+					self.front = f
+				else:
+					self.sides.append(f)
+
+			order = []
+			for c in curves:
+				curve = c[0].Shape.Geometry
+				
+				for f in self.sides:
+					matched = False
+					for e in f.Edges:
+						if e.Shape.Geometry.IsCoincident(curve):
+							matched = True
+							break
+					if matched:
+						order.append(f)
+						break
+
+			self.sides = order
+
+	@staticmethod
+	def faces_connected(face1, face2):
+		None
+
+	@staticmethod
+	def faces_coincident(face1, face2):
+		None
+
+	def cross_sect_and_match(self, surface):
+		self.front = None
+		self.back = None
+		self.sides = []
+
+		if self.select():
+			for f in self.selection.Items[0].Faces:
+				match_count = 0
+				
+				for c in curves:
+					curve = c[0].Shape.Geometry
+					
+					for e in f.Edges:
+						if e.Shape.Geometry.IsCoincident(curve):
+							match_count += 1
+							break
+				
+				if match_count == len(curves):
+					#print("back: count={c}".format(c=match_count))
+					self.back = f
+				elif match_count == 0:
+					#print("front: count={c}".format(c=match_count))
+					self.front = f
+				else:
+					#print("side: count={c}".format(c=match_count))
+					self.sides.append(f)
+			
+			order = []
+			for c in curves:
+				curve = c[0].Shape.Geometry
+				
+				for f in self.sides:
+					matched = False
+					for e in f.Edges:
+						if e.Shape.Geometry.IsCoincident(curve):
+							matched = True
+							break
+					if matched:
+						order.append(f)
+						break
+
+			self.sides = order
 
 def named_object_select(name):
 	s = Selection.CreateByNames(name)
@@ -956,9 +1118,7 @@ class Q2D_Sketcher(object):
 		self.plane = plane
 		self.curves = []
 		self.shapes = []
-		self.front = None
-		self.back = None
-		self.sides = []
+		self.body = QSC_Body()
 
 	def __draw_circle(self, circle):
 		result = SketchCircle.Create(circle.center.point(), circle.radius)
@@ -1017,49 +1177,9 @@ class Q2D_Sketcher(object):
 		self._create_surface(name)
 		self._clear_curves()
 
-	def _match_curves(self, body_name): # FIXME: this won't work if extruding a circle as a cylinder
-		self.front = None
-		self.back = None
-		self.sides = []
-
-		s = named_object_select(body_name)
-		if s is not None:
-			for f in s.Items[0].Faces:
-				match_count = 0
-				
-				for c in self.curves:
-					curve = c[0].Shape.Geometry
-					
-					for e in f.Edges:
-						if e.Shape.Geometry.IsCoincident(curve):
-							match_count += 1
-							break
-				
-				if match_count == len(self.curves):
-					#print("back: count={c}".format(c=match_count))
-					self.back = f
-				elif match_count == 0:
-					#print("front: count={c}".format(c=match_count))
-					self.front = f
-				else:
-					#print("side: count={c}".format(c=match_count))
-					self.sides.append(f)
-			
-			order = []
-			for c in self.curves:
-				curve = c[0].Shape.Geometry
-				
-				for f in self.sides:
-					matched = False
-					for e in f.Edges:
-						if e.Shape.Geometry.IsCoincident(curve):
-							matched = True
-							break
-					if matched:
-						order.append(f)
-						break
-
-			self.sides = order
+	def _match_curves(self, body_name):
+		self.body.rename(body_name)
+		self.body.match_curves(self.curves)
 
 class Q2D_Extrusion(Q2D_Sketcher):
 
@@ -1129,14 +1249,17 @@ class Q2D_Helix(Q2D_Sketcher):
 		plotter.draw(occlusion)
 		plotter.create_surface_and_clear('Helix-Split-Plane')
 
-		helix = QSC_Select.by_name(self.name)
-		surface = QSC_Select.by_name('Helix-Split-Plane')
+		helix = QSC_Select(self.name)
+		helix.select()
+		surface = QSC_Surface('Helix-Split-Plane')
 		SplitBody.Execute(helix.selection, surface.principal_face(), False)
 
 		surface.delete()
 
-		new_body = QSC_Select.by_name(self.name + '1')
+		new_body = QSC_Select(self.name + '1')
 		new_body.rename(new_body_name)
+
+		#self._match_curves(self.name)
 
 	def revolve_and_clear(self, name, revolutions, cut=False, match=True, clear=True):
 		self.name = name
@@ -1146,6 +1269,7 @@ class Q2D_Helix(Q2D_Sketcher):
 			self._match_curves(name)
 		if clear:
 			self._clear_curves()
+		return self.body
 
 class Q3D_NURBS(object): # cubic surface
 
@@ -1601,10 +1725,10 @@ elif arc_test == 2: # let's draw a hook
 		#  sides[0] == sides[10] - the seat
 		#  sides[1 .. 9]         - clockwise around the hook
 		#  sides[11]             - the top hole
-		Selection.Create(plotter.sides[0]).CreateAGroup('Seat')
-		Selection.Create(plotter.sides[11]).CreateAGroup('Hole')
-		Selection.Create(plotter.front).CreateAGroup('Front')
-		Selection.Create(plotter.back).CreateAGroup('Back')
+		Selection.Create(plotter.body.sides[0]).CreateAGroup('Seat')
+		Selection.Create(plotter.body.sides[11]).CreateAGroup('Hole')
+		Selection.Create(plotter.body.front).CreateAGroup('Front')
+		Selection.Create(plotter.body.back).CreateAGroup('Back')
 	else:
 		plotter.show()
 
@@ -1648,68 +1772,48 @@ elif arc_test == 4:
 		path.append(l_l)
 		path.end_point(p_0l)
 
-		P.draw(path)
+		if GeometrySequence == 0:
+			P.draw(Q2D_Circle(Q2D_Point((0.005,-0.005)), 0.005))
+		else:
+			P.draw(path)
 
 	if Q2D_SpaceClaim:
 		h_radius = 0.05
 		h_pitch  = 0.02
 
+		black = (  0.0,   0.0,   0.0,   0.0)
+		white = (255.0, 255.0, 255.0, 255.0)
+		red   = (255.0, 255.0,   0.0,   0.0)
+		green = (255.0,   0.0, 255.0,   0.0)
+		blue  = (255.0,   0.0,   0.0, 255.0)
+
 		plotter = Q2D_Helix(h_radius, h_pitch, (0,0,-2.5*h_pitch), (0,0,1), (0,1,0), (1,0,0))
 		make_conduit_profile(plotter)
-		plotter.revolve_and_clear('Conduit-Left', 2.0)
+		Conduit_Left = plotter.revolve_and_clear('Conduit-Left', 2.0)
 
-		Selection.Create(plotter.front).CreateAGroup('Conduit-Left-Front')
-		Selection.Create(plotter.back).CreateAGroup('Conduit-Left-Back')
+		Selection.Create(Conduit_Left.front).CreateAGroup('Conduit-Left-Front')
+		Selection.Create(Conduit_Left.back).CreateAGroup('Conduit-Left-Back')
 
-		count = len(plotter.sides) - 1  # first and last are the same
-		for s in range(0, count):
-			a = 255
-			r = int(255.0 * s / (count - 1))
-			g = int(255.0 * (count - 1 - s) / (count - 1))
-			b = 0
-			side = Selection.Create(plotter.sides[s])
-			ColorHelper.SetColor(side, Color.FromArgb(a, r, g, b))
-
-		Conduit_Left = QSC_Select.by_name('Conduit-Left')
+		Conduit_Left.paint(black, white, red, green)
 		Conduit_Left.lock()
 
 		plotter = Q2D_Helix(h_radius, h_pitch, (0,0,-0.5*h_pitch), (0,0,1), (0,1,0), (1,0,0))
 		make_conduit_profile(plotter)
-		plotter.revolve_and_clear('Conduit-Middle', 1.0)
+		Conduit_Middle = plotter.revolve_and_clear('Conduit-Middle', 1.0)
 
-		Selection.Create(plotter.front).CreateAGroup('Conduit-Middle-Front')
-		Selection.Create(plotter.back).CreateAGroup('Conduit-Middle-Back')
-
-		count = len(plotter.sides) - 1  # first and last are the same
-		for s in range(0, count):
-			a = 255
-			r = 0
-			g = int(255.0 * s / (count - 1))
-			b = int(255.0 * (count - 1 - s) / (count - 1))
-			side = Selection.Create(plotter.sides[s])
-			ColorHelper.SetColor(side, Color.FromArgb(a, r, g, b))
+		Conduit_Middle.paint(black, white, green, blue)
+		Conduit_Middle.lock()
 
 		Conduit_Middle_Helix = plotter
-		Conduit_Middle = QSC_Select.by_name('Conduit-Middle')
-		Conduit_Middle.lock()
 
 		plotter = Q2D_Helix(h_radius, h_pitch, (0,0,0.5*h_pitch), (0,0,1), (0,1,0), (1,0,0))
 		make_conduit_profile(plotter)
-		plotter.revolve_and_clear('Conduit-Right', 2.0)
+		Conduit_Right = plotter.revolve_and_clear('Conduit-Right', 2.0)
 
-		Selection.Create(plotter.front).CreateAGroup('Conduit-Right-Front')
-		Selection.Create(plotter.back).CreateAGroup('Conduit-Right-Back')
+		Selection.Create(Conduit_Right.front).CreateAGroup('Conduit-Right-Front')
+		Selection.Create(Conduit_Right.back).CreateAGroup('Conduit-Right-Back')
 
-		count = len(plotter.sides) - 1  # first and last are the same
-		for s in range(0, count):
-			a = 255
-			r = int(255.0 * (count - 1 - s) / (count - 1))
-			g = 0
-			b = int(255.0 * s / (count - 1))
-			side = Selection.Create(plotter.sides[s])
-			ColorHelper.SetColor(side, Color.FromArgb(a, r, g, b))
-
-		Conduit_Right = QSC_Select.by_name('Conduit-Right')
+		Conduit_Right.paint(black, white, blue, red)
 		Conduit_Right.lock()
 
 		Conduit_Left.hide()
@@ -1719,6 +1823,9 @@ elif arc_test == 4:
 		Conduit_Middle_Helix.split(DEG(175.0), 'Conduit-Middle-Right')
 		Conduit_Middle_Helix.split(DEG(185.0), 'Conduit-Middle-Middle')
 		Conduit_Middle.rename('Conduit-Middle-Left')
+
+		Selection.Create(Conduit_Middle_Helix.body.front).CreateAGroup('Conduit-Middle-Left-Front')
+		Selection.Create(Conduit_Middle_Helix.body.back).CreateAGroup('Conduit-Middle-Left-Back')
 
 	else:
 		plotter = Q2D_Plotter([-0.01,0.04], [-0.01,0.01])
