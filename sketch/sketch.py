@@ -97,6 +97,7 @@ class QSC_Surface(QSC_Select):
 	def principal_face(self):
 		if self.select():
 			return Selection.Create(self.selection.Items[0].Faces[0])
+		return None
 
 class QSC_Body(QSC_Select):
 
@@ -144,7 +145,7 @@ class QSC_Body(QSC_Select):
 					r = int(c_sides_from[1] * (count - 1 - s) / (count - 1)) + int(c_sides_to[1] * s / (count - 1))
 					g = int(c_sides_from[2] * (count - 1 - s) / (count - 1)) + int(c_sides_to[2] * s / (count - 1))
 					b = int(c_sides_from[3] * (count - 1 - s) / (count - 1)) + int(c_sides_to[3] * s / (count - 1))
-					side = Selection.Create(plotter.body.sides[s])
+					side = Selection.Create(self.sides[s])
 					ColorHelper.SetColor(side, Color.FromArgb(a, r, g, b))
 
 	def match_curves(self, curves):
