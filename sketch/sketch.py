@@ -1,6 +1,12 @@
 # -*- indent-tabs-mode: t; tab-width: 4 -*-
 
-arc_test = 4 # 0: arc-arc test; 1: arc-line test; 2: hook; 3: SpaceClaim 3D-NURBS
+# 0: arc-arc test
+# 1: arc-line test
+# 2: hook
+# 3: SpaceClaim 3D-NURBS
+# 4: conduit
+# 5: ski
+arc_test = 5
 
 # ==== Preliminary setup: Are we using SpaceClaim? ==== #
 
@@ -65,6 +71,10 @@ class QSC_Select(object):
 			print('Named selection failed: ' + self.name)
 		return success
 
+	def create_named_selection(self, name):
+		if self.select():
+			self.selection.CreateAGroup(name)
+
 	def delete(self):
 		if self.select():
 			Delete.Execute(self.selection)
@@ -98,6 +108,10 @@ class QSC_Surface(QSC_Select):
 		if self.select():
 			return Selection.Create(self.selection.Items[0].Faces[0])
 		return None
+
+	def paint(self, rgba):
+		if self.select():
+			ColorHelper.SetColor(self.selection, Color.FromArgb(*rgba))
 
 class QSC_Body(QSC_Select):
 
@@ -306,6 +320,16 @@ def named_object_extrude(face_name, body_name, thickness, direction, cut=False):
 		result = ExtrudeFaces.Execute(face, direction, thickness, options)
 		body = Selection.Create(result.CreatedBody)
 		RenameObject.Execute(body, body_name)
+
+def named_surfaces_loft(surf_1_name, surf_2_name, body_name):
+	s1 = named_object_select(surf_1_name)
+	s2 = named_object_select(surf_2_name)
+	if s1 is not None and s2 is not None:
+		selection = Selection.Create(s1.Items[0].Faces[0], s2.Items[0].Faces[0])
+		options = LoftOptions()
+		options.GeometryCommandOptions = GeometryCommandOptions()
+		Loft.Create(selection, None, options)
+		named_object_rename('Solid', body_name)
 
 def named_object_revolve_helix(face_name, body_name, origin, direction, pitch, revolutions, righthanded, cut=False):
 	s = named_object_select(face_name)
@@ -1832,6 +1856,144 @@ elif arc_test == 4:
 		plotter = Q2D_Plotter([-0.01,0.04], [-0.01,0.01])
 		make_conduit_profile(plotter)
 		plotter.show()
+
+elif arc_test == 5:
+	midoff = 0.001
+	min_t  = 0.005
+	skin_t = 0.001
+
+	def ski_top(zoff=0.0):
+		pts = []
+		pts.append((-0.65,0.005,0.03))
+		pts.append((-0.62,0.040,0.00))
+		pts.append((-0.61,0.040,0.00))
+		pts.append((-0.60,0.040,0.00))
+		pts.append((-0.40,0.040,0.00))
+		pts.append((-0.20,0.030,0.01))
+		pts.append(( 0.00,0.030,0.01))
+		pts.append(( 0.20,0.030,0.01))
+		pts.append(( 0.40,0.040,0.00))
+		pts.append(( 0.60,0.040,0.00))
+		Nu = len(pts)
+		Nv = 4
+		NS = Q3D_NURBS(Nu, Nv)
+		for iu in range(0, Nu):
+			p = pts[iu]
+			x = p[0]
+			y = p[1]
+			z = p[2] + min_t / 2.0 + zoff
+			NS.set_control_point(iu, 0, (x, y, z))
+			NS.set_control_point(iu, 1, (x, midoff, z))
+			NS.set_control_point(iu, 2, (x, -midoff, z))
+			NS.set_control_point(iu, 3, (x, -y, z))
+
+		name = 'ski-top'
+		NS.create_nurbs_surface(name)
+		#NS.add_nurbscurves_to_sketch()
+		#NS.add_controlpoints_to_sketch()
+
+	def ski_bottom(zoff=0.0):
+		pts = []
+		pts.append((-0.65,0.005,0.03))
+		pts.append((-0.62,0.040,0.00))
+		pts.append((-0.61,0.040,0.00))
+		pts.append((-0.60,0.040,0.00))
+		pts.append((-0.40,0.040,0.00))
+		pts.append((-0.20,0.030,0.005))
+		pts.append(( 0.00,0.030,0.005))
+		pts.append(( 0.20,0.030,0.005))
+		pts.append(( 0.40,0.040,0.00))
+		pts.append(( 0.60,0.040,0.00))
+		Nu = len(pts)
+		Nv = 4
+		NS = Q3D_NURBS(Nu, Nv)
+		for iu in range(0, Nu):
+			p = pts[iu]
+			x = p[0]
+			y = p[1]
+			z = p[2] - min_t / 2.0 + zoff
+			NS.set_control_point(iu, 0, (x, y, z))
+			NS.set_control_point(iu, 1, (x, midoff, z))
+			NS.set_control_point(iu, 2, (x, -midoff, z))
+			NS.set_control_point(iu, 3, (x, -y, z))
+
+		name = 'ski-bottom'
+		NS.create_nurbs_surface(name)
+		#NS.add_nurbscurves_to_sketch()
+		#NS.add_controlpoints_to_sketch()
+	
+	ski_top()
+	ski_bottom()
+	named_surfaces_loft('ski-top', 'ski-bottom', 'ski-core')
+	
+	Core = QSC_Select('ski-core')
+	Core.lock()
+
+	def surf_split(surf_name, new_surf_name, xoff):
+		origin = Point.Create(xoff, 0.0, 0.0)
+		prof_x = Direction.Create(0.0, 1.0, 0.0)
+		prof_y = Direction.Create(0.0, 0.0, 1.0)
+		plane  = Plane.Create(Frame.Create(origin, prof_x, prof_y))
+		ViewHelper.SetSketchPlane(plane)
+
+		plotter = Q2D_Sketcher(plane)
+		occlusion = Q2D_Path.polygon([(-0.1, -0.1), (0.1, -0.1), (0.1, 0.1), (-0.1, 0.1)])
+		plotter.draw(occlusion)
+		plotter.create_surface_and_clear('split-plane')
+		splitter = QSC_Surface('split-plane')
+
+		surface = QSC_Surface(surf_name)
+		surface.select()
+		SplitBody.Execute(surface.selection, splitter.principal_face(), False)
+
+		splitter.delete()
+
+		new_surf = QSC_Surface(surf_name + '1')
+		new_surf.rename(new_surf_name)
+		
+	ski_top()
+	Top = QSC_Surface('ski-top')
+
+	surf_split('ski-top', 'ski-top-front', -0.15)
+	TopFront = QSC_Surface('ski-top-front')
+	TopFront.lock()
+
+	surf_split('ski-top', 'ski-top-foot', 0.15)
+	TopFoot = QSC_Surface('ski-top-foot')
+	TopFoot.lock()
+
+	Top.rename('ski-top-back')
+	Top.lock()
+
+	ski_bottom()
+	Bottom = QSC_Surface('ski-bottom')
+
+	surf_split('ski-bottom', 'ski-bottom-tip', -0.6)
+	Tip = QSC_Surface('ski-bottom-tip')
+	Tip.lock()
+
+	surf_split('ski-bottom', 'ski-bottom-far-front', -0.5)
+	FarFront = QSC_Surface('ski-bottom-far-front')
+	FarFront.lock()
+
+	surf_split('ski-bottom', 'ski-bottom-near-front', -0.15)
+	NearFront = QSC_Surface('ski-bottom-near-front')
+	NearFront.lock()
+
+	surf_split('ski-bottom', 'ski-bottom-foot',  0.15)
+	Foot = QSC_Surface('ski-bottom-foot')
+	Foot.lock()
+
+	surf_split('ski-bottom', 'ski-bottom-near-back', 0.5)
+	NearBack = QSC_Surface('ski-bottom-near-back')
+	NearBack.lock()
+	
+	Bottom.rename('ski-bottom-far-back')
+	Bottom.lock()
+	
+	TopFoot.create_named_selection('Ski Top Foot')
+	FarFront.create_named_selection('Ski Bottom Front')
+	Bottom.create_named_selection('Ski Bottom Back')
 
 if Q2D_SpaceClaim:
 	# Finally, switch to solid-modelling mode
