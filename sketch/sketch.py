@@ -6,7 +6,8 @@
 # 3: SpaceClaim 3D-NURBS
 # 4: conduit
 # 5: ski
-arc_test = 5
+# 6: cube
+arc_test = 4
 
 # ==== Preliminary setup: Are we using SpaceClaim? ==== #
 
@@ -211,54 +212,102 @@ class QSC_Body(QSC_Select):
 
 	@staticmethod
 	def faces_connected(face1, face2):
-		None
+		connected = False
+		for e1 in face1.Edges:
+			for e2 in face2.Edges:
+				if e1.MidPoint().Point.Equals(e2.MidPoint().Point):
+					connected = True
+		return connected
 
 	@staticmethod
 	def faces_coincident(face1, face2):
-		None
+		return face1.Shape.Geometry.IsCoincident(face2.Shape.Geometry)
 
-	def cross_sect_and_match(self, surface):
+	def _sort_faces(self, ref_front, ref_back):
 		self.front = None
 		self.back = None
 		self.sides = []
 
-		if self.select():
-			for f in self.selection.Items[0].Faces:
-				match_count = 0
-				
-				for c in curves:
-					curve = c[0].Shape.Geometry
-					
-					for e in f.Edges:
-						if e.Shape.Geometry.IsCoincident(curve):
-							match_count += 1
-							break
-				
-				if match_count == len(curves):
-					#print("back: count={c}".format(c=match_count))
-					self.back = f
-				elif match_count == 0:
-					#print("front: count={c}".format(c=match_count))
-					self.front = f
-				else:
-					#print("side: count={c}".format(c=match_count))
-					self.sides.append(f)
-			
-			order = []
-			for c in curves:
-				curve = c[0].Shape.Geometry
-				
-				for f in self.sides:
-					matched = False
-					for e in f.Edges:
-						if e.Shape.Geometry.IsCoincident(curve):
-							matched = True
-							break
-					if matched:
-						order.append(f)
-						break
+		for f in self.selection.Items[0].Faces:
+			if QSC_Body.faces_coincident(f, ref_front):
+				#print('front matched')
+				self.front = f
+				continue
+			if QSC_Body.faces_coincident(f, ref_back):
+				#print('back matched')
+				self.back = f
+				continue
+			#print('side assigned')
+			self.sides.append(f)
 
-			self.sides = order
+		if self.front is not None and self.back is None:
+			#print('searching for the back')
+			for s in self.sides:
+				if QSC_Body.faces_connected(s, ref_front):
+					#print('an actual side')
+					continue
+				#print('the back?')
+				self.back = s
+				self.sides.remove(s)
+				break
+
+		if self.front is None and self.back is not None:
+			#print('searching for the front')
+			for s in self.sides:
+				if QSC_Body.faces_connected(s, ref_back):
+					#print('an actual side')
+					continue
+				#print('the front?')
+				self.front = s
+				self.sides.remove(s)
+				break
+
+	def _reorganise_sides(self, ref_body):
+		org_sides = []
+		for r in ref_body.sides:
+			for s in self.sides:
+				if QSC_Body.faces_connected(s, r):
+					#print('matched with ref-body, count={d}'.format(d=count))
+					org_sides.append(s)
+					break
+		self.sides = org_sides
+
+	def cross_sect_and_match(self, surface, split_name, ref_body=None):
+		split_body = None
+
+		if self.select():
+			SplitBody.Execute(self.selection, surface.principal_face(), False)
+
+			old_front = self.front
+			old_back  = self.back
+
+			self._sort_faces(old_front, old_back)
+
+			if ref_body is not None and self.front is not None and self.back is not None:
+				if QSC_Body.faces_coincident(self.front, ref_body.back) or QSC_Body.faces_coincident(self.back, ref_body.front):
+					#print('Matching original to reference:')
+					self._reorganise_sides(ref_body)
+
+			new_body = QSC_Body(self.name + '1')
+			if new_body.select():
+				new_body._sort_faces(old_front, old_back)
+
+				split_body = new_body
+				split_body.rename(split_name)
+
+				if ref_body is not None and split_body.front is not None and split_body.back is not None:
+					if QSC_Body.faces_coincident(split_body.front, ref_body.back) or QSC_Body.faces_coincident(split_body.back, ref_body.front):
+						#print('Matching off-cut to reference:')
+						split_body._reorganise_sides(ref_body)
+
+						if self.front is not None and self.back is not None:
+							#print('Matching original to off-cut:')
+							self._reorganise_sides(split_body)
+					else:
+						#print('Matching off-cut to original:')
+						split_body._reorganise_sides(self)
+
+		return split_body
 
 def named_object_select(name):
 	s = Selection.CreateByNames(name)
@@ -1201,6 +1250,7 @@ class Q2D_Sketcher(object):
 	def create_surface_and_clear(self, name):
 		self._create_surface(name)
 		self._clear_curves()
+		return QSC_Surface(name)
 
 	def _match_curves(self, body_name):
 		self.body.rename(body_name)
@@ -1216,6 +1266,7 @@ class Q2D_Extrusion(Q2D_Sketcher):
 		named_object_extrude(name, name, thickness, direction, False)
 		self._match_curves(name)
 		self._clear_curves()
+		return self.body
 
 class Q2D_Helix(Q2D_Sketcher):
 
@@ -1265,26 +1316,19 @@ class Q2D_Helix(Q2D_Sketcher):
 		plane  = Plane.Create(Frame.Create(origin, prof_x, prof_y))
 		return plane
             
-	def split(self, angle, new_body_name):
+	def split(self, angle, new_body_name, ref_body=None):
 		plane = self.offset_plane(angle)
 		ViewHelper.SetSketchPlane(plane)
 		plotter = Q2D_Sketcher(plane)
 
 		occlusion = Q2D_Path.polygon([(-3.0 * self.pitch, 0.0), (3.0 * self.pitch, 0.0), (3.0 * self.pitch, 2.0 * self.radius), (-3.0 * self.pitch, 2.0 * self.radius)])
 		plotter.draw(occlusion)
-		plotter.create_surface_and_clear('Helix-Split-Plane')
+		surface = plotter.create_surface_and_clear('Helix-Split-Plane')
 
-		helix = QSC_Select(self.name)
-		helix.select()
-		surface = QSC_Surface('Helix-Split-Plane')
-		SplitBody.Execute(helix.selection, surface.principal_face(), False)
-
+		split_body = self.body.cross_sect_and_match(surface, new_body_name, ref_body)
 		surface.delete()
 
-		new_body = QSC_Select(self.name + '1')
-		new_body.rename(new_body_name)
-
-		#self._match_curves(self.name)
+		return split_body
 
 	def revolve_and_clear(self, name, revolutions, cut=False, match=True, clear=True):
 		self.name = name
@@ -1845,9 +1889,15 @@ elif arc_test == 4:
 		Conduit_Right.hide()
 		Conduit_Middle.unlock()
 
-		Conduit_Middle_Helix.split(DEG(175.0), 'Conduit-Middle-Right')
-		Conduit_Middle_Helix.split(DEG(185.0), 'Conduit-Middle-Middle')
+		Conduit_Middle_Right  = Conduit_Middle_Helix.split(DEG(175.0), 'Conduit-Middle-Right',  Conduit_Right)
+		Conduit_Middle_Right.lock()
+		Conduit_Middle_Right.hide()
+
+		Conduit_Middle_Middle = Conduit_Middle_Helix.split(DEG(185.0), 'Conduit-Middle-Middle', Conduit_Middle_Right)
+
 		Conduit_Middle.rename('Conduit-Middle-Left')
+		Conduit_Middle.lock()
+		Conduit_Middle.hide()
 
 		Selection.Create(Conduit_Middle_Helix.body.front).CreateAGroup('Conduit-Middle-Left-Front')
 		Selection.Create(Conduit_Middle_Helix.body.back).CreateAGroup('Conduit-Middle-Left-Back')
@@ -1994,6 +2044,39 @@ elif arc_test == 5:
 	TopFoot.create_named_selection('Ski Top Foot')
 	FarFront.create_named_selection('Ski Bottom Front')
 	Bottom.create_named_selection('Ski Bottom Back')
+
+elif arc_test == 6:
+	black = (  0.0,   0.0,   0.0,   0.0)
+	white = (255.0, 255.0, 255.0, 255.0)
+	red   = (255.0, 255.0,   0.0,   0.0)
+	green = (255.0,   0.0, 255.0,   0.0)
+	blue  = (255.0,   0.0,   0.0, 255.0)
+
+	plane, normal = sketch_reset('XY', (0.0,0.0,-1.0))
+	plotter = Q2D_Extrusion(plane)
+	square = Q2D_Path.polygon([(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)])
+	plotter.draw(square)
+	Ref = plotter.extrude_and_clear('Ref', normal, 1.0)
+	Ref.paint(black, white, blue, red)
+	Ref.lock()
+
+	plane, normal = sketch_reset('XY', (0.0,0.0,0.0))
+	plotter = Q2D_Extrusion(plane)
+	square = Q2D_Path.polygon([(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)])
+	plotter.draw(square)
+	Cube = plotter.extrude_and_clear('Cube', normal, 1.0)
+	Cube.paint(black, white, blue, red)
+
+	plane, normal = sketch_reset('XY', (0.0,0.0,0.5))
+	splitter = Q2D_Sketcher(plane)
+	outline = Q2D_Path.polygon([(-1.0,-1.0), (2.0,-1.0), (2.0,2.0), (-1.0,2.0)])
+	splitter.draw(outline)
+	split_plane = splitter.create_surface_and_clear('split-plane')
+
+	Offcut = Cube.cross_sect_and_match(split_plane, 'Offcut', Ref)
+	Offcut.paint(black, white, blue, red)
+	Cube.paint(black, white, blue, red)
+	split_plane.delete()
 
 if Q2D_SpaceClaim:
 	# Finally, switch to solid-modelling mode
