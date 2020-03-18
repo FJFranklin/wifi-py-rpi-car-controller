@@ -7,7 +7,8 @@
 # 4: conduit
 # 5: ski
 # 6: cube
-arc_test = 4
+# 7: foil
+arc_test = 7
 
 # ==== Preliminary setup: Are we using SpaceClaim? ==== #
 
@@ -2077,6 +2078,68 @@ elif arc_test == 6:
 	Offcut.paint(black, white, blue, red)
 	Cube.paint(black, white, blue, red)
 	split_plane.delete()
+
+elif arc_test == 7:
+	def rotate(x, y, theta):
+		s = math.sin(theta)
+		c = math.cos(theta)
+		return x * c - y * s, y * c + x * s
+
+	ftheta = DEG(Parameters.foil_theta)
+	fdepth = Parameters.foil_depth
+	foil_w = Parameters.foil_width
+	foil_h = Parameters.foil_height
+	foil_l = Parameters.foil_left
+	foil_r = Parameters.foil_right
+	foil_d = Parameters.foil_down
+	foil_u = Parameters.foil_up
+	
+	pt_l  = (-foil_w / 2.0,  foil_h * (foil_l - 0.5))
+	pt_dl = (-foil_w / 2.0, -foil_h / 2.0)
+	pt_d  = ( foil_w * (foil_d - 0.5), -foil_h / 2.0)
+	pt_dr = ( foil_w / 2.0, -foil_h / 2.0)
+	pt_r  = ( foil_w / 2.0,  foil_h * (foil_r - 0.5))
+	pt_ur = ( foil_w / 2.0,  foil_h / 2.0)
+	pt_u  = ( foil_w * (foil_u - 0.5),  foil_h / 2.0)
+	pt_ul = (-foil_w / 2.0,  foil_h / 2.0)
+	
+	pts = [pt_l, pt_dl, pt_d, pt_dr, pt_r, pt_ur, pt_u, pt_ul]
+
+	wt_dl = math.sqrt(1.0 / Parameters.wt_down_left)
+	wt_dr = math.sqrt(1.0 / Parameters.wt_down_right)
+	wt_ul = math.sqrt(1.0 / Parameters.wt_up_left)
+	wt_ur = math.sqrt(1.0 / Parameters.wt_up_right)
+
+	wt = [1.0, wt_dl, 1.0, wt_dr, 1.0, wt_ur, 1.0, wt_ul]
+
+	Narc = 4
+	Ncps = 1 + 2 * Narc
+	knots = [Knot(0, 3)]
+	for a in range(1, Narc):
+		knots.append(Knot(a, 2))
+	knots.append(Knot(Narc, 3))
+	knarr = Array[Knot](knots)
+	d = NurbsData(3, False, False, knarr)
+	c = Array.CreateInstance(ControlPoint, Ncps)
+	cpi = 0
+	z = 0.0
+	for p in range(0, 2 * Narc):
+		x, y = pts[p]
+		if ftheta:
+			x, y = rotate(x, y, ftheta)
+		c[cpi] = ControlPoint(Point.Create(x, y, z), wt[p])
+		cpi = cpi + 1
+	x, y = pts[0]
+	if ftheta:
+		x, y = rotate(x, y, ftheta)
+	c[cpi] = ControlPoint(Point.Create(x, y, z), wt[0])
+	plane, normal = sketch_reset()
+	sn = SketchNurbs.Create(NurbsCurve.CreateFromControlPoints(d, c))
+	shapes = Array[ITrimmedCurve]([sn.CreatedCurve[0].Shape])
+	surface = PlanarBody.Create(plane, shapes, None, 'foil')
+	s = Selection.Create(sn.CreatedCurve)
+	Delete.Execute(s)
+	named_object_extrude('foil', 'Foil', fdepth, normal)
 
 if Q2D_SpaceClaim:
 	# Finally, switch to solid-modelling mode
