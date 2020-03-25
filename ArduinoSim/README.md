@@ -13,7 +13,7 @@ https://www.staff.ncl.ac.uk/francisfranklin/arduino-lab/
 4. Meanwhile, the servo should be sweeping back and forth smoothly across 180 degrees.
 
 <a href="images/Demo-800x600.gif"><img style="align:center;" src="images/Demo-400x300.gif"/></a>
-<div style="text-align: center;">_Click to Enlarge_</div>
+_(Click to Enlarge)_
 
 ## Python
 
@@ -48,6 +48,16 @@ Returns the number of microseconds since program started.
 Returns the number of milliseconds since program started.
 ### `pinMode(number, mode)`
 Specify that pin _number_ should be used as an input (if _mode_ is INPUT) or as an output (if _mode_ is OUTPUT). Note: _number_ is an integer in the range 0-13.
+
+In addition, a servo controller can be created using, e.g.:
+```python
+myServo = Servo()
+```
+and this has the usual Servo methods, most importantly:
+### `myServo.attach(number)`
+Attach the servo controller to pin _number_.
+### `myServo.write(angle)`
+Set the servo to position _angle_, where 0 <= _angle_ <= 180.
 
 --------
 
