@@ -47,7 +47,9 @@ Returns the number of microseconds since program started.
 ### `millis()`
 Returns the number of milliseconds since program started.
 ### `pinMode(number, mode)`
-Specify that pin _number_ should be used as an input (if _mode_ is INPUT) or as an output (if _mode_ is OUTPUT). Note: _number_ is an integer in the range 0-13.
+Specify that pin _number_ should be used as an input (if _mode_ is INPUT) or as an output (if _mode_ is OUTPUT).
+
+**Note:** _number_ is an integer in the range 0-13.
 
 In addition, a servo controller can be created using, e.g.:
 ```python
