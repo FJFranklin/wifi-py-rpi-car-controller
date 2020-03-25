@@ -43,7 +43,7 @@ def loop():
         else:
             digitalWrite(LED_BUILTIN, LOW)
 
-        # Have the LEDs on the breadboard light up if the corresponding switches are pressed
+        # Have the servo position change if the top button is pressed
         switch1state = digitalRead(switch1pin)
 
         if switch1state:
