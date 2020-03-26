@@ -1,5 +1,5 @@
 import math
-import sys
+import platform
 import datetime
 
 import numpy as np
@@ -19,6 +19,12 @@ __pin_mode = [OUTPUT] * 14
 __pin_state = [LOW] * 14
 
 __ax = None
+
+# oddly different scaling on Mac OS X 
+if platform.system() == 'Darwin':
+    __ax_scale = 1
+else:
+    __ax_scale = 2
 
 __servo_patch = None
 
@@ -178,8 +184,9 @@ __button1_active = False
 __button2_active = False
 
 def __button_check(event):
-    x = event.x
-    y = 1199 - event.y
+    x = __ax_scale * event.x
+    y = 1199 - __ax_scale * event.y
+    #print('({x},{y})'.format(x=x,y=y))
     b = None
 
     global __button1_highlight
@@ -296,11 +303,16 @@ def __mouse_leave(event):
     __button2()
 
 def __close(event):
-    sys.exit()
+    #print('close event received')
+    global __ax
+    __ax = None
 
 __tref = 0
 __last = 0
 def __sync():
+    if __ax is None:
+        return
+
     now = millis()
 
     global __tref
@@ -317,6 +329,9 @@ def __sync():
     __plt.pause(0.00001)
 
 def delay(ms):
+    if __ax is None:
+        return
+
     start = millis()
 
     while True:
@@ -324,7 +339,9 @@ def delay(ms):
         if millis() - start >= ms:
             break
 
-def ArduinoSim(setup, loop, dpi=72, scale=2):
+def ArduinoSim(setup, loop):
+    dpi=72
+    scale=2
     xsize = 1600
     ysize = 1200
     fig = __plt.figure(figsize=(xsize / dpi, ysize / dpi), dpi=(dpi/scale))
@@ -356,7 +373,7 @@ def ArduinoSim(setup, loop, dpi=72, scale=2):
     __timeStart = datetime.datetime.now()
 
     setup()
-    while True:
+    while __ax is not None:
         loop()
         __sync()
 
