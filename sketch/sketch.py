@@ -8,7 +8,7 @@
 # 5: ski
 # 6: cube
 # 7: foil
-arc_test = 7
+arc_test = 2
 
 # ==== Preliminary setup: Are we using SpaceClaim? ==== #
 

@@ -1,6 +1,19 @@
 # -*- indent-tabs-mode: t; tab-width: 4 -*-
 
-arc_test = 2 # 0: arc-arc test; 1: arc-line test; 2: hook; 3: SpaceClaim 3D-NURBS
+# 0:  arc-arc test
+# 1:  arc-line test
+# 2:  hook
+# 3:  SpaceClaim: 3D-NURBS
+# 4:  conduit
+# 5:  SpaceClaim: ski
+# 6:  SpaceClaim: cube
+# 7:  SpaceClaim: foil
+# 8: !SpaceClaim: mesh
+arc_test = 8
+
+print_path_info = False
+print_plot_info = False
+plot_construction_arcs = False
 
 # ==== Preliminary setup: Are we using SpaceClaim? ==== #
 
@@ -28,15 +41,283 @@ else:
 	def DEG(a):
 		return math.radians(a)
 
+	GeometrySequence = 1
+
+	Q2D_path_color = 'blue' # color for plotting path if using MatPlotLib
+
 # ==== General SpaceClaim convenience functions ==== #
 
 def remove_all_bodies():
 	while GetRootPart().Bodies.Count > 0:
-		GetRootPart().Bodies[0].Delete()
+		b = GetRootPart().Bodies[0]
+		if b.IsLocked:
+			s = Selection.Create(b)
+			ViewHelper.LockBodies(s, False)
+		b.Delete()
 
 def remove_all_curves():
 	while GetRootPart().Curves.Count > 0:
 		GetRootPart().Curves[0].Delete()
+
+class QSC_Select(object):
+
+	@staticmethod
+	def create(name, selection): # create named selection
+		if len(selection.Items) == 0:
+			print('Cannot name empty selection: ' + name)
+			return None
+		RenameObject.Execute(selection, name)
+		return QSC_Select(name)
+
+	def __init__(self, name):
+		self.name = name
+		self.selection = None
+		
+	def select(self): # get named selection
+		success = True
+		self.selection = Selection.CreateByNames(self.name)
+		if len(self.selection.Items) == 0:
+			self.selection = None
+			success = False
+			print('Named selection failed: ' + self.name)
+		return success
+
+	def create_named_selection(self, name):
+		if self.select():
+			self.selection.CreateAGroup(name)
+
+	def delete(self):
+		if self.select():
+			Delete.Execute(self.selection)
+
+	def rename(self, name):
+		if self.select():
+			RenameObject.Execute(self.selection, name)
+		self.name = name
+
+	def lock(self):
+		if self.select():
+			ViewHelper.LockBodies(self.selection, True)
+
+	def unlock(self):
+		if self.select():
+			ViewHelper.LockBodies(self.selection, False)
+
+	def show(self):
+		if self.select():
+			ViewHelper.SetObjectVisibility(self.selection, VisibilityType.Show)
+
+	def hide(self):
+		if self.select():
+			ViewHelper.SetObjectVisibility(self.selection, VisibilityType.Hide)
+
+class QSC_Surface(QSC_Select):
+	def __init__(self, name):
+		QSC_Select.__init__(self, name)
+
+	def principal_face(self):
+		if self.select():
+			return Selection.Create(self.selection.Items[0].Faces[0])
+		return None
+
+	def paint(self, rgba):
+		if self.select():
+			ColorHelper.SetColor(self.selection, Color.FromArgb(*rgba))
+
+class QSC_Body(QSC_Select):
+
+	__counter = 0
+
+	@staticmethod
+	def __name():
+		name = 'body_' + str(QSC_Body.__counter)
+		QSC_Body.__counter += 1
+		return name
+
+	def __init__(self, name=None):
+		if name is None:
+			name = QSC_Body.__name()
+
+		QSC_Select.__init__(self, name)
+		self.front = None
+		self.back = None
+		self.sides = []
+
+	def paint(self, c_front, c_back, c_sides_from, c_sides_to=None):
+		if self.front is not None and c_front is not None:
+			side = Selection.Create(self.front)
+			ColorHelper.SetColor(side, Color.FromArgb(*c_front))
+
+		if self.back is not None and c_front is not None:
+			side = Selection.Create(self.back)
+			ColorHelper.SetColor(side, Color.FromArgb(*c_back))
+
+		if len(self.sides) > 0 and c_sides_from is not None:
+			if len(self.sides) == 1:
+				side = Selection.Create(self.sides[0])
+				ColorHelper.SetColor(side, Color.FromArgb(*c_sides_from))
+			elif c_sides_to is None:
+				for s in self.sides:
+					side = Selection.Create(self.sides[s])
+					ColorHelper.SetColor(side, Color.FromArgb(*c_sides_from))
+			else:
+				count = len(self.sides)
+				if self.sides[0] == self.sides[count-1]: # first and last are the same
+					count -= 1
+
+				for s in range(0, count):
+					a = int(c_sides_from[0] * (count - 1 - s) / (count - 1)) + int(c_sides_to[0] * s / (count - 1))
+					r = int(c_sides_from[1] * (count - 1 - s) / (count - 1)) + int(c_sides_to[1] * s / (count - 1))
+					g = int(c_sides_from[2] * (count - 1 - s) / (count - 1)) + int(c_sides_to[2] * s / (count - 1))
+					b = int(c_sides_from[3] * (count - 1 - s) / (count - 1)) + int(c_sides_to[3] * s / (count - 1))
+					side = Selection.Create(self.sides[s])
+					ColorHelper.SetColor(side, Color.FromArgb(a, r, g, b))
+
+	def match_curves(self, curves):
+		self.front = None
+		self.back = None
+		self.sides = []
+
+		if self.select():
+			b = self.selection.Items[0]
+
+			for f in b.Faces:
+				match_all = True
+				match_none = True
+
+				for e in f.Edges:
+					match = False
+					for c in curves:
+						curve = c[0].Shape.Geometry
+						if e.Shape.Geometry.IsCoincident(curve):
+							match = True
+							break
+					if match:
+						match_none = False
+					else:
+						match_all = False
+
+				if match_all:
+					self.back = f
+				elif match_none:
+					self.front = f
+				else:
+					self.sides.append(f)
+
+			order = []
+			for c in curves:
+				curve = c[0].Shape.Geometry
+				
+				for f in self.sides:
+					matched = False
+					for e in f.Edges:
+						if e.Shape.Geometry.IsCoincident(curve):
+							matched = True
+							break
+					if matched:
+						order.append(f)
+						break
+
+			self.sides = order
+
+	@staticmethod
+	def faces_connected(face1, face2):
+		connected = False
+		for e1 in face1.Edges:
+			for e2 in face2.Edges:
+				if e1.MidPoint().Point.Equals(e2.MidPoint().Point):
+					connected = True
+		return connected
+
+	@staticmethod
+	def faces_coincident(face1, face2):
+		return face1.Shape.Geometry.IsCoincident(face2.Shape.Geometry)
+
+	def _sort_faces(self, ref_front, ref_back):
+		self.front = None
+		self.back = None
+		self.sides = []
+
+		for f in self.selection.Items[0].Faces:
+			if QSC_Body.faces_coincident(f, ref_front):
+				#print('front matched')
+				self.front = f
+				continue
+			if QSC_Body.faces_coincident(f, ref_back):
+				#print('back matched')
+				self.back = f
+				continue
+			#print('side assigned')
+			self.sides.append(f)
+
+		if self.front is not None and self.back is None:
+			#print('searching for the back')
+			for s in self.sides:
+				if QSC_Body.faces_connected(s, ref_front):
+					#print('an actual side')
+					continue
+				#print('the back?')
+				self.back = s
+				self.sides.remove(s)
+				break
+
+		if self.front is None and self.back is not None:
+			#print('searching for the front')
+			for s in self.sides:
+				if QSC_Body.faces_connected(s, ref_back):
+					#print('an actual side')
+					continue
+				#print('the front?')
+				self.front = s
+				self.sides.remove(s)
+				break
+
+	def _reorganise_sides(self, ref_body):
+		org_sides = []
+		for r in ref_body.sides:
+			for s in self.sides:
+				if QSC_Body.faces_connected(s, r):
+					#print('matched with ref-body, count={d}'.format(d=count))
+					org_sides.append(s)
+					break
+		self.sides = org_sides
+
+	def cross_sect_and_match(self, surface, split_name, ref_body=None):
+		split_body = None
+
+		if self.select():
+			SplitBody.Execute(self.selection, surface.principal_face(), False)
+
+			old_front = self.front
+			old_back  = self.back
+
+			self._sort_faces(old_front, old_back)
+
+			if ref_body is not None and self.front is not None and self.back is not None:
+				if QSC_Body.faces_coincident(self.front, ref_body.back) or QSC_Body.faces_coincident(self.back, ref_body.front):
+					#print('Matching original to reference:')
+					self._reorganise_sides(ref_body)
+
+			new_body = QSC_Body(self.name + '1')
+			if new_body.select():
+				new_body._sort_faces(old_front, old_back)
+
+				split_body = new_body
+				split_body.rename(split_name)
+
+				if ref_body is not None and split_body.front is not None and split_body.back is not None:
+					if QSC_Body.faces_coincident(split_body.front, ref_body.back) or QSC_Body.faces_coincident(split_body.back, ref_body.front):
+						#print('Matching off-cut to reference:')
+						split_body._reorganise_sides(ref_body)
+
+						if self.front is not None and self.back is not None:
+							#print('Matching original to off-cut:')
+							self._reorganise_sides(split_body)
+					else:
+						#print('Matching off-cut to original:')
+						split_body._reorganise_sides(self)
+
+		return split_body
 
 def named_object_select(name):
 	s = Selection.CreateByNames(name)
@@ -54,6 +335,16 @@ def named_object_rename(name, new_name):
 	s = named_object_select(name)
 	if s is not None:
 		RenameObject.Execute(s, new_name)
+
+def named_object_lock(name):
+	s = named_object_select(name)
+	if s is not None:
+		ViewHelper.LockBodies(s, True)
+
+def named_object_unlock(name):
+	s = named_object_select(name)
+	if s is not None:
+		ViewHelper.LockBodies(s, False)
 
 def named_object_rotate(name, angle):
 	s = named_object_select(name)
@@ -88,6 +379,31 @@ def named_object_extrude(face_name, body_name, thickness, direction, cut=False):
 		result = ExtrudeFaces.Execute(face, direction, thickness, options)
 		body = Selection.Create(result.CreatedBody)
 		RenameObject.Execute(body, body_name)
+
+def named_surfaces_loft(surf_1_name, surf_2_name, body_name):
+	s1 = named_object_select(surf_1_name)
+	s2 = named_object_select(surf_2_name)
+	if s1 is not None and s2 is not None:
+		selection = Selection.Create(s1.Items[0].Faces[0], s2.Items[0].Faces[0])
+		options = LoftOptions()
+		options.GeometryCommandOptions = GeometryCommandOptions()
+		Loft.Create(selection, None, options)
+		named_object_rename('Solid', body_name)
+
+def named_object_revolve_helix(face_name, body_name, origin, direction, pitch, revolutions, righthanded, cut=False):
+	s = named_object_select(face_name)
+	if s is not None:
+		face = Selection.Create(s.Items[0].Faces[0])
+		axis = Line.Create(origin, direction)
+		taperAngle = 0
+		bothSides = False
+		options = RevolveFaceOptions()
+		if cut:
+			options.ExtrudeType = ExtrudeType.Cut
+		else:
+			options.ExtrudeType = ExtrudeType.Add
+		RevolveHelixFaces.Execute(face, axis, direction, revolutions * pitch, pitch, taperAngle, righthanded, bothSides, options)
+		named_object_rename('Solid', body_name)
 
 def write_parameters(filename, pars):
 	with open(filename, 'w') as f:
@@ -389,7 +705,40 @@ class Q2D_Arc(Q2D_Object):
 		self.circle = circle
 		self.clockwise = clockwise
 
+	def concentric(self, offset):
+		if self.clockwise:
+			offset = -offset
+		if self.circle.radius - offset <= 0:
+			return None
+
+		v_center = Q2D_Point.from_to(self.start, self.circle.center) # vector pointing inwards
+		cc_start = self.start.cartesian_relative(offset * v_center.dx, offset * v_center.dy)
+
+		return Q2D_Arc(cc_start, Q2D_Circle(self.circle.center, self.circle.radius - offset), self.clockwise)
+
 class Q2D_Path(object):
+
+	@staticmethod
+	def polygon(points): # where points = [(x1,y1) .. (xN,yN)], N > 2
+		path = None
+		if len(points) > 2:
+			p0 = Q2D_Point(points[0])
+			p1 = p0
+
+			for i in range(1, len(points)):
+				p2 = Q2D_Point(points[i])
+				line_12 = Q2D_Line(p1, Q2D_Point.from_to(p1, p2))
+				if i == 1:
+					path = Q2D_Path(line_12)
+				else:
+					path.append(line_12)
+				p1 = p2
+
+			line_12 = Q2D_Line(p1, Q2D_Point.from_to(p1, p0))
+			path.append(line_12)
+			path.end_point(p0)
+
+		return path
 
 	def __init__(self, line_or_arc):
 		self.name = "Path"
@@ -416,8 +765,13 @@ class Q2D_Path(object):
 		d2 = l2.direction
 
 		pi = l1.intersection(l2, radius)
-		if pi is not None:
+		if pi is None:
+			if print_path_info:
+				print('Unable to add line to line - no intersection')
+		else:
 			if radius > 0:
+				if print_path_info:
+					print('Adding line to line with transition')
 				p1 = l1.project(pi)
 				p2 = l2.project(pi)
 
@@ -426,6 +780,8 @@ class Q2D_Path(object):
 
 				self.__append(Q2D_Line(p2, d2))
 			else:
+				if print_path_info:
+					print('Adding line to line without transition')
 				self.__append(Q2D_Line(pi, d2))
 
 	@staticmethod
@@ -458,13 +814,16 @@ class Q2D_Path(object):
 		cross = cp.cross(line.direction)
 
 		if abs(cp.length - circle.radius) < Q2D_Design_Tolerance:
-			print("tangent: error = {e}".format(e=(cp.length - circle.radius)))
+			if print_path_info:
+				print("tangent: error = {e}".format(e=(cp.length - circle.radius)))
 			point = midpoint
 			tangent = True # check sense
 		elif cp.length > circle.radius:
-			print("line does not intersect circle; missed by {d}".format(d=(cp.length - circle.radius)))
+			if print_path_info:
+				print("line does not intersect circle; missed by {d}".format(d=(cp.length - circle.radius)))
 		else: # cp.length < circle.radius:
-			print("line intersects circle")
+			if print_path_info:
+				print("line intersects circle")
 			dv = line.direction.copy()
 			dv.length = (circle.radius**2.0 - cp.length**2.0)**0.5
 
@@ -490,35 +849,45 @@ class Q2D_Path(object):
 
 		if not arc.clockwise:
 			sense = not co_sense
-			offset = -transition
 		else:
 			sense = co_sense
-			offset = transition
 
 		point, cross, tangent = Q2D_Path.__intersect_line(line, arc.circle, sense)
 		if transition is None:
 			if point is None:
-				print('Unable to add line without transition')
+				if print_path_info:
+					print('Unable to add line without transition')
 			else:
-				print('Adding line without transition')
+				if print_path_info:
+					print('Adding line without transition')
 				self.__append(Q2D_Line(point, line.direction))
 		else:
+			if not arc.clockwise:
+				offset = -transition
+			else:
+				offset = transition
+
 			if point is not None:
-				print('point = ({x}, {y}); cross={c}; tangent={t}'.format(x=point.x(), y=point.y(), c=cross, t=tangent))
+				if print_path_info:
+					print('point = ({x}, {y}); cross={c}; tangent={t}'.format(x=point.x(), y=point.y(), c=cross, t=tangent))
 
 			if tangent:
 				if (cross > 0.0 and not arc.clockwise) or (cross < 0.0 and arc.clockwise):
 					if not co_sense:
-						print('Co-sense transition should be used here')
+						if print_path_info:
+							print('Co-sense transition should be used here')
 				else:
 					if co_sense:
-						print('Contra-sense transition should be used here')
+						if print_path_info:
+							print('Contra-sense transition should be used here')
 
 				if co_sense:
-					print('Adding (tangent) line (without transition)')
+					if print_path_info:
+						print('Adding (tangent) line (without transition)')
 					self.__append(Q2D_Line(line.project(point), line.direction))
 				else:
-					print('Adding (tangent) line (with counter-sense transition)')
+					if print_path_info:
+						print('Adding (tangent) line (with counter-sense transition)')
 					o = Q2D_Circle(arc.circle.center, arc.circle.radius + transition)
 					l = line.parallel(offset)
 					p, c, t = Q2D_Path.__intersect_line(l, o, not farside)
@@ -528,10 +897,12 @@ class Q2D_Path(object):
 			elif point is None:
 				if (cross > 0.0 and not arc.clockwise) or (cross < 0.0 and arc.clockwise):
 					if not co_sense:
-						print('Co-sense transition should be used here')
+						if print_path_info:
+							print('Co-sense transition should be used here')
 				else:
 					if co_sense:
-						print('Contra-sense transition should be used here')
+						if print_path_info:
+							print('Contra-sense transition should be used here')
 
 				if co_sense:
 					if transition > arc.circle.radius:
@@ -539,14 +910,17 @@ class Q2D_Path(object):
 						l = line.parallel(-offset)
 						p, c, t = Q2D_Path.__intersect_line(l, o, not farside)
 						if p is not None:
-							print('Adding line (with co-sense transition)')
+							if print_path_info:
+								print('Adding line (with co-sense transition)')
 							#print 'point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t
 							self.__append(Q2D_Arc(arc.circle.project(p, True), Q2D_Circle(p, transition), clockwise=arc.clockwise))
 							self.__append(Q2D_Line(line.project(p), line.direction))
 						else:
-							print('Unable to add line with specified (co-sense) transition; try increasing the transition radius')
+							if print_path_info:
+								print('Unable to add line with specified (co-sense) transition; try increasing the transition radius')
 					else:
-						print('Unable to add line with specified (co-sense) transition; require transition radius > arc radius')
+						if print_path_info:
+							print('Unable to add line with specified (co-sense) transition; require transition radius > arc radius')
 				else:
 					o = Q2D_Circle(arc.circle.center, arc.circle.radius + transition)
 					if arc.clockwise:
@@ -555,12 +929,14 @@ class Q2D_Path(object):
 						l = line.parallel( transition)
 					p, c, t = Q2D_Path.__intersect_line(l, o, not farside)
 					if p is not None:
-						print('Adding line (with counter-sense transition)')
+						if print_path_info:
+							print('Adding line (with counter-sense transition)')
 						#print 'point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t
 						self.__append(Q2D_Arc(arc.circle.project(p), Q2D_Circle(p, transition), clockwise=(not arc.clockwise)))
 						self.__append(Q2D_Line(line.project(p), line.direction))
 					else:
-						print('Unable to add line with specified (counter-sense) transition')
+						if print_path_info:
+							print('Unable to add line with specified (counter-sense) transition')
 			else: # line intersects circle
 				if co_sense:
 					if transition < arc.circle.radius:
@@ -568,20 +944,24 @@ class Q2D_Path(object):
 						l = line.parallel(-offset)
 						p, c, t = Q2D_Path.__intersect_line(l, o, not farside)
 						if p is not None:
-							print('Adding line (with co-sense transition)')
+							if print_path_info:
+								print('Adding line (with co-sense transition)')
 							#print 'point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t
 							self.__append(Q2D_Arc(arc.circle.project(p), Q2D_Circle(p, transition), clockwise=arc.clockwise))
 							self.__append(Q2D_Line(line.project(p), line.direction))
 						else:
-							print('Unable to add line with specified (co-sense) transition; try increasing the transition radius')
+							if print_path_info:
+								print('Unable to add line with specified (co-sense) transition; try increasing the transition radius')
 					else:
-						print('Unable to add line with specified (co-sense) transition; require transition radius > arc radius')
+						if print_path_info:
+							print('Unable to add line with specified (co-sense) transition; require transition radius > arc radius')
 				else:
 					o = Q2D_Circle(arc.circle.center, arc.circle.radius + transition)
 					l = line.parallel(offset)
 					p, c, t = Q2D_Path.__intersect_line(l, o, not farside)
 					if p is not None:
-						print('Adding (counter-sense) arc (with transition)')
+						if print_path_info:
+							print('Adding (counter-sense) arc (with transition)')
 						#print('point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t)
 						self.__append(Q2D_Arc(arc.circle.project(p), Q2D_Circle(p, transition), clockwise=(not arc.clockwise)))
 						self.__append(Q2D_Line(line.project(p), line.direction))
@@ -601,35 +981,45 @@ class Q2D_Path(object):
 
 		if arc.clockwise:
 			sense = not co_sense
-			offset = -transition
 		else:
 			sense = co_sense
-			offset = transition
 
 		point, cross, tangent = Q2D_Path.__intersect_line(line, arc.circle, sense)
 		if transition is None:
 			if point is None:
-				print('Unable to add arc without transition')
+				if print_path_info:
+					print('Unable to add arc without transition')
 			else:
-				print('Adding arc without transition')
-				self.__append(Q2D_Arc(point, arc.circle))
+				if print_path_info:
+					print('Adding arc without transition')
+				self.__append(Q2D_Arc(point, arc.circle, clockwise=arc.clockwise))
 		else:
+			if arc.clockwise:
+				offset = -transition
+			else:
+				offset = transition
+
 			if point is not None:
-				print('point = ({x}, {y}); cross={c}; tangent={t}'.format(x=point.x(), y=point.y(), c=cross, t=tangent))
+				if print_path_info:
+					print('point = ({x}, {y}); cross={c}; tangent={t}'.format(x=point.x(), y=point.y(), c=cross, t=tangent))
 
 			if tangent:
 				if (cross > 0.0 and not arc.clockwise) or (cross < 0.0 and arc.clockwise):
 					if not co_sense:
-						print('Co-sense transition should be used here')
+						if print_path_info:
+							print('Co-sense transition should be used here')
 				else:
 					if co_sense:
-						print('Contra-sense transition should be used here')
+						if print_path_info:
+							print('Contra-sense transition should be used here')
 
 				if co_sense:
-					print('Adding (tangent) arc (without transition)')
+					if print_path_info:
+						print('Adding (tangent) arc (without transition)')
 					self.__append(Q2D_Arc(point, arc.circle, clockwise=arc.clockwise))
 				else:
-					print('Adding (counter-sense tangent) arc (with transition)')
+					if print_path_info:
+						print('Adding (counter-sense tangent) arc (with transition)')
 					o = Q2D_Circle(arc.circle.center, arc.circle.radius + transition)
 					l = line.parallel(-offset)
 					p, c, t = Q2D_Path.__intersect_line(l, o, farside)
@@ -639,10 +1029,12 @@ class Q2D_Path(object):
 			elif point is None:
 				if (cross > 0.0 and not arc.clockwise) or (cross < 0.0 and arc.clockwise):
 					if not co_sense:
-						print('Co-sense transition should be used here')
+						if print_path_info:
+							print('Co-sense transition should be used here')
 				else:
 					if co_sense:
-						print('Contra-sense transition should be used here')
+						if print_path_info:
+							print('Contra-sense transition should be used here')
 
 				if co_sense:
 					if transition > arc.circle.radius:
@@ -650,25 +1042,30 @@ class Q2D_Path(object):
 						l = line.parallel(offset)
 						p, c, t = Q2D_Path.__intersect_line(l, o, farside)
 						if p is not None:
-							print('Adding (co-sense) arc (with transition)')
+							if print_path_info:
+								print('Adding (co-sense) arc (with transition)')
 							#print 'point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t
 							self.__append(Q2D_Arc(line.project(p), Q2D_Circle(p, transition), clockwise=arc.clockwise))
 							self.__append(Q2D_Arc(arc.circle.project(p, True), arc.circle, clockwise=arc.clockwise))
 						else:
-							print('Unable to add (co-sense) arc with specified transition; try increasing the transition radius')
+							if print_path_info:
+								print('Unable to add (co-sense) arc with specified transition; try increasing the transition radius')
 					else:
-						print('Unable to add (co-sense) arc with specified transition; require transition radius > arc radius')
+						if print_path_info:
+							print('Unable to add (co-sense) arc with specified transition; require transition radius > arc radius')
 				else:
 					o = Q2D_Circle(arc.circle.center, arc.circle.radius + transition)
 					l = line.parallel(-offset)
 					p, c, t = Q2D_Path.__intersect_line(l, o, farside)
 					if p is not None:
-						print('Adding (counter-sense) arc (with transition)')
+						if print_path_info:
+							print('Adding (counter-sense) arc (with transition)')
 						#print('point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t)
 						self.__append(Q2D_Arc(line.project(p), Q2D_Circle(p, transition), clockwise=(not arc.clockwise)))
 						self.__append(Q2D_Arc(arc.circle.project(p), arc.circle, clockwise=arc.clockwise))
 					else:
-						print('Unable to add (counter-sense) arc with specified transition')
+						if print_path_info:
+							print('Unable to add (counter-sense) arc with specified transition')
 			else: # line intersects circle
 				if co_sense:
 					if transition < arc.circle.radius:
@@ -676,20 +1073,24 @@ class Q2D_Path(object):
 						l = line.parallel(offset)
 						p, c, t = Q2D_Path.__intersect_line(l, o, farside)
 						if p is not None:
-							print('Adding (co-sense) arc (with transition)')
+							if print_path_info:
+								print('Adding (co-sense) arc (with transition)')
 							#print('point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t)
 							self.__append(Q2D_Arc(line.project(p), Q2D_Circle(p, transition), clockwise=arc.clockwise))
 							self.__append(Q2D_Arc(arc.circle.project(p), arc.circle, clockwise=arc.clockwise))
 						else:
-							print('Unable to add (co-sense) arc with specified transition; try increasing the transition radius')
+							if print_path_info:
+								print('Unable to add (co-sense) arc with specified transition; try increasing the transition radius')
 					else:
-						print('Unable to add (co-sense) arc with specified transition; require transition radius > arc radius')
+						if print_path_info:
+							print('Unable to add (co-sense) arc with specified transition; require transition radius > arc radius')
 				else:
 					o = Q2D_Circle(arc.circle.center, arc.circle.radius + transition)
 					l = line.parallel(-offset)
 					p, c, t = Q2D_Path.__intersect_line(l, o, farside)
 					if p is not None:
-						print('Adding (counter-sense) arc (with transition)')
+						if print_path_info:
+							print('Adding (counter-sense) arc (with transition)')
 						#print('point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t)
 						self.__append(Q2D_Arc(line.project(p), Q2D_Circle(p, transition), clockwise=(not arc.clockwise)))
 						self.__append(Q2D_Arc(arc.circle.project(p), arc.circle, clockwise=arc.clockwise))
@@ -737,9 +1138,11 @@ class Q2D_Path(object):
 		point = Q2D_Path.__intersect_circle(lhs_o, rhs_o, kwargs)
 
 		if point is None:
-			print("Unable to intersect arcs")
+			if print_path_info:
+				print("Unable to intersect arcs")
 		else:
-			print("Adding arc with transition")
+			if print_path_info:
+				print("Adding arc with transition")
 			lhs_point = lhs.circle.project(point, lhs_invert)
 			rhs_point = rhs.circle.project(point, rhs_invert)
 			self.__append(Q2D_Arc(lhs_point, Q2D_Circle(point, transition), clockwise=clockwise))
@@ -757,6 +1160,38 @@ class Q2D_Path(object):
 			elif line_or_arc.name == "Arc":
 				self.__append_arc_to_arc(line_or_arc, transition, kwargs)
 
+	def offset_path(self, offset):
+		path = None
+		endp = None
+		item = self.chain
+
+		while item is not None:
+			if item.name == "Line":
+				line = item.parallel(offset)
+				if path is None:
+					path = Q2D_Path(line)
+					endp = line.start
+				else:
+					path.__append(line)
+			elif item.name == "Arc":
+				arc = item.concentric(offset)
+				if arc is None:
+					print("* * * Path segment skipped... behaviour undefined! * * *")
+					item = item.chain
+					continue
+				if path is None:
+					path = Q2D_Path(arc)
+					endp = arc.start
+				else:
+					path.__append(arc)
+			else:
+				if path:
+					path.end_point(endp)
+
+			item = item.chain
+
+		return path
+		
 class Q2D_Plotter(object):
 
 	def __init__(self, x_range, y_range):
@@ -772,27 +1207,31 @@ class Q2D_Plotter(object):
 		self._ax.set_xlim(x_range)
 		self._ax.set_ylim(y_range)
 
-	def show(self):
-		plt.show()
-
 	def __draw_point(self, point, center=False):
 		if center:
 			marker = '+'
 			color = 'green'
 		else:
 			marker = '.'
-			color = 'blue'
+			color = Q2D_path_color
+		if print_plot_info:
+			print('Point: ({x},{y})'.format(x=point.start[0], y=point.start[1]))
 		self._ax.scatter(point.start[0], point.start[1], marker=marker, color=color)
 
 	def __draw_circle(self, circle, construction=True):
+		if construction and not plot_construction_arcs:
+			return
+
 		x_axis = 2.0 * circle.radius
 		y_axis = 2.0 * circle.radius
 		if construction:
 			ec='green'
 			ls='--'
 		else:
-			ec='blue'
+			ec=Q2D_path_color
 			ls='-'
+		if print_plot_info:
+			print('Ellipse: Center: ({x},{y}); Axes=({a},{b})'.format(x=circle.center.start[0], y=circle.center.start[1], a=x_axis, b=y_axis))
 		patch = mpatches.Ellipse(circle.center.start, x_axis, y_axis, edgecolor=ec, linestyle=ls, facecolor=None, fill=False, linewidth=1)
 		self._ax.add_patch(patch)
 		self.__draw_point(circle.center, True)
@@ -815,7 +1254,9 @@ class Q2D_Plotter(object):
 			t2 += 360.0
 		x_axis = 2.0 * arc.circle.radius
 		y_axis = 2.0 * arc.circle.radius
-		patch = mpatches.Arc(arc.circle.center.start, x_axis, y_axis, theta1=t1, theta2=t2, edgecolor='blue', facecolor=None, fill=False)
+		if print_plot_info:
+			print('Arc: Center: ({x},{y}); Axes=({a},{b}); Angles=({s},{e})'.format(x=arc.circle.center.start[0], y=arc.circle.center.start[1], a=x_axis, b=y_axis, s=t1, e=t2))
+		patch = mpatches.Arc(arc.circle.center.start, x_axis, y_axis, theta1=t1, theta2=t2, edgecolor=Q2D_path_color, facecolor=None, fill=False)
 		self._ax.add_patch(patch)
 		self.__draw_point(arc.circle.center, True)
 		self.__draw_point(arc.start)
@@ -825,7 +1266,9 @@ class Q2D_Plotter(object):
 		p2 = line.chain
 		if p2.name != "Point":
 			p2 = p2.start
-		self._ax.plot([p1.start[0], p2.start[0]], [p1.start[1], p2.start[1]], '-', color='blue', linewidth=1)
+		if print_plot_info:
+			print('Line: From: ({x},{y}); To: ({a},{b})'.format(x=p1.start[0], y=p1.start[1], a=p2.start[0], b=p2.start[1]))
+		self._ax.plot([p1.start[0], p2.start[0]], [p1.start[1], p2.start[1]], '-', color=Q2D_path_color, linewidth=1)
 		self.__draw_point(p1)
 
 	def draw(self, path):
@@ -850,6 +1293,7 @@ class Q2D_Sketcher(object):
 		self.plane = plane
 		self.curves = []
 		self.shapes = []
+		self.body = QSC_Body()
 
 	def __draw_circle(self, circle):
 		result = SketchCircle.Create(circle.center.point(), circle.radius)
@@ -907,64 +1351,95 @@ class Q2D_Sketcher(object):
 	def create_surface_and_clear(self, name):
 		self._create_surface(name)
 		self._clear_curves()
+		return QSC_Surface(name)
+
+	def _match_curves(self, body_name):
+		self.body.rename(body_name)
+		self.body.match_curves(self.curves)
 
 class Q2D_Extrusion(Q2D_Sketcher):
 
 	def __init__(self, plane): # where plane is a SpaceClaim sketch plane - see, e.g., sketch_reset()
 		Q2D_Sketcher.__init__(self, plane)
-		self.front = None
-		self.back = None
-		self.sides = []
-
-	def __match_curves(self, body_name): # FIXME: this won't work if extruding a circle as a cylinder
-		self.front = None
-		self.back = None
-		self.sides = []
-
-		s = named_object_select(body_name)
-		if s is not None:
-			for f in s.Items[0].Faces:
-				match_count = 0
-				
-				for c in self.curves:
-					curve = c[0].Shape.Geometry
-					
-					for e in f.Edges:
-						if e.Shape.Geometry.IsCoincident(curve):
-							match_count += 1
-							break
-				
-				if match_count == len(self.curves):
-					#print("back: count={c}".format(c=match_count))
-					self.back = f
-				elif match_count == 0:
-					#print("front: count={c}".format(c=match_count))
-					self.front = f
-				else:
-					#print("side: count={c}".format(c=match_count))
-					self.sides.append(f)
-			
-			order = []
-			for c in self.curves:
-				curve = c[0].Shape.Geometry
-				
-				for f in self.sides:
-					matched = False
-					for e in f.Edges:
-						if e.Shape.Geometry.IsCoincident(curve):
-							matched = True
-							break
-					if matched:
-						order.append(f)
-						break
-
-			self.sides = order
 
 	def extrude_and_clear(self, name, direction, thickness):
 		self._create_surface(name)
 		named_object_extrude(name, name, thickness, direction, False)
-		self.__match_curves(name)
+		self._match_curves(name)
 		self._clear_curves()
+		return self.body
+
+class Q2D_Helix(Q2D_Sketcher):
+
+	def __init__(self, helix_radius, helix_pitch, origin, e_axis, e_radial, e_transverse, righthanded=True, incline=True): # where origin is (x,y,z) and e_* are basis vectors as (x,y,z)
+		if incline:
+			h_adjust = math.atan(h_pitch / (2.0 * math.pi * helix_radius))
+			c = math.cos(h_adjust)
+			if righthanded:
+				s =  math.sin(h_adjust)
+			else:
+				s = -math.sin(h_adjust)
+		else:
+			c = 1.0
+			s = 0.0
+		h_axis   = Direction.Create(*e_axis)
+		h_prof_y = Direction.Create(*e_radial)
+		h_prof_x = Direction.Create(c * e_axis[0] + s * e_transverse[0], c * e_axis[1] + s * e_transverse[1], c * e_axis[2] + s * e_transverse[2])
+		h_origin = Point.Create(origin[0] + h_radius * e_radial[0], origin[1] + h_radius * e_radial[1], origin[2] + h_radius * e_radial[2])
+		h_plane  = Plane.Create(Frame.Create(h_origin, h_prof_x, h_prof_y))
+		ViewHelper.SetSketchPlane(h_plane)
+
+		Q2D_Sketcher.__init__(self, h_plane)
+		self.origin = Point.Create(*origin)
+		self.axis = h_axis
+		self.pitch = helix_pitch
+		self.radius = helix_radius
+		self.righthanded = righthanded
+		self.incline_cos = c
+		self.incline_sin = s
+		self.basis_origin = origin
+		self.basis_e_axis = e_axis
+		self.basis_e_radial = e_radial
+		self.basis_e_transverse = e_transverse
+		self.name = None
+
+	def offset_plane(self, angle):
+		c = math.cos(angle)
+		s = math.sin(angle)
+		e_radial     = ( self.basis_e_radial[0] * c + self.basis_e_transverse[0] * s,  self.basis_e_radial[1] * c + self.basis_e_transverse[1] * s,  self.basis_e_radial[2] * c + self.basis_e_transverse[2] * s)
+		e_transverse = (-self.basis_e_radial[0] * s + self.basis_e_transverse[0] * c, -self.basis_e_radial[1] * s + self.basis_e_transverse[1] * c, -self.basis_e_radial[2] * s + self.basis_e_transverse[2] * c)
+
+		c = self.incline_cos
+		s = self.incline_sin
+		prof_y = Direction.Create(*e_radial)
+		prof_x = Direction.Create(c * self.basis_e_axis[0] + s * e_transverse[0], c * self.basis_e_axis[1] + s * e_transverse[1], c * self.basis_e_axis[2] + s * e_transverse[2])
+		origin = Point.Create(*self.basis_origin)
+		plane  = Plane.Create(Frame.Create(origin, prof_x, prof_y))
+		return plane
+            
+	def split(self, angle, new_body_name, ref_body=None):
+		plane = self.offset_plane(angle)
+		ViewHelper.SetSketchPlane(plane)
+		plotter = Q2D_Sketcher(plane)
+
+		occlusion = Q2D_Path.polygon([(-3.0 * self.pitch, 0.0), (3.0 * self.pitch, 0.0), (3.0 * self.pitch, 2.0 * self.radius), (-3.0 * self.pitch, 2.0 * self.radius)])
+		plotter.draw(occlusion)
+		surface = plotter.create_surface_and_clear('Helix-Split-Plane')
+
+		split_body = self.body.cross_sect_and_match(surface, new_body_name, ref_body)
+		surface.delete()
+
+		return split_body
+
+	def revolve_and_clear(self, name, revolutions, cut=False, match=True, clear=True):
+		self.name = name
+		self._create_surface(name)
+		named_object_revolve_helix(name, name, self.origin, self.axis, self.pitch, revolutions, self.righthanded, cut)
+		if match:
+			self._match_curves(name)
+		if clear:
+			self._clear_curves()
+		return self.body
 
 class Q3D_NURBS(object): # cubic surface
 
@@ -1162,8 +1637,6 @@ if arc_test == 0:
 
 	if Q2D_SpaceClaim:
 		print("Attempting to create a surface will fail; however, switching to solid view will let SpaceClaim identify bounded regions...")
-	else:
-		plotter.show()
 
 elif arc_test == 1:
 	if Q2D_SpaceClaim:
@@ -1352,8 +1825,6 @@ elif arc_test == 1:
 
 	if Q2D_SpaceClaim:
 		print("Attempting to create a surface will fail; however, switching to solid view will let SpaceClaim identify bounded regions...")
-	else:
-		plotter.show()
 
 elif arc_test == 2: # let's draw a hook
 
@@ -1420,17 +1891,407 @@ elif arc_test == 2: # let's draw a hook
 		#  sides[0] == sides[10] - the seat
 		#  sides[1 .. 9]         - clockwise around the hook
 		#  sides[11]             - the top hole
-		Selection.Create(plotter.sides[0]).CreateAGroup('Seat')
-		Selection.Create(plotter.sides[11]).CreateAGroup('Hole')
-		Selection.Create(plotter.front).CreateAGroup('Front')
-		Selection.Create(plotter.back).CreateAGroup('Back')
-	else:
-		plotter.show()
+		Selection.Create(plotter.body.sides[0]).CreateAGroup('Seat')
+		Selection.Create(plotter.body.sides[11]).CreateAGroup('Hole')
+		Selection.Create(plotter.body.front).CreateAGroup('Front')
+		Selection.Create(plotter.body.back).CreateAGroup('Back')
 
 elif arc_test == 3:
 	if Q2D_SpaceClaim:
 		Q3D_NURBS.example('sphere', 12, 8)
 
+elif arc_test == 4:
+	def make_conduit_profile(P):
+		oy = 0.0136
+
+		p_0l = Q2D_Point((0.000, oy - 0.018))
+		p_tr = Q2D_Point((0.030, oy + 0.000))
+		p_cc = Q2D_Point((0.015, oy - 0.015))
+
+		pc_l = Q2D_Point((0.005, oy + 0.000))
+		pc_r = Q2D_Point((0.025, oy + 0.000))
+
+		cl_o = Q2D_Circle(pc_l, 0.020)
+		cl_i = Q2D_Circle(pc_l, 0.018)
+		cr_o = Q2D_Circle(pc_r, 0.017)
+		cr_i = Q2D_Circle(pc_r, 0.015)
+
+		l_l = Q2D_Line(p_0l, Q2D_Vector(DEG(270.0)))
+		l_r = Q2D_Line(p_tr, Q2D_Vector(DEG( 90.0)))
+		l_c = Q2D_Line(p_cc, Q2D_Vector(DEG( 30.0)))
+
+		al_o = Q2D_Arc(None, cl_o, False)
+		al_i = Q2D_Arc(None, cl_i, True)
+		ar_o = Q2D_Arc(None, cr_o, False)
+		ar_i = Q2D_Arc(None, cr_i, True)
+
+		path = Q2D_Path(l_l)
+		path.append(al_o, farside=True)
+		path.append(l_c.parallel(-0.001), transition=0.007, co_sense=True, farside=True)
+		path.append(ar_o, transition=0.005, co_sense=False, farside=False)
+		path.append(l_r, farside=True)
+		path.append(ar_i)
+		path.append(l_c.parallel(0.001, True), transition=0.007, co_sense=False, farside=False)
+		path.append(al_i, transition=0.005, co_sense=True, farside=True)
+		path.append(l_l)
+		path.end_point(p_0l)
+
+		if GeometrySequence == 0:
+			P.draw(Q2D_Circle(Q2D_Point((0.005,-0.005)), 0.005))
+		else:
+			P.draw(path)
+
+	if Q2D_SpaceClaim:
+		h_radius = 0.05
+		h_pitch  = 0.02
+
+		black = (  0.0,   0.0,   0.0,   0.0)
+		white = (255.0, 255.0, 255.0, 255.0)
+		red   = (255.0, 255.0,   0.0,   0.0)
+		green = (255.0,   0.0, 255.0,   0.0)
+		blue  = (255.0,   0.0,   0.0, 255.0)
+
+		plotter = Q2D_Helix(h_radius, h_pitch, (0,0,-2.5*h_pitch), (0,0,1), (0,1,0), (1,0,0))
+		make_conduit_profile(plotter)
+		Conduit_Left = plotter.revolve_and_clear('Conduit-Left', 2.0)
+
+		Selection.Create(Conduit_Left.front).CreateAGroup('Conduit-Left-Front')
+		Selection.Create(Conduit_Left.back).CreateAGroup('Conduit-Left-Back')
+
+		Conduit_Left.paint(black, white, red, green)
+		Conduit_Left.lock()
+
+		plotter = Q2D_Helix(h_radius, h_pitch, (0,0,-0.5*h_pitch), (0,0,1), (0,1,0), (1,0,0))
+		make_conduit_profile(plotter)
+		Conduit_Middle = plotter.revolve_and_clear('Conduit-Middle', 1.0)
+
+		Conduit_Middle.paint(black, white, green, blue)
+		Conduit_Middle.lock()
+
+		Conduit_Middle_Helix = plotter
+
+		plotter = Q2D_Helix(h_radius, h_pitch, (0,0,0.5*h_pitch), (0,0,1), (0,1,0), (1,0,0))
+		make_conduit_profile(plotter)
+		Conduit_Right = plotter.revolve_and_clear('Conduit-Right', 2.0)
+
+		Selection.Create(Conduit_Right.front).CreateAGroup('Conduit-Right-Front')
+		Selection.Create(Conduit_Right.back).CreateAGroup('Conduit-Right-Back')
+
+		Conduit_Right.paint(black, white, blue, red)
+		Conduit_Right.lock()
+
+		Conduit_Left.hide()
+		Conduit_Right.hide()
+		Conduit_Middle.unlock()
+
+		Conduit_Middle_Right  = Conduit_Middle_Helix.split(DEG(175.0), 'Conduit-Middle-Right',  Conduit_Right)
+		Conduit_Middle_Right.lock()
+		Conduit_Middle_Right.hide()
+
+		Conduit_Middle_Middle = Conduit_Middle_Helix.split(DEG(185.0), 'Conduit-Middle-Middle', Conduit_Middle_Right)
+
+		Conduit_Middle.rename('Conduit-Middle-Left')
+		Conduit_Middle.lock()
+		Conduit_Middle.hide()
+
+		Selection.Create(Conduit_Middle_Helix.body.front).CreateAGroup('Conduit-Middle-Left-Front')
+		Selection.Create(Conduit_Middle_Helix.body.back).CreateAGroup('Conduit-Middle-Left-Back')
+
+	else:
+		plotter = Q2D_Plotter([-0.01,0.04], [-0.01,0.01])
+		make_conduit_profile(plotter)
+
+elif arc_test == 5:
+	midoff = 0.001
+	min_t  = 0.005
+	skin_t = 0.001
+
+	def ski_top(zoff=0.0):
+		pts = []
+		pts.append((-0.65,0.005,0.03))
+		pts.append((-0.62,0.040,0.00))
+		pts.append((-0.61,0.040,0.00))
+		pts.append((-0.60,0.040,0.00))
+		pts.append((-0.40,0.040,0.00))
+		pts.append((-0.20,0.030,0.01))
+		pts.append(( 0.00,0.030,0.01))
+		pts.append(( 0.20,0.030,0.01))
+		pts.append(( 0.40,0.040,0.00))
+		pts.append(( 0.60,0.040,0.00))
+		Nu = len(pts)
+		Nv = 4
+		NS = Q3D_NURBS(Nu, Nv)
+		for iu in range(0, Nu):
+			p = pts[iu]
+			x = p[0]
+			y = p[1]
+			z = p[2] + min_t / 2.0 + zoff
+			NS.set_control_point(iu, 0, (x, y, z))
+			NS.set_control_point(iu, 1, (x, midoff, z))
+			NS.set_control_point(iu, 2, (x, -midoff, z))
+			NS.set_control_point(iu, 3, (x, -y, z))
+
+		name = 'ski-top'
+		NS.create_nurbs_surface(name)
+		#NS.add_nurbscurves_to_sketch()
+		#NS.add_controlpoints_to_sketch()
+
+	def ski_bottom(zoff=0.0):
+		pts = []
+		pts.append((-0.65,0.005,0.03))
+		pts.append((-0.62,0.040,0.00))
+		pts.append((-0.61,0.040,0.00))
+		pts.append((-0.60,0.040,0.00))
+		pts.append((-0.40,0.040,0.00))
+		pts.append((-0.20,0.030,0.005))
+		pts.append(( 0.00,0.030,0.005))
+		pts.append(( 0.20,0.030,0.005))
+		pts.append(( 0.40,0.040,0.00))
+		pts.append(( 0.60,0.040,0.00))
+		Nu = len(pts)
+		Nv = 4
+		NS = Q3D_NURBS(Nu, Nv)
+		for iu in range(0, Nu):
+			p = pts[iu]
+			x = p[0]
+			y = p[1]
+			z = p[2] - min_t / 2.0 + zoff
+			NS.set_control_point(iu, 0, (x, y, z))
+			NS.set_control_point(iu, 1, (x, midoff, z))
+			NS.set_control_point(iu, 2, (x, -midoff, z))
+			NS.set_control_point(iu, 3, (x, -y, z))
+
+		name = 'ski-bottom'
+		NS.create_nurbs_surface(name)
+		#NS.add_nurbscurves_to_sketch()
+		#NS.add_controlpoints_to_sketch()
+	
+	ski_top()
+	ski_bottom()
+	named_surfaces_loft('ski-top', 'ski-bottom', 'ski-core')
+	
+	Core = QSC_Select('ski-core')
+	Core.lock()
+
+	def surf_split(surf_name, new_surf_name, xoff):
+		origin = Point.Create(xoff, 0.0, 0.0)
+		prof_x = Direction.Create(0.0, 1.0, 0.0)
+		prof_y = Direction.Create(0.0, 0.0, 1.0)
+		plane  = Plane.Create(Frame.Create(origin, prof_x, prof_y))
+		ViewHelper.SetSketchPlane(plane)
+
+		plotter = Q2D_Sketcher(plane)
+		occlusion = Q2D_Path.polygon([(-0.1, -0.1), (0.1, -0.1), (0.1, 0.1), (-0.1, 0.1)])
+		plotter.draw(occlusion)
+		plotter.create_surface_and_clear('split-plane')
+		splitter = QSC_Surface('split-plane')
+
+		surface = QSC_Surface(surf_name)
+		surface.select()
+		SplitBody.Execute(surface.selection, splitter.principal_face(), False)
+
+		splitter.delete()
+
+		new_surf = QSC_Surface(surf_name + '1')
+		new_surf.rename(new_surf_name)
+		
+	ski_top()
+	Top = QSC_Surface('ski-top')
+
+	surf_split('ski-top', 'ski-top-front', -0.15)
+	TopFront = QSC_Surface('ski-top-front')
+	TopFront.lock()
+
+	surf_split('ski-top', 'ski-top-foot', 0.15)
+	TopFoot = QSC_Surface('ski-top-foot')
+	TopFoot.lock()
+
+	Top.rename('ski-top-back')
+	Top.lock()
+
+	ski_bottom()
+	Bottom = QSC_Surface('ski-bottom')
+
+	surf_split('ski-bottom', 'ski-bottom-tip', -0.6)
+	Tip = QSC_Surface('ski-bottom-tip')
+	Tip.lock()
+
+	surf_split('ski-bottom', 'ski-bottom-far-front', -0.5)
+	FarFront = QSC_Surface('ski-bottom-far-front')
+	FarFront.lock()
+
+	surf_split('ski-bottom', 'ski-bottom-near-front', -0.15)
+	NearFront = QSC_Surface('ski-bottom-near-front')
+	NearFront.lock()
+
+	surf_split('ski-bottom', 'ski-bottom-foot',  0.15)
+	Foot = QSC_Surface('ski-bottom-foot')
+	Foot.lock()
+
+	surf_split('ski-bottom', 'ski-bottom-near-back', 0.5)
+	NearBack = QSC_Surface('ski-bottom-near-back')
+	NearBack.lock()
+	
+	Bottom.rename('ski-bottom-far-back')
+	Bottom.lock()
+	
+	TopFoot.create_named_selection('Ski Top Foot')
+	FarFront.create_named_selection('Ski Bottom Front')
+	Bottom.create_named_selection('Ski Bottom Back')
+
+elif arc_test == 6:
+	black = (  0.0,   0.0,   0.0,   0.0)
+	white = (255.0, 255.0, 255.0, 255.0)
+	red   = (255.0, 255.0,   0.0,   0.0)
+	green = (255.0,   0.0, 255.0,   0.0)
+	blue  = (255.0,   0.0,   0.0, 255.0)
+
+	plane, normal = sketch_reset('XY', (0.0,0.0,-1.0))
+	plotter = Q2D_Extrusion(plane)
+	square = Q2D_Path.polygon([(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)])
+	plotter.draw(square)
+	Ref = plotter.extrude_and_clear('Ref', normal, 1.0)
+	Ref.paint(black, white, blue, red)
+	Ref.lock()
+
+	plane, normal = sketch_reset('XY', (0.0,0.0,0.0))
+	plotter = Q2D_Extrusion(plane)
+	square = Q2D_Path.polygon([(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)])
+	plotter.draw(square)
+	Cube = plotter.extrude_and_clear('Cube', normal, 1.0)
+	Cube.paint(black, white, blue, red)
+
+	plane, normal = sketch_reset('XY', (0.0,0.0,0.5))
+	splitter = Q2D_Sketcher(plane)
+	outline = Q2D_Path.polygon([(-1.0,-1.0), (2.0,-1.0), (2.0,2.0), (-1.0,2.0)])
+	splitter.draw(outline)
+	split_plane = splitter.create_surface_and_clear('split-plane')
+
+	Offcut = Cube.cross_sect_and_match(split_plane, 'Offcut', Ref)
+	Offcut.paint(black, white, blue, red)
+	Cube.paint(black, white, blue, red)
+	split_plane.delete()
+
+elif arc_test == 7:
+	def rotate(x, y, theta):
+		s = math.sin(theta)
+		c = math.cos(theta)
+		return x * c - y * s, y * c + x * s
+
+	ftheta = DEG(Parameters.foil_theta)
+	fdepth = Parameters.foil_depth
+	foil_w = Parameters.foil_width
+	foil_h = Parameters.foil_height
+	foil_l = Parameters.foil_left
+	foil_r = Parameters.foil_right
+	foil_d = Parameters.foil_down
+	foil_u = Parameters.foil_up
+	
+	pt_l  = (-foil_w / 2.0,  foil_h * (foil_l - 0.5))
+	pt_dl = (-foil_w / 2.0, -foil_h / 2.0)
+	pt_d  = ( foil_w * (foil_d - 0.5), -foil_h / 2.0)
+	pt_dr = ( foil_w / 2.0, -foil_h / 2.0)
+	pt_r  = ( foil_w / 2.0,  foil_h * (foil_r - 0.5))
+	pt_ur = ( foil_w / 2.0,  foil_h / 2.0)
+	pt_u  = ( foil_w * (foil_u - 0.5),  foil_h / 2.0)
+	pt_ul = (-foil_w / 2.0,  foil_h / 2.0)
+	
+	pts = [pt_l, pt_dl, pt_d, pt_dr, pt_r, pt_ur, pt_u, pt_ul]
+
+	wt_dl = math.sqrt(1.0 / Parameters.wt_down_left)
+	wt_dr = math.sqrt(1.0 / Parameters.wt_down_right)
+	wt_ul = math.sqrt(1.0 / Parameters.wt_up_left)
+	wt_ur = math.sqrt(1.0 / Parameters.wt_up_right)
+
+	wt = [1.0, wt_dl, 1.0, wt_dr, 1.0, wt_ur, 1.0, wt_ul]
+
+	Narc = 4
+	Ncps = 1 + 2 * Narc
+	knots = [Knot(0, 3)]
+	for a in range(1, Narc):
+		knots.append(Knot(a, 2))
+	knots.append(Knot(Narc, 3))
+	knarr = Array[Knot](knots)
+	d = NurbsData(3, False, False, knarr)
+	c = Array.CreateInstance(ControlPoint, Ncps)
+	cpi = 0
+	z = 0.0
+	for p in range(0, 2 * Narc):
+		x, y = pts[p]
+		if ftheta:
+			x, y = rotate(x, y, ftheta)
+		c[cpi] = ControlPoint(Point.Create(x, y, z), wt[p])
+		cpi = cpi + 1
+	x, y = pts[0]
+	if ftheta:
+		x, y = rotate(x, y, ftheta)
+	c[cpi] = ControlPoint(Point.Create(x, y, z), wt[0])
+	plane, normal = sketch_reset()
+	sn = SketchNurbs.Create(NurbsCurve.CreateFromControlPoints(d, c))
+	shapes = Array[ITrimmedCurve]([sn.CreatedCurve[0].Shape])
+	surface = PlanarBody.Create(plane, shapes, None, 'foil')
+	s = Selection.Create(sn.CreatedCurve)
+	Delete.Execute(s)
+	named_object_extrude('foil', 'Foil', fdepth, normal)
+
+elif arc_test == 8: # let's draw a hook
+
+	# Fixed Parameters
+	r_seat = 0.015 # loading pin has 30mm diameter
+	r_hole = 0.008 # supporting pin has 16mm diameter
+	y_csep = 0.160 # centre-centre separation is 160mm
+
+	# Adjustable Parameters
+	neck_t = 0.010 # thickness of neck
+	neck_a = -80.0 # angle of neck (deg)
+
+	r_top  = 0.016 # outer radius at top
+	r_main = 0.070 # main body radius
+
+	x_main = 0.03  # coordinates of main body centre
+	y_main = 0.02
+
+	r1 = 0.06 # transition radii
+	r2 = 0.01
+	rb = 0.01
+
+	# Let's draw the hook
+	plotter = Q2D_Plotter([-0.13,0.13], [-0.07,0.19])
+
+	p_start = Q2D_Point((0.0, -r_seat))	# start/end point of path
+
+	p_seat  = Q2D_Point((0.0, 0.0))		# construction circle-centers
+	p_hole  = Q2D_Point((0.0, y_csep))
+	p_main  = Q2D_Point((x_main, y_main))
+
+	c_seat = Q2D_Circle(p_seat, r_seat)                 # circle outlining the seat of the hook
+	a_seat = Q2D_Arc(p_start, c_seat, clockwise=False)  # define arc anti-clockwise from bottom
+	c_top  = Q2D_Circle(p_hole, r_top)                  # circle outlining the top of the hook
+	a_top  = Q2D_Arc(None, c_top, clockwise=True)       # define arc clockwise; start irrelevant
+	c_main = Q2D_Circle(p_main, r_main)	   	            # circle outlining the top of the hook
+	a_main = Q2D_Arc(None, c_main, clockwise=True)      # define arc clockwise; start irrelevant
+
+	l_neck = Q2D_Line(p_hole, Q2D_Vector(DEG(neck_a)))  # neck center-line
+
+	path = Q2D_Path(a_seat)
+	path.append(l_neck.parallel(-neck_t / 2, True), transition=r1, farside=False, co_sense=True)
+	path.append(a_top, transition=r2, farside=False, co_sense=False)
+	path.append(l_neck.parallel( neck_t / 2, False), transition=r2, farside=False, co_sense=False)
+	path.append(a_main, transition=r2, farside=False, co_sense=False)
+	path.append(a_seat, transition=rb, farside=False, co_sense=True)
+	path.end_point(p_start)
+
+	plotter.draw(path)
+
+	plotter.draw(Q2D_Circle(p_hole, r_hole)) # circle outlining the top hole of the hook
+
+	Q2D_path_color = 'red'
+	for i in range(-3,4,6):
+		inset = 0.001 * i
+		plotter.draw(path.offset_path(inset))
+
 if Q2D_SpaceClaim:
 	# Finally, switch to solid-modelling mode
 	ViewHelper.SetViewMode(InteractionMode.Solid)
+else:
+	plt.show()
