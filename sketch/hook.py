@@ -8,7 +8,8 @@
 # 5:  SpaceClaim: ski
 # 6:  SpaceClaim: cube
 # 7:  SpaceClaim: foil
-# 8: !SpaceClaim: mesh
+# 8: !SpaceClaim: hook - offset
+# 8: !SpaceClaim: hook - mesh w/ dmsh
 arc_test = 8
 
 print_path_info = False
@@ -676,6 +677,26 @@ class Q2D_Line(Q2D_Object):
 		rhs = Q2D_Line(point, self.direction.copy().rotate())
 		return self.intersection(rhs)
 
+	def poly_points(self, interval):
+		points = []
+		if self.chain is not None:
+			p1 = self.start
+			p2 = self.chain
+			if p2.name != "Point":
+				p2 = p2.start
+
+			dx = p2.x() - p1.x()
+			dy = p2.y() - p1.y()
+			length = math.sqrt(dx**2 + dy**2)
+
+			count = int(math.ceil(length / interval))
+			for c in range(0, count):
+				x = p1.x() + (dx * c) / count
+				y = p1.y() + (dy * c) / count
+				points += [[x, y]]
+
+		return points
+
 class Q2D_Circle(object):
 
 	def __init__(self, center, radius):
@@ -697,6 +718,17 @@ class Q2D_Circle(object):
 			v = Q2D_Point.from_to(self.center, point)
 		return self.center.polar_relative(self.radius, v.theta)
 
+	def poly_points(self, interval):
+		points = []
+		circumference = 2.0 * math.pi * self.radius
+
+		count = int(math.ceil(circumference / interval))
+		for c in range(0, count):
+			point = self.point_on_circumference((2.0 * math.pi * c) / count)
+			points += [[point.x(), point.y()]]
+
+		return points
+
 class Q2D_Arc(Q2D_Object):
 
 	def __init__(self, start, circle, clockwise=False):
@@ -715,6 +747,37 @@ class Q2D_Arc(Q2D_Object):
 		cc_start = self.start.cartesian_relative(offset * v_center.dx, offset * v_center.dy)
 
 		return Q2D_Arc(cc_start, Q2D_Circle(self.circle.center, self.circle.radius - offset), self.clockwise)
+
+	def poly_points(self, interval):
+		points = []
+		if self.chain is not None:
+			p1 = self.start
+			p2 = self.chain
+			if p2.name != "Point":
+				p2 = p2.start
+			t1 = math.atan2(p1.start[1] - self.circle.center.start[1], p1.start[0] - self.circle.center.start[0])
+			t2 = math.atan2(p2.start[1] - self.circle.center.start[1], p2.start[0] - self.circle.center.start[0])
+			if self.clockwise:
+				if t1 <= t2:
+					if t2 > 0:
+						t2 -= 2.0 * math.pi
+					else:
+						t1 += 2.0 * math.pi
+				arc_length = (t1 - t2) * self.circle.radius
+			else:
+				if t2 <= t1:
+					if t2 < 0:
+						t2 += 2.0 * math.pi
+					else:
+						t1 -= 2.0 * math.pi
+				arc_length = (t2 - t1) * self.circle.radius
+
+			count = int(math.ceil(arc_length / interval))
+			for c in range(0, count):
+				point = self.circle.point_on_circumference(t1 + ((t2 - t1) * c) / count)
+				points += [[point.x(), point.y()]]
+
+		return points
 
 class Q2D_Path(object):
 
@@ -1192,6 +1255,23 @@ class Q2D_Path(object):
 
 		return path
 		
+	def poly_points(self, arc_interval, line_interval=None):
+		points = []
+		item = self.chain
+
+		while item is not None:
+			if item.name == "Line":
+				if line_interval is not None:
+					points += item.poly_points(line_interval)
+				else:
+					points += [[item.start.x(), item.start.y()]]
+			elif item.name == "Arc":
+				points += item.poly_points(arc_interval)
+
+			item = item.chain
+
+		return points
+		
 class Q2D_Plotter(object):
 
 	def __init__(self, x_range, y_range):
@@ -1217,6 +1297,12 @@ class Q2D_Plotter(object):
 		if print_plot_info:
 			print('Point: ({x},{y})'.format(x=point.start[0], y=point.start[1]))
 		self._ax.scatter(point.start[0], point.start[1], marker=marker, color=color)
+
+	def draw_points(self, points):
+		marker = '.'
+		color = Q2D_path_color
+		for p in points:
+			self._ax.scatter(p[0], p[1], marker=marker, color=color)
 
 	def __draw_circle(self, circle, construction=True):
 		if construction and not plot_construction_arcs:
@@ -2234,7 +2320,7 @@ elif arc_test == 7:
 	Delete.Execute(s)
 	named_object_extrude('foil', 'Foil', fdepth, normal)
 
-elif arc_test == 8: # let's draw a hook
+elif arc_test == 8 or arc_test == 9: # let's draw a hook
 
 	# Fixed Parameters
 	r_seat = 0.015 # loading pin has 30mm diameter
@@ -2283,12 +2369,24 @@ elif arc_test == 8: # let's draw a hook
 
 	plotter.draw(path)
 
-	plotter.draw(Q2D_Circle(p_hole, r_hole)) # circle outlining the top hole of the hook
+	hole = Q2D_Circle(p_hole, r_hole)
+	plotter.draw(hole) # circle outlining the top hole of the hook
 
-	Q2D_path_color = 'red'
-	for i in range(-3,4,6):
-		inset = 0.001 * i
-		plotter.draw(path.offset_path(inset))
+	if arc_test == 8: # offset path
+		Q2D_path_color = 'red'
+		for i in range(-3,4,6):
+			inset = 0.001 * i
+			plotter.draw(path.offset_path(inset))
+
+	if arc_test == 9:
+		import dmsh
+		ppts = path.poly_points(0.003, 0.005)
+		Q2D_path_color = 'red'
+		ppts.reverse()
+		plotter.draw_points(ppts)
+		poly = dmsh.Difference(dmsh.Polygon(ppts), dmsh.Polygon(hole.poly_points(0.002)))
+		X, cells = dmsh.generate(poly, 0.005, show=True, tol=1.0e-10)
+		#poly.plot()
 
 if Q2D_SpaceClaim:
 	# Finally, switch to solid-modelling mode
