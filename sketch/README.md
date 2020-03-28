@@ -26,7 +26,7 @@ The hook extruded...
 <img style="align:center;" src="images/arc-test-2-hook-SpaceClaim-selections.png"/>
 
 It's possible to offset whole paths:
-<img style="align:center;" src="images/arc-test-8-hook-offsets.png"/>
+<img style="align:center;width:50%;" src="images/arc-test-8-hook-offsets.png"/>
 
 and to use <a href="https://github.com/nschloe/dmsh">dmsh</a> to generate meshes:
-<img style="align:center;" src="images/arc-test-9-hook-mesh.png"/>
+<img style="align:center;width:50%;" src="images/arc-test-9-hook-mesh.png"/>
