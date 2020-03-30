@@ -10,7 +10,7 @@
 # 7:  SpaceClaim: foil
 # 8: !SpaceClaim: hook - offset
 # 8: !SpaceClaim: hook - mesh w/ dmsh
-arc_test = 8
+arc_test = 9
 
 print_path_info = False
 print_plot_info = False
@@ -1304,6 +1304,13 @@ class Q2D_Plotter(object):
 		for p in points:
 			self._ax.scatter(p[0], p[1], marker=marker, color=color)
 
+	def draw_elements(self, nodes, elements):
+		for e in elements:
+			n1 = nodes[e[0]]
+			n2 = nodes[e[1]]
+			n3 = nodes[e[2]]
+			self._ax.plot([n1[0], n2[0], n3[0], n1[0]], [n1[1], n2[1], n3[1], n1[1]], '-', color=Q2D_path_color, linewidth=0.5)
+
 	def __draw_circle(self, circle, construction=True):
 		if construction and not plot_construction_arcs:
 			return
@@ -2367,26 +2374,136 @@ elif arc_test == 8 or arc_test == 9: # let's draw a hook
 	path.append(a_seat, transition=rb, farside=False, co_sense=True)
 	path.end_point(p_start)
 
-	plotter.draw(path)
-
 	hole = Q2D_Circle(p_hole, r_hole)
-	plotter.draw(hole) # circle outlining the top hole of the hook
 
 	if arc_test == 8: # offset path
+		plotter.draw(path)
+		plotter.draw(hole) # circle outlining the top hole of the hook
+
 		Q2D_path_color = 'red'
 		for i in range(-3,4,6):
 			inset = 0.001 * i
 			plotter.draw(path.offset_path(inset))
 
 	if arc_test == 9:
-		import dmsh
+		plotter.draw(path)
+		plotter.draw(hole) # circle outlining the top hole of the hook
+
 		ppts = path.poly_points(0.003, 0.005)
-		Q2D_path_color = 'red'
 		ppts.reverse()
-		plotter.draw_points(ppts)
+		#plotter.draw_points(ppts)
+
+		import dmsh
 		poly = dmsh.Difference(dmsh.Polygon(ppts), dmsh.Polygon(hole.poly_points(0.002)))
-		X, cells = dmsh.generate(poly, 0.005, show=True, tol=1.0e-10)
-		#poly.plot()
+		#poly = dmsh.Polygon(ppts)
+
+		def edge_size(x):
+			dseat = (x[0]**2 + x[1]**2)**0.5
+			dhole = (x[0]**2 + (x[1]-y_csep)**2)**0.5
+			return 0.005 - 0.001 * (dhole < 0.07) - 0.001 * (dhole < 0.02) - 0.002 * (dseat < 0.02)
+
+		print("Generating mesh...")
+		nodes, elements = dmsh.generate(poly, edge_size, show=False, tol=1) # high tolerance to take the default mesh
+		#nodes, elements = dmsh.generate(poly, 0.005, show=False, tol=5E-4)
+
+		#Q2D_path_color = 'yellow'
+		#plotter.draw_elements(nodes, elements)
+
+		def node_is_left(nn, n0, n1):
+			vn = nn - n0
+			vt = n1 - n0
+			return vn[0] * vt[1] - vn[1] * vt[0] < 0
+
+		def element_contains_node(N, n, e):
+			contains = False
+			nn = N[n]
+			n0 = N[e[0]]
+			n1 = N[e[1]]
+			n2 = N[e[2]]
+			if node_is_left(nn, n0, n1) and node_is_left(nn, n1, n2) and node_is_left(nn, n2, n0):
+				contains = True
+				print("Violation @ Node #{n}".format(n=n))
+			return contains
+
+		def violation(nn, n0, n1):
+			vn = nn - n0
+			vt = n1 - n0
+			x = vt[0]
+			y = vt[1]
+			l = (x**2 + y**2)**0.5
+			vt[0] = -y / l
+			vt[1] =  x / l
+			vdot = vn[0] * vt[0] + vn[1] * vt[1]
+			if abs(vdot) < l * 1E-2:
+				#print("vdot={v}".format(v=vdot))
+				if vdot < 0:
+					vdot = l * -1E-2
+				else:
+					vdot = l *  1E-2
+			return vt * vdot
+
+		def verify(P, N, E):
+			adjustments = []
+			for e1 in E:
+				for e2 in E:
+					if e1 is not e2:
+						if e1[0] in e2 and e1[1] in e2:
+							if element_contains_node(N, e1[2], e2):
+								N[e1[2]] -= 2.0 * violation(N[e1[2]], N[e1[0]], N[e1[1]])
+								P.draw_points([N[e1[2]]])
+								adjustments.append((e1[2], -1.01 * violation(N[e1[2]], N[e1[0]], N[e1[1]])))
+						elif e1[1] in e2 and e1[2] in e2:
+							if element_contains_node(N, e1[0], e2):
+								N[e1[0]] -= 2.0 * violation(N[e1[0]], N[e1[1]], N[e1[2]])
+								P.draw_points([N[e1[0]]])
+								adjustments.append((e1[0], -1.01 * violation(N[e1[0]], N[e1[1]], N[e1[2]])))
+						elif e1[2] in e2 and e1[0] in e2:
+							if element_contains_node(N, e1[1], e2):
+								N[e1[1]] -= 2.0 * violation(N[e1[1]], N[e1[2]], N[e1[0]])
+								P.draw_points([N[e1[1]]])
+								adjustments.append((e1[1], -1.01 * violation(N[e1[1]], N[e1[2]], N[e1[0]])))
+
+			for e1 in E:
+				if not node_is_left(N[e1[0]], N[e1[1]], N[e1[2]]):
+					print("not left! nodes=({a},{b},{c})".format(a=e1[0], b=e1[1], c=e1[2]))
+					n01 = N[e1[1]] - N[e1[0]]
+					n12 = N[e1[2]] - N[e1[1]]
+					n20 = N[e1[0]] - N[e1[2]]
+					if n01[0] * n20[0] + n01[1] * n20[1] > 0:
+						N[e1[0]] -= 2.0 * violation(N[e1[0]], N[e1[1]], N[e1[2]])
+						P.draw_points([N[e1[0]]])
+						adjustments.append((e1[0], -1.01 * violation(N[e1[0]], N[e1[1]], N[e1[2]])))
+					if n12[0] * n01[0] + n12[1] * n01[1] > 0:
+						N[e1[1]] -= 2.0 * violation(N[e1[1]], N[e1[2]], N[e1[0]])
+						P.draw_points([N[e1[1]]])
+						adjustments.append((e1[1], -1.01 * violation(N[e1[1]], N[e1[2]], N[e1[0]])))
+					if n20[0] * n12[0] + n20[1] * n12[1] > 0:
+						N[e1[2]] -= 2.0 * violation(N[e1[2]], N[e1[0]], N[e1[1]])
+						P.draw_points([N[e1[2]]])
+						adjustments.append((e1[2], -1.01 * violation(N[e1[2]], N[e1[0]], N[e1[1]])))
+
+					#P.draw_elements(N, [e1])
+
+			return adjustments
+
+		print("Verifying mesh...")
+		Q2D_path_color = 'red'
+		while True:
+			adjustments = verify(plotter, nodes, elements)
+			if len(adjustments) == 0:
+				break
+			print(adjustments)
+			print("Re-verifying mesh...")
+
+		print("Optimising mesh...")
+		import optimesh
+		#nodes, elements = optimesh.cpt.fixed_point_uniform(nodes, elements, 1.0e-10, 100, verbose=True)
+		#nodes, elements = optimesh.odt.fixed_point_uniform(nodes, elements, 1.0e-10, 100, verbose=True)
+		#nodes, elements = optimesh.cvt.quasi_newton_uniform_full(nodes, elements, 1.0e-10, 100, verbose=True)
+		nodes, elements = optimesh.cpt.linear_solve_density_preserving(nodes, elements, 1.0e-10, 100, verbose=True)
+
+		Q2D_path_color = 'grey'
+		plotter.draw_elements(nodes, elements)
 
 if Q2D_SpaceClaim:
 	# Finally, switch to solid-modelling mode
