@@ -36,9 +36,6 @@ else:
 	Q2D_SpaceClaim = False
 	# Okay, we're not using SpaceClaim; let's plot the paths with MatPlotLib instead
 
-	import matplotlib.pyplot as plt
-	import matplotlib.patches as mpatches
-
 	def DEG(a):
 		return math.radians(a)
 
@@ -1274,11 +1271,30 @@ class Q2D_Path(object):
 		
 class Q2D_Plotter(object):
 
+	__plt = None
+	__mpatches = None
+
+	@staticmethod
+	def __load():
+		if Q2D_Plotter.__plt is None:
+			import matplotlib.pyplot as plt
+			import matplotlib.patches as mpatches
+
+			Q2D_Plotter.__plt = plt
+			Q2D_Plotter.__mpatches = mpatches
+
+	@staticmethod
+	def show():
+		if Q2D_Plotter.__plt is not None:
+			Q2D_Plotter.__plt.show()
+
 	def __init__(self, x_range, y_range):
+		Q2D_Plotter.__load()
+
 		xsize = 1500
 		ysize = 1500
 		dpi_osx = 192 # Something very illogical here.
-		self._fig = plt.figure(figsize=(xsize / dpi_osx, ysize / dpi_osx), dpi=(dpi_osx/2))
+		self._fig = Q2D_Plotter.__plt.figure(figsize=(xsize / dpi_osx, ysize / dpi_osx), dpi=(dpi_osx/2))
 
 		self._ax = self._fig.add_subplot(111)
 		self._ax.set_facecolor('white')
@@ -1325,7 +1341,7 @@ class Q2D_Plotter(object):
 			ls='-'
 		if print_plot_info:
 			print('Ellipse: Center: ({x},{y}); Axes=({a},{b})'.format(x=circle.center.start[0], y=circle.center.start[1], a=x_axis, b=y_axis))
-		patch = mpatches.Ellipse(circle.center.start, x_axis, y_axis, edgecolor=ec, linestyle=ls, facecolor=None, fill=False, linewidth=1)
+		patch = Q2D_Plotter.__mpatches.Ellipse(circle.center.start, x_axis, y_axis, edgecolor=ec, linestyle=ls, facecolor=None, fill=False, linewidth=1)
 		self._ax.add_patch(patch)
 		self.__draw_point(circle.center, True)
 
@@ -1349,7 +1365,7 @@ class Q2D_Plotter(object):
 		y_axis = 2.0 * arc.circle.radius
 		if print_plot_info:
 			print('Arc: Center: ({x},{y}); Axes=({a},{b}); Angles=({s},{e})'.format(x=arc.circle.center.start[0], y=arc.circle.center.start[1], a=x_axis, b=y_axis, s=t1, e=t2))
-		patch = mpatches.Arc(arc.circle.center.start, x_axis, y_axis, theta1=t1, theta2=t2, edgecolor=Q2D_path_color, facecolor=None, fill=False)
+		patch = Q2D_Plotter.__mpatches.Arc(arc.circle.center.start, x_axis, y_axis, theta1=t1, theta2=t2, edgecolor=Q2D_path_color, facecolor=None, fill=False)
 		self._ax.add_patch(patch)
 		self.__draw_point(arc.circle.center, True)
 		self.__draw_point(arc.start)
@@ -2349,8 +2365,6 @@ elif arc_test == 8 or arc_test == 9: # let's draw a hook
 	rb = 0.01
 
 	# Let's draw the hook
-	plotter = Q2D_Plotter([-0.13,0.13], [-0.07,0.19])
-
 	p_start = Q2D_Point((0.0, -r_seat))	# start/end point of path
 
 	p_seat  = Q2D_Point((0.0, 0.0))		# construction circle-centers
@@ -2377,6 +2391,7 @@ elif arc_test == 8 or arc_test == 9: # let's draw a hook
 	hole = Q2D_Circle(p_hole, r_hole)
 
 	if arc_test == 8: # offset path
+		plotter = Q2D_Plotter([-0.13,0.13], [-0.07,0.19])
 		plotter.draw(path)
 		plotter.draw(hole) # circle outlining the top hole of the hook
 
@@ -2386,15 +2401,14 @@ elif arc_test == 8 or arc_test == 9: # let's draw a hook
 			plotter.draw(path.offset_path(inset))
 
 	if arc_test == 9:
-		plotter.draw(path)
-		plotter.draw(hole) # circle outlining the top hole of the hook
-
 		ppts = path.poly_points(0.003, 0.005)
 		ppts.reverse()
 		#plotter.draw_points(ppts)
 
+		hpts = hole.poly_points(0.002)
+
 		import dmsh
-		poly = dmsh.Difference(dmsh.Polygon(ppts), dmsh.Polygon(hole.poly_points(0.002)))
+		poly = dmsh.Difference(dmsh.Polygon(ppts), dmsh.Polygon(hpts))
 		#poly = dmsh.Polygon(ppts)
 
 		def edge_size(x):
@@ -2406,8 +2420,22 @@ elif arc_test == 8 or arc_test == 9: # let's draw a hook
 		nodes, elements = dmsh.generate(poly, edge_size, show=False, tol=1) # high tolerance to take the default mesh
 		#nodes, elements = dmsh.generate(poly, 0.005, show=False, tol=5E-4)
 
-		#Q2D_path_color = 'yellow'
-		#plotter.draw_elements(nodes, elements)
+		boundary = []
+		for n1 in nodes:
+			matched = False
+			for n2 in ppts:
+				if n1[0] == n2[0] and n1[1] == n2[1]:
+					matched = True
+					break
+			if not matched:
+				for n2 in hpts:
+					if n1[0] == n2[0] and n1[1] == n2[1]:
+						matched = True
+						break
+			if matched:
+				boundary.append(True)
+			else:
+				boundary.append(False)
 
 		def node_is_left(nn, n0, n1):
 			vn = nn - n0
@@ -2442,7 +2470,7 @@ elif arc_test == 8 or arc_test == 9: # let's draw a hook
 					vdot = l *  1E-2
 			return vt * vdot
 
-		def verify(P, N, E):
+		def verify(P, N, E, B):
 			adjustments = []
 			for e1 in E:
 				for e2 in E:
@@ -2450,57 +2478,68 @@ elif arc_test == 8 or arc_test == 9: # let's draw a hook
 						if e1[0] in e2 and e1[1] in e2:
 							if element_contains_node(N, e1[2], e2):
 								N[e1[2]] -= 2.0 * violation(N[e1[2]], N[e1[0]], N[e1[1]])
-								P.draw_points([N[e1[2]]])
+								if P is not None:
+									P.draw_points([N[e1[2]]])
 								adjustments.append((e1[2], -1.01 * violation(N[e1[2]], N[e1[0]], N[e1[1]])))
 						elif e1[1] in e2 and e1[2] in e2:
 							if element_contains_node(N, e1[0], e2):
 								N[e1[0]] -= 2.0 * violation(N[e1[0]], N[e1[1]], N[e1[2]])
-								P.draw_points([N[e1[0]]])
+								if P is not None:
+									P.draw_points([N[e1[0]]])
 								adjustments.append((e1[0], -1.01 * violation(N[e1[0]], N[e1[1]], N[e1[2]])))
 						elif e1[2] in e2 and e1[0] in e2:
 							if element_contains_node(N, e1[1], e2):
 								N[e1[1]] -= 2.0 * violation(N[e1[1]], N[e1[2]], N[e1[0]])
-								P.draw_points([N[e1[1]]])
+								if P is not None:
+									P.draw_points([N[e1[1]]])
 								adjustments.append((e1[1], -1.01 * violation(N[e1[1]], N[e1[2]], N[e1[0]])))
 
 			for e1 in E:
 				if not node_is_left(N[e1[0]], N[e1[1]], N[e1[2]]):
-					print("not left! nodes=({a},{b},{c})".format(a=e1[0], b=e1[1], c=e1[2]))
-					n01 = N[e1[1]] - N[e1[0]]
-					n12 = N[e1[2]] - N[e1[1]]
-					n20 = N[e1[0]] - N[e1[2]]
-					if n01[0] * n20[0] + n01[1] * n20[1] > 0:
-						N[e1[0]] -= 2.0 * violation(N[e1[0]], N[e1[1]], N[e1[2]])
-						P.draw_points([N[e1[0]]])
-						adjustments.append((e1[0], -1.01 * violation(N[e1[0]], N[e1[1]], N[e1[2]])))
-					if n12[0] * n01[0] + n12[1] * n01[1] > 0:
-						N[e1[1]] -= 2.0 * violation(N[e1[1]], N[e1[2]], N[e1[0]])
-						P.draw_points([N[e1[1]]])
-						adjustments.append((e1[1], -1.01 * violation(N[e1[1]], N[e1[2]], N[e1[0]])))
-					if n20[0] * n12[0] + n20[1] * n12[1] > 0:
+					if B[e1[0]] and B[e1[1]] and not B[e1[2]]:
+						# move e1[2]
 						N[e1[2]] -= 2.0 * violation(N[e1[2]], N[e1[0]], N[e1[1]])
-						P.draw_points([N[e1[2]]])
+						if P is not None:
+							P.draw_points([N[e1[2]]])
 						adjustments.append((e1[2], -1.01 * violation(N[e1[2]], N[e1[0]], N[e1[1]])))
-
-					#P.draw_elements(N, [e1])
+					if B[e1[1]] and B[e1[2]] and not B[e1[0]]:
+						# move e1[0]
+						N[e1[0]] -= 2.0 * violation(N[e1[0]], N[e1[1]], N[e1[2]])
+						if P is not None:
+							P.draw_points([N[e1[0]]])
+						adjustments.append((e1[0], -1.01 * violation(N[e1[0]], N[e1[1]], N[e1[2]])))
+					if B[e1[2]] and B[e1[0]] and not B[e1[1]]:
+						# move e1[1]
+						N[e1[1]] -= 2.0 * violation(N[e1[1]], N[e1[2]], N[e1[0]])
+						if P is not None:
+							P.draw_points([N[e1[1]]])
+						adjustments.append((e1[1], -1.01 * violation(N[e1[1]], N[e1[2]], N[e1[0]])))
 
 			return adjustments
 
 		print("Verifying mesh...")
-		Q2D_path_color = 'red'
 		while True:
-			adjustments = verify(plotter, nodes, elements)
+			plotter = None
+			Q2D_path_color = 'red'
+			adjustments = verify(plotter, nodes, elements, boundary)
 			if len(adjustments) == 0:
 				break
 			print(adjustments)
 			print("Re-verifying mesh...")
 
-		print("Optimising mesh...")
-		import optimesh
-		#nodes, elements = optimesh.cpt.fixed_point_uniform(nodes, elements, 1.0e-10, 100, verbose=True)
-		#nodes, elements = optimesh.odt.fixed_point_uniform(nodes, elements, 1.0e-10, 100, verbose=True)
-		#nodes, elements = optimesh.cvt.quasi_newton_uniform_full(nodes, elements, 1.0e-10, 100, verbose=True)
-		nodes, elements = optimesh.cpt.linear_solve_density_preserving(nodes, elements, 1.0e-10, 100, verbose=True)
+		enable_Optimesh = True
+		if enable_Optimesh:
+			print("Optimising mesh...")
+			import optimesh
+			#nodes, elements = optimesh.cpt.fixed_point_uniform(nodes, elements, 1.0e-10, 100, verbose=True)
+			#nodes, elements = optimesh.odt.fixed_point_uniform(nodes, elements, 1.0e-10, 100, verbose=True)
+			#nodes, elements = optimesh.cvt.quasi_newton_uniform_full(nodes, elements, 1.0e-10, 100, verbose=True)
+			nodes, elements = optimesh.cpt.linear_solve_density_preserving(nodes, elements, 1.0e-10, 100, verbose=True)
+
+		plotter = Q2D_Plotter([-0.13,0.13], [-0.07,0.19])
+		Q2D_path_color = 'blue'
+		plotter.draw(path)
+		plotter.draw(hole) # circle outlining the top hole of the hook
 
 		Q2D_path_color = 'grey'
 		plotter.draw_elements(nodes, elements)
@@ -2509,4 +2548,4 @@ if Q2D_SpaceClaim:
 	# Finally, switch to solid-modelling mode
 	ViewHelper.SetViewMode(InteractionMode.Solid)
 else:
-	plt.show()
+	Q2D_Plotter.show()

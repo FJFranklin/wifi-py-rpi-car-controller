@@ -28,5 +28,5 @@ The hook extruded...
 It's possible to offset whole paths:
 <img style="align:center;width:50%;" src="images/arc-test-8-hook-offsets.png" width="50%" height="50%" />
 
-and to use <a href="https://github.com/nschloe/dmsh">dmsh</a> to generate meshes:
-<img style="align:center;width:50%;" src="images/arc-test-9-hook-mesh.png" width="50%" height="50%" />
+and to use <a href="https://github.com/nschloe/dmsh">dmsh</a> and <a href="https://github.com/nschloe/optimesh">optimesh</a> to generate meshes:
+<img style="align:center;width:50%;" src="images/arc-test-9-hook-mesh.png" />
