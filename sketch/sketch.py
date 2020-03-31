@@ -1,14 +1,20 @@
 # -*- indent-tabs-mode: t; tab-width: 4 -*-
 
-# 0: arc-arc test
-# 1: arc-line test
-# 2: hook
-# 3: SpaceClaim 3D-NURBS
-# 4: conduit
-# 5: ski
-# 6: cube
-# 7: foil
-arc_test = 2
+# 0:  arc-arc test
+# 1:  arc-line test
+# 2:  hook
+# 3:  SpaceClaim: 3D-NURBS
+# 4:  conduit
+# 5:  SpaceClaim: ski
+# 6:  SpaceClaim: cube
+# 7:  SpaceClaim: foil
+# 8: !SpaceClaim: hook - offset
+# 8: !SpaceClaim: hook - mesh w/ dmsh
+arc_test = 4
+
+print_path_info = False
+print_plot_info = False
+plot_construction_arcs = False
 
 # ==== Preliminary setup: Are we using SpaceClaim? ==== #
 
@@ -30,11 +36,12 @@ else:
 	Q2D_SpaceClaim = False
 	# Okay, we're not using SpaceClaim; let's plot the paths with MatPlotLib instead
 
-	import matplotlib.pyplot as plt
-	import matplotlib.patches as mpatches
-
 	def DEG(a):
 		return math.radians(a)
+
+	GeometrySequence = 1
+
+	Q2D_path_color = 'blue' # color for plotting path if using MatPlotLib
 
 # ==== General SpaceClaim convenience functions ==== #
 
@@ -667,6 +674,26 @@ class Q2D_Line(Q2D_Object):
 		rhs = Q2D_Line(point, self.direction.copy().rotate())
 		return self.intersection(rhs)
 
+	def poly_points(self, interval):
+		points = []
+		if self.chain is not None:
+			p1 = self.start
+			p2 = self.chain
+			if p2.name != "Point":
+				p2 = p2.start
+
+			dx = p2.x() - p1.x()
+			dy = p2.y() - p1.y()
+			length = math.sqrt(dx**2 + dy**2)
+
+			count = int(math.ceil(length / interval))
+			for c in range(0, count):
+				x = p1.x() + (dx * c) / count
+				y = p1.y() + (dy * c) / count
+				points += [[x, y]]
+
+		return points
+
 class Q2D_Circle(object):
 
 	def __init__(self, center, radius):
@@ -688,6 +715,17 @@ class Q2D_Circle(object):
 			v = Q2D_Point.from_to(self.center, point)
 		return self.center.polar_relative(self.radius, v.theta)
 
+	def poly_points(self, interval):
+		points = []
+		circumference = 2.0 * math.pi * self.radius
+
+		count = int(math.ceil(circumference / interval))
+		for c in range(0, count):
+			point = self.point_on_circumference((2.0 * math.pi * c) / count)
+			points += [[point.x(), point.y()]]
+
+		return points
+
 class Q2D_Arc(Q2D_Object):
 
 	def __init__(self, start, circle, clockwise=False):
@@ -695,6 +733,48 @@ class Q2D_Arc(Q2D_Object):
 		self.start = start
 		self.circle = circle
 		self.clockwise = clockwise
+
+	def concentric(self, offset):
+		if self.clockwise:
+			offset = -offset
+		if self.circle.radius - offset <= 0:
+			return None
+
+		v_center = Q2D_Point.from_to(self.start, self.circle.center) # vector pointing inwards
+		cc_start = self.start.cartesian_relative(offset * v_center.dx, offset * v_center.dy)
+
+		return Q2D_Arc(cc_start, Q2D_Circle(self.circle.center, self.circle.radius - offset), self.clockwise)
+
+	def poly_points(self, interval):
+		points = []
+		if self.chain is not None:
+			p1 = self.start
+			p2 = self.chain
+			if p2.name != "Point":
+				p2 = p2.start
+			t1 = math.atan2(p1.start[1] - self.circle.center.start[1], p1.start[0] - self.circle.center.start[0])
+			t2 = math.atan2(p2.start[1] - self.circle.center.start[1], p2.start[0] - self.circle.center.start[0])
+			if self.clockwise:
+				if t1 <= t2:
+					if t2 > 0:
+						t2 -= 2.0 * math.pi
+					else:
+						t1 += 2.0 * math.pi
+				arc_length = (t1 - t2) * self.circle.radius
+			else:
+				if t2 <= t1:
+					if t2 < 0:
+						t2 += 2.0 * math.pi
+					else:
+						t1 -= 2.0 * math.pi
+				arc_length = (t2 - t1) * self.circle.radius
+
+			count = int(math.ceil(arc_length / interval))
+			for c in range(0, count):
+				point = self.circle.point_on_circumference(t1 + ((t2 - t1) * c) / count)
+				points += [[point.x(), point.y()]]
+
+		return points
 
 class Q2D_Path(object):
 
@@ -746,10 +826,12 @@ class Q2D_Path(object):
 
 		pi = l1.intersection(l2, radius)
 		if pi is None:
-			print('Unable to add line to line - no intersection')
+			if print_path_info:
+				print('Unable to add line to line - no intersection')
 		else:
 			if radius > 0:
-				print('Adding line to line with transition')
+				if print_path_info:
+					print('Adding line to line with transition')
 				p1 = l1.project(pi)
 				p2 = l2.project(pi)
 
@@ -758,7 +840,8 @@ class Q2D_Path(object):
 
 				self.__append(Q2D_Line(p2, d2))
 			else:
-				print('Adding line to line without transition')
+				if print_path_info:
+					print('Adding line to line without transition')
 				self.__append(Q2D_Line(pi, d2))
 
 	@staticmethod
@@ -791,13 +874,16 @@ class Q2D_Path(object):
 		cross = cp.cross(line.direction)
 
 		if abs(cp.length - circle.radius) < Q2D_Design_Tolerance:
-			print("tangent: error = {e}".format(e=(cp.length - circle.radius)))
+			if print_path_info:
+				print("tangent: error = {e}".format(e=(cp.length - circle.radius)))
 			point = midpoint
 			tangent = True # check sense
 		elif cp.length > circle.radius:
-			print("line does not intersect circle; missed by {d}".format(d=(cp.length - circle.radius)))
+			if print_path_info:
+				print("line does not intersect circle; missed by {d}".format(d=(cp.length - circle.radius)))
 		else: # cp.length < circle.radius:
-			print("line intersects circle")
+			if print_path_info:
+				print("line intersects circle")
 			dv = line.direction.copy()
 			dv.length = (circle.radius**2.0 - cp.length**2.0)**0.5
 
@@ -829,9 +915,11 @@ class Q2D_Path(object):
 		point, cross, tangent = Q2D_Path.__intersect_line(line, arc.circle, sense)
 		if transition is None:
 			if point is None:
-				print('Unable to add line without transition')
+				if print_path_info:
+					print('Unable to add line without transition')
 			else:
-				print('Adding line without transition')
+				if print_path_info:
+					print('Adding line without transition')
 				self.__append(Q2D_Line(point, line.direction))
 		else:
 			if not arc.clockwise:
@@ -840,21 +928,26 @@ class Q2D_Path(object):
 				offset = transition
 
 			if point is not None:
-				print('point = ({x}, {y}); cross={c}; tangent={t}'.format(x=point.x(), y=point.y(), c=cross, t=tangent))
+				if print_path_info:
+					print('point = ({x}, {y}); cross={c}; tangent={t}'.format(x=point.x(), y=point.y(), c=cross, t=tangent))
 
 			if tangent:
 				if (cross > 0.0 and not arc.clockwise) or (cross < 0.0 and arc.clockwise):
 					if not co_sense:
-						print('Co-sense transition should be used here')
+						if print_path_info:
+							print('Co-sense transition should be used here')
 				else:
 					if co_sense:
-						print('Contra-sense transition should be used here')
+						if print_path_info:
+							print('Contra-sense transition should be used here')
 
 				if co_sense:
-					print('Adding (tangent) line (without transition)')
+					if print_path_info:
+						print('Adding (tangent) line (without transition)')
 					self.__append(Q2D_Line(line.project(point), line.direction))
 				else:
-					print('Adding (tangent) line (with counter-sense transition)')
+					if print_path_info:
+						print('Adding (tangent) line (with counter-sense transition)')
 					o = Q2D_Circle(arc.circle.center, arc.circle.radius + transition)
 					l = line.parallel(offset)
 					p, c, t = Q2D_Path.__intersect_line(l, o, not farside)
@@ -864,10 +957,12 @@ class Q2D_Path(object):
 			elif point is None:
 				if (cross > 0.0 and not arc.clockwise) or (cross < 0.0 and arc.clockwise):
 					if not co_sense:
-						print('Co-sense transition should be used here')
+						if print_path_info:
+							print('Co-sense transition should be used here')
 				else:
 					if co_sense:
-						print('Contra-sense transition should be used here')
+						if print_path_info:
+							print('Contra-sense transition should be used here')
 
 				if co_sense:
 					if transition > arc.circle.radius:
@@ -875,14 +970,17 @@ class Q2D_Path(object):
 						l = line.parallel(-offset)
 						p, c, t = Q2D_Path.__intersect_line(l, o, not farside)
 						if p is not None:
-							print('Adding line (with co-sense transition)')
+							if print_path_info:
+								print('Adding line (with co-sense transition)')
 							#print 'point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t
 							self.__append(Q2D_Arc(arc.circle.project(p, True), Q2D_Circle(p, transition), clockwise=arc.clockwise))
 							self.__append(Q2D_Line(line.project(p), line.direction))
 						else:
-							print('Unable to add line with specified (co-sense) transition; try increasing the transition radius')
+							if print_path_info:
+								print('Unable to add line with specified (co-sense) transition; try increasing the transition radius')
 					else:
-						print('Unable to add line with specified (co-sense) transition; require transition radius > arc radius')
+						if print_path_info:
+							print('Unable to add line with specified (co-sense) transition; require transition radius > arc radius')
 				else:
 					o = Q2D_Circle(arc.circle.center, arc.circle.radius + transition)
 					if arc.clockwise:
@@ -891,12 +989,14 @@ class Q2D_Path(object):
 						l = line.parallel( transition)
 					p, c, t = Q2D_Path.__intersect_line(l, o, not farside)
 					if p is not None:
-						print('Adding line (with counter-sense transition)')
+						if print_path_info:
+							print('Adding line (with counter-sense transition)')
 						#print 'point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t
 						self.__append(Q2D_Arc(arc.circle.project(p), Q2D_Circle(p, transition), clockwise=(not arc.clockwise)))
 						self.__append(Q2D_Line(line.project(p), line.direction))
 					else:
-						print('Unable to add line with specified (counter-sense) transition')
+						if print_path_info:
+							print('Unable to add line with specified (counter-sense) transition')
 			else: # line intersects circle
 				if co_sense:
 					if transition < arc.circle.radius:
@@ -904,20 +1004,24 @@ class Q2D_Path(object):
 						l = line.parallel(-offset)
 						p, c, t = Q2D_Path.__intersect_line(l, o, not farside)
 						if p is not None:
-							print('Adding line (with co-sense transition)')
+							if print_path_info:
+								print('Adding line (with co-sense transition)')
 							#print 'point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t
 							self.__append(Q2D_Arc(arc.circle.project(p), Q2D_Circle(p, transition), clockwise=arc.clockwise))
 							self.__append(Q2D_Line(line.project(p), line.direction))
 						else:
-							print('Unable to add line with specified (co-sense) transition; try increasing the transition radius')
+							if print_path_info:
+								print('Unable to add line with specified (co-sense) transition; try increasing the transition radius')
 					else:
-						print('Unable to add line with specified (co-sense) transition; require transition radius > arc radius')
+						if print_path_info:
+							print('Unable to add line with specified (co-sense) transition; require transition radius > arc radius')
 				else:
 					o = Q2D_Circle(arc.circle.center, arc.circle.radius + transition)
 					l = line.parallel(offset)
 					p, c, t = Q2D_Path.__intersect_line(l, o, not farside)
 					if p is not None:
-						print('Adding (counter-sense) arc (with transition)')
+						if print_path_info:
+							print('Adding (counter-sense) arc (with transition)')
 						#print('point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t)
 						self.__append(Q2D_Arc(arc.circle.project(p), Q2D_Circle(p, transition), clockwise=(not arc.clockwise)))
 						self.__append(Q2D_Line(line.project(p), line.direction))
@@ -943,9 +1047,11 @@ class Q2D_Path(object):
 		point, cross, tangent = Q2D_Path.__intersect_line(line, arc.circle, sense)
 		if transition is None:
 			if point is None:
-				print('Unable to add arc without transition')
+				if print_path_info:
+					print('Unable to add arc without transition')
 			else:
-				print('Adding arc without transition')
+				if print_path_info:
+					print('Adding arc without transition')
 				self.__append(Q2D_Arc(point, arc.circle, clockwise=arc.clockwise))
 		else:
 			if arc.clockwise:
@@ -954,21 +1060,26 @@ class Q2D_Path(object):
 				offset = transition
 
 			if point is not None:
-				print('point = ({x}, {y}); cross={c}; tangent={t}'.format(x=point.x(), y=point.y(), c=cross, t=tangent))
+				if print_path_info:
+					print('point = ({x}, {y}); cross={c}; tangent={t}'.format(x=point.x(), y=point.y(), c=cross, t=tangent))
 
 			if tangent:
 				if (cross > 0.0 and not arc.clockwise) or (cross < 0.0 and arc.clockwise):
 					if not co_sense:
-						print('Co-sense transition should be used here')
+						if print_path_info:
+							print('Co-sense transition should be used here')
 				else:
 					if co_sense:
-						print('Contra-sense transition should be used here')
+						if print_path_info:
+							print('Contra-sense transition should be used here')
 
 				if co_sense:
-					print('Adding (tangent) arc (without transition)')
+					if print_path_info:
+						print('Adding (tangent) arc (without transition)')
 					self.__append(Q2D_Arc(point, arc.circle, clockwise=arc.clockwise))
 				else:
-					print('Adding (counter-sense tangent) arc (with transition)')
+					if print_path_info:
+						print('Adding (counter-sense tangent) arc (with transition)')
 					o = Q2D_Circle(arc.circle.center, arc.circle.radius + transition)
 					l = line.parallel(-offset)
 					p, c, t = Q2D_Path.__intersect_line(l, o, farside)
@@ -978,10 +1089,12 @@ class Q2D_Path(object):
 			elif point is None:
 				if (cross > 0.0 and not arc.clockwise) or (cross < 0.0 and arc.clockwise):
 					if not co_sense:
-						print('Co-sense transition should be used here')
+						if print_path_info:
+							print('Co-sense transition should be used here')
 				else:
 					if co_sense:
-						print('Contra-sense transition should be used here')
+						if print_path_info:
+							print('Contra-sense transition should be used here')
 
 				if co_sense:
 					if transition > arc.circle.radius:
@@ -989,25 +1102,30 @@ class Q2D_Path(object):
 						l = line.parallel(offset)
 						p, c, t = Q2D_Path.__intersect_line(l, o, farside)
 						if p is not None:
-							print('Adding (co-sense) arc (with transition)')
+							if print_path_info:
+								print('Adding (co-sense) arc (with transition)')
 							#print 'point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t
 							self.__append(Q2D_Arc(line.project(p), Q2D_Circle(p, transition), clockwise=arc.clockwise))
 							self.__append(Q2D_Arc(arc.circle.project(p, True), arc.circle, clockwise=arc.clockwise))
 						else:
-							print('Unable to add (co-sense) arc with specified transition; try increasing the transition radius')
+							if print_path_info:
+								print('Unable to add (co-sense) arc with specified transition; try increasing the transition radius')
 					else:
-						print('Unable to add (co-sense) arc with specified transition; require transition radius > arc radius')
+						if print_path_info:
+							print('Unable to add (co-sense) arc with specified transition; require transition radius > arc radius')
 				else:
 					o = Q2D_Circle(arc.circle.center, arc.circle.radius + transition)
 					l = line.parallel(-offset)
 					p, c, t = Q2D_Path.__intersect_line(l, o, farside)
 					if p is not None:
-						print('Adding (counter-sense) arc (with transition)')
+						if print_path_info:
+							print('Adding (counter-sense) arc (with transition)')
 						#print('point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t)
 						self.__append(Q2D_Arc(line.project(p), Q2D_Circle(p, transition), clockwise=(not arc.clockwise)))
 						self.__append(Q2D_Arc(arc.circle.project(p), arc.circle, clockwise=arc.clockwise))
 					else:
-						print('Unable to add (counter-sense) arc with specified transition')
+						if print_path_info:
+							print('Unable to add (counter-sense) arc with specified transition')
 			else: # line intersects circle
 				if co_sense:
 					if transition < arc.circle.radius:
@@ -1015,20 +1133,24 @@ class Q2D_Path(object):
 						l = line.parallel(offset)
 						p, c, t = Q2D_Path.__intersect_line(l, o, farside)
 						if p is not None:
-							print('Adding (co-sense) arc (with transition)')
+							if print_path_info:
+								print('Adding (co-sense) arc (with transition)')
 							#print('point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t)
 							self.__append(Q2D_Arc(line.project(p), Q2D_Circle(p, transition), clockwise=arc.clockwise))
 							self.__append(Q2D_Arc(arc.circle.project(p), arc.circle, clockwise=arc.clockwise))
 						else:
-							print('Unable to add (co-sense) arc with specified transition; try increasing the transition radius')
+							if print_path_info:
+								print('Unable to add (co-sense) arc with specified transition; try increasing the transition radius')
 					else:
-						print('Unable to add (co-sense) arc with specified transition; require transition radius > arc radius')
+						if print_path_info:
+							print('Unable to add (co-sense) arc with specified transition; require transition radius > arc radius')
 				else:
 					o = Q2D_Circle(arc.circle.center, arc.circle.radius + transition)
 					l = line.parallel(-offset)
 					p, c, t = Q2D_Path.__intersect_line(l, o, farside)
 					if p is not None:
-						print('Adding (counter-sense) arc (with transition)')
+						if print_path_info:
+							print('Adding (counter-sense) arc (with transition)')
 						#print('point = (', p.x(), p.y(), '); cross =', c, 'tangent =', t)
 						self.__append(Q2D_Arc(line.project(p), Q2D_Circle(p, transition), clockwise=(not arc.clockwise)))
 						self.__append(Q2D_Arc(arc.circle.project(p), arc.circle, clockwise=arc.clockwise))
@@ -1076,9 +1198,11 @@ class Q2D_Path(object):
 		point = Q2D_Path.__intersect_circle(lhs_o, rhs_o, kwargs)
 
 		if point is None:
-			print("Unable to intersect arcs")
+			if print_path_info:
+				print("Unable to intersect arcs")
 		else:
-			print("Adding arc with transition")
+			if print_path_info:
+				print("Adding arc with transition")
 			lhs_point = lhs.circle.project(point, lhs_invert)
 			rhs_point = rhs.circle.project(point, rhs_invert)
 			self.__append(Q2D_Arc(lhs_point, Q2D_Circle(point, transition), clockwise=clockwise))
@@ -1096,13 +1220,81 @@ class Q2D_Path(object):
 			elif line_or_arc.name == "Arc":
 				self.__append_arc_to_arc(line_or_arc, transition, kwargs)
 
+	def offset_path(self, offset):
+		path = None
+		endp = None
+		item = self.chain
+
+		while item is not None:
+			if item.name == "Line":
+				line = item.parallel(offset)
+				if path is None:
+					path = Q2D_Path(line)
+					endp = line.start
+				else:
+					path.__append(line)
+			elif item.name == "Arc":
+				arc = item.concentric(offset)
+				if arc is None:
+					print("* * * Path segment skipped... behaviour undefined! * * *")
+					item = item.chain
+					continue
+				if path is None:
+					path = Q2D_Path(arc)
+					endp = arc.start
+				else:
+					path.__append(arc)
+			else:
+				if path:
+					path.end_point(endp)
+
+			item = item.chain
+
+		return path
+		
+	def poly_points(self, arc_interval, line_interval=None):
+		points = []
+		item = self.chain
+
+		while item is not None:
+			if item.name == "Line":
+				if line_interval is not None:
+					points += item.poly_points(line_interval)
+				else:
+					points += [[item.start.x(), item.start.y()]]
+			elif item.name == "Arc":
+				points += item.poly_points(arc_interval)
+
+			item = item.chain
+
+		return points
+		
 class Q2D_Plotter(object):
 
+	__plt = None
+	__mpatches = None
+
+	@staticmethod
+	def __load():
+		if Q2D_Plotter.__plt is None:
+			import matplotlib.pyplot as plt
+			import matplotlib.patches as mpatches
+
+			Q2D_Plotter.__plt = plt
+			Q2D_Plotter.__mpatches = mpatches
+
+	@staticmethod
+	def show():
+		if Q2D_Plotter.__plt is not None:
+			Q2D_Plotter.__plt.show()
+
 	def __init__(self, x_range, y_range):
+		Q2D_Plotter.__load()
+
 		xsize = 1500
 		ysize = 1500
 		dpi_osx = 192 # Something very illogical here.
-		self._fig = plt.figure(figsize=(xsize / dpi_osx, ysize / dpi_osx), dpi=(dpi_osx/2))
+		self._fig = Q2D_Plotter.__plt.figure(figsize=(xsize / dpi_osx, ysize / dpi_osx), dpi=(dpi_osx/2))
 
 		self._ax = self._fig.add_subplot(111)
 		self._ax.set_facecolor('white')
@@ -1111,30 +1303,45 @@ class Q2D_Plotter(object):
 		self._ax.set_xlim(x_range)
 		self._ax.set_ylim(y_range)
 
-	def show(self):
-		plt.show()
-
 	def __draw_point(self, point, center=False):
 		if center:
 			marker = '+'
 			color = 'green'
 		else:
 			marker = '.'
-			color = 'blue'
-		print('Point: ({x},{y})'.format(x=point.start[0], y=point.start[1]))
+			color = Q2D_path_color
+		if print_plot_info:
+			print('Point: ({x},{y})'.format(x=point.start[0], y=point.start[1]))
 		self._ax.scatter(point.start[0], point.start[1], marker=marker, color=color)
 
+	def draw_points(self, points):
+		marker = '.'
+		color = Q2D_path_color
+		for p in points:
+			self._ax.scatter(p[0], p[1], marker=marker, color=color)
+
+	def draw_elements(self, nodes, elements):
+		for e in elements:
+			n1 = nodes[e[0]]
+			n2 = nodes[e[1]]
+			n3 = nodes[e[2]]
+			self._ax.plot([n1[0], n2[0], n3[0], n1[0]], [n1[1], n2[1], n3[1], n1[1]], '-', color=Q2D_path_color, linewidth=0.5)
+
 	def __draw_circle(self, circle, construction=True):
+		if construction and not plot_construction_arcs:
+			return
+
 		x_axis = 2.0 * circle.radius
 		y_axis = 2.0 * circle.radius
 		if construction:
 			ec='green'
 			ls='--'
 		else:
-			ec='blue'
+			ec=Q2D_path_color
 			ls='-'
-		print('Ellipse: Center: ({x},{y}); Axes=({a},{b})'.format(x=circle.center.start[0], y=circle.center.start[1], a=x_axis, b=y_axis))
-		patch = mpatches.Ellipse(circle.center.start, x_axis, y_axis, edgecolor=ec, linestyle=ls, facecolor=None, fill=False, linewidth=1)
+		if print_plot_info:
+			print('Ellipse: Center: ({x},{y}); Axes=({a},{b})'.format(x=circle.center.start[0], y=circle.center.start[1], a=x_axis, b=y_axis))
+		patch = Q2D_Plotter.__mpatches.Ellipse(circle.center.start, x_axis, y_axis, edgecolor=ec, linestyle=ls, facecolor=None, fill=False, linewidth=1)
 		self._ax.add_patch(patch)
 		self.__draw_point(circle.center, True)
 
@@ -1156,8 +1363,9 @@ class Q2D_Plotter(object):
 			t2 += 360.0
 		x_axis = 2.0 * arc.circle.radius
 		y_axis = 2.0 * arc.circle.radius
-		print('Arc: Center: ({x},{y}); Axes=({a},{b}); Angles=({s},{e})'.format(x=arc.circle.center.start[0], y=arc.circle.center.start[1], a=x_axis, b=y_axis, s=t1, e=t2))
-		patch = mpatches.Arc(arc.circle.center.start, x_axis, y_axis, theta1=t1, theta2=t2, edgecolor='blue', facecolor=None, fill=False)
+		if print_plot_info:
+			print('Arc: Center: ({x},{y}); Axes=({a},{b}); Angles=({s},{e})'.format(x=arc.circle.center.start[0], y=arc.circle.center.start[1], a=x_axis, b=y_axis, s=t1, e=t2))
+		patch = Q2D_Plotter.__mpatches.Arc(arc.circle.center.start, x_axis, y_axis, theta1=t1, theta2=t2, edgecolor=Q2D_path_color, facecolor=None, fill=False)
 		self._ax.add_patch(patch)
 		self.__draw_point(arc.circle.center, True)
 		self.__draw_point(arc.start)
@@ -1167,8 +1375,9 @@ class Q2D_Plotter(object):
 		p2 = line.chain
 		if p2.name != "Point":
 			p2 = p2.start
-		print('Line: From: ({x},{y}); To: ({a},{b})'.format(x=p1.start[0], y=p1.start[1], a=p2.start[0], b=p2.start[1]))
-		self._ax.plot([p1.start[0], p2.start[0]], [p1.start[1], p2.start[1]], '-', color='blue', linewidth=1)
+		if print_plot_info:
+			print('Line: From: ({x},{y}); To: ({a},{b})'.format(x=p1.start[0], y=p1.start[1], a=p2.start[0], b=p2.start[1]))
+		self._ax.plot([p1.start[0], p2.start[0]], [p1.start[1], p2.start[1]], '-', color=Q2D_path_color, linewidth=1)
 		self.__draw_point(p1)
 
 	def draw(self, path):
@@ -1537,8 +1746,6 @@ if arc_test == 0:
 
 	if Q2D_SpaceClaim:
 		print("Attempting to create a surface will fail; however, switching to solid view will let SpaceClaim identify bounded regions...")
-	else:
-		plotter.show()
 
 elif arc_test == 1:
 	if Q2D_SpaceClaim:
@@ -1727,8 +1934,6 @@ elif arc_test == 1:
 
 	if Q2D_SpaceClaim:
 		print("Attempting to create a surface will fail; however, switching to solid view will let SpaceClaim identify bounded regions...")
-	else:
-		plotter.show()
 
 elif arc_test == 2: # let's draw a hook
 
@@ -1799,8 +2004,6 @@ elif arc_test == 2: # let's draw a hook
 		Selection.Create(plotter.body.sides[11]).CreateAGroup('Hole')
 		Selection.Create(plotter.body.front).CreateAGroup('Front')
 		Selection.Create(plotter.body.back).CreateAGroup('Back')
-	else:
-		plotter.show()
 
 elif arc_test == 3:
 	if Q2D_SpaceClaim:
@@ -1903,10 +2106,11 @@ elif arc_test == 4:
 		Selection.Create(Conduit_Middle_Helix.body.front).CreateAGroup('Conduit-Middle-Left-Front')
 		Selection.Create(Conduit_Middle_Helix.body.back).CreateAGroup('Conduit-Middle-Left-Back')
 
+		Selection.Create(Conduit_Middle_Middle.front).CreateAGroup('Conduit-Middle-Middle-Front')
+		Selection.Create(Conduit_Middle_Middle.back).CreateAGroup('Conduit-Middle-Middle-Back')
 	else:
 		plotter = Q2D_Plotter([-0.01,0.04], [-0.01,0.01])
 		make_conduit_profile(plotter)
-		plotter.show()
 
 elif arc_test == 5:
 	midoff = 0.001
@@ -2141,6 +2345,209 @@ elif arc_test == 7:
 	Delete.Execute(s)
 	named_object_extrude('foil', 'Foil', fdepth, normal)
 
+elif arc_test == 8 or arc_test == 9: # let's draw a hook
+
+	# Fixed Parameters
+	r_seat = 0.015 # loading pin has 30mm diameter
+	r_hole = 0.008 # supporting pin has 16mm diameter
+	y_csep = 0.160 # centre-centre separation is 160mm
+
+	# Adjustable Parameters
+	neck_t = 0.010 # thickness of neck
+	neck_a = -80.0 # angle of neck (deg)
+
+	r_top  = 0.016 # outer radius at top
+	r_main = 0.070 # main body radius
+
+	x_main = 0.03  # coordinates of main body centre
+	y_main = 0.02
+
+	r1 = 0.06 # transition radii
+	r2 = 0.01
+	rb = 0.01
+
+	# Let's draw the hook
+	p_start = Q2D_Point((0.0, -r_seat))	# start/end point of path
+
+	p_seat  = Q2D_Point((0.0, 0.0))		# construction circle-centers
+	p_hole  = Q2D_Point((0.0, y_csep))
+	p_main  = Q2D_Point((x_main, y_main))
+
+	c_seat = Q2D_Circle(p_seat, r_seat)                 # circle outlining the seat of the hook
+	a_seat = Q2D_Arc(p_start, c_seat, clockwise=False)  # define arc anti-clockwise from bottom
+	c_top  = Q2D_Circle(p_hole, r_top)                  # circle outlining the top of the hook
+	a_top  = Q2D_Arc(None, c_top, clockwise=True)       # define arc clockwise; start irrelevant
+	c_main = Q2D_Circle(p_main, r_main)	   	            # circle outlining the top of the hook
+	a_main = Q2D_Arc(None, c_main, clockwise=True)      # define arc clockwise; start irrelevant
+
+	l_neck = Q2D_Line(p_hole, Q2D_Vector(DEG(neck_a)))  # neck center-line
+
+	path = Q2D_Path(a_seat)
+	path.append(l_neck.parallel(-neck_t / 2, True), transition=r1, farside=False, co_sense=True)
+	path.append(a_top, transition=r2, farside=False, co_sense=False)
+	path.append(l_neck.parallel( neck_t / 2, False), transition=r2, farside=False, co_sense=False)
+	path.append(a_main, transition=r2, farside=False, co_sense=False)
+	path.append(a_seat, transition=rb, farside=False, co_sense=True)
+	path.end_point(p_start)
+
+	hole = Q2D_Circle(p_hole, r_hole)
+
+	if arc_test == 8: # offset path
+		plotter = Q2D_Plotter([-0.13,0.13], [-0.07,0.19])
+		plotter.draw(path)
+		plotter.draw(hole) # circle outlining the top hole of the hook
+
+		Q2D_path_color = 'red'
+		for i in range(-3,4,6):
+			inset = 0.001 * i
+			plotter.draw(path.offset_path(inset))
+
+	if arc_test == 9:
+		ppts = path.poly_points(0.003, 0.005)
+		ppts.reverse()
+		#plotter.draw_points(ppts)
+
+		hpts = hole.poly_points(0.002)
+
+		import dmsh
+		poly = dmsh.Difference(dmsh.Polygon(ppts), dmsh.Polygon(hpts))
+		#poly = dmsh.Polygon(ppts)
+
+		def edge_size(x):
+			dseat = (x[0]**2 + x[1]**2)**0.5
+			dhole = (x[0]**2 + (x[1]-y_csep)**2)**0.5
+			return 0.005 - 0.001 * (dhole < 0.07) - 0.001 * (dhole < 0.02) - 0.002 * (dseat < 0.02)
+
+		print("Generating mesh...")
+		nodes, elements = dmsh.generate(poly, edge_size, show=False, tol=1) # high tolerance to take the default mesh
+		#nodes, elements = dmsh.generate(poly, 0.005, show=False, tol=5E-4)
+
+		boundary = []
+		for n1 in nodes:
+			matched = False
+			for n2 in ppts:
+				if n1[0] == n2[0] and n1[1] == n2[1]:
+					matched = True
+					break
+			if not matched:
+				for n2 in hpts:
+					if n1[0] == n2[0] and n1[1] == n2[1]:
+						matched = True
+						break
+			if matched:
+				boundary.append(True)
+			else:
+				boundary.append(False)
+
+		def node_is_left(nn, n0, n1):
+			vn = nn - n0
+			vt = n1 - n0
+			return vn[0] * vt[1] - vn[1] * vt[0] < 0
+
+		def element_contains_node(N, n, e):
+			contains = False
+			nn = N[n]
+			n0 = N[e[0]]
+			n1 = N[e[1]]
+			n2 = N[e[2]]
+			if node_is_left(nn, n0, n1) and node_is_left(nn, n1, n2) and node_is_left(nn, n2, n0):
+				contains = True
+				print("Violation @ Node #{n}".format(n=n))
+			return contains
+
+		def violation(nn, n0, n1):
+			vn = nn - n0
+			vt = n1 - n0
+			x = vt[0]
+			y = vt[1]
+			l = (x**2 + y**2)**0.5
+			vt[0] = -y / l
+			vt[1] =  x / l
+			vdot = vn[0] * vt[0] + vn[1] * vt[1]
+			if abs(vdot) < l * 1E-2:
+				#print("vdot={v}".format(v=vdot))
+				if vdot < 0:
+					vdot = l * -1E-2
+				else:
+					vdot = l *  1E-2
+			return vt * vdot
+
+		def verify(P, N, E, B):
+			adjustments = []
+			for e1 in E:
+				for e2 in E:
+					if e1 is not e2:
+						if e1[0] in e2 and e1[1] in e2:
+							if element_contains_node(N, e1[2], e2):
+								N[e1[2]] -= 2.0 * violation(N[e1[2]], N[e1[0]], N[e1[1]])
+								if P is not None:
+									P.draw_points([N[e1[2]]])
+								adjustments.append((e1[2], -1.01 * violation(N[e1[2]], N[e1[0]], N[e1[1]])))
+						elif e1[1] in e2 and e1[2] in e2:
+							if element_contains_node(N, e1[0], e2):
+								N[e1[0]] -= 2.0 * violation(N[e1[0]], N[e1[1]], N[e1[2]])
+								if P is not None:
+									P.draw_points([N[e1[0]]])
+								adjustments.append((e1[0], -1.01 * violation(N[e1[0]], N[e1[1]], N[e1[2]])))
+						elif e1[2] in e2 and e1[0] in e2:
+							if element_contains_node(N, e1[1], e2):
+								N[e1[1]] -= 2.0 * violation(N[e1[1]], N[e1[2]], N[e1[0]])
+								if P is not None:
+									P.draw_points([N[e1[1]]])
+								adjustments.append((e1[1], -1.01 * violation(N[e1[1]], N[e1[2]], N[e1[0]])))
+
+			for e1 in E:
+				if not node_is_left(N[e1[0]], N[e1[1]], N[e1[2]]):
+					if B[e1[0]] and B[e1[1]] and not B[e1[2]]:
+						# move e1[2]
+						N[e1[2]] -= 2.0 * violation(N[e1[2]], N[e1[0]], N[e1[1]])
+						if P is not None:
+							P.draw_points([N[e1[2]]])
+						adjustments.append((e1[2], -1.01 * violation(N[e1[2]], N[e1[0]], N[e1[1]])))
+					if B[e1[1]] and B[e1[2]] and not B[e1[0]]:
+						# move e1[0]
+						N[e1[0]] -= 2.0 * violation(N[e1[0]], N[e1[1]], N[e1[2]])
+						if P is not None:
+							P.draw_points([N[e1[0]]])
+						adjustments.append((e1[0], -1.01 * violation(N[e1[0]], N[e1[1]], N[e1[2]])))
+					if B[e1[2]] and B[e1[0]] and not B[e1[1]]:
+						# move e1[1]
+						N[e1[1]] -= 2.0 * violation(N[e1[1]], N[e1[2]], N[e1[0]])
+						if P is not None:
+							P.draw_points([N[e1[1]]])
+						adjustments.append((e1[1], -1.01 * violation(N[e1[1]], N[e1[2]], N[e1[0]])))
+
+			return adjustments
+
+		print("Verifying mesh...")
+		while True:
+			plotter = None
+			Q2D_path_color = 'red'
+			adjustments = verify(plotter, nodes, elements, boundary)
+			if len(adjustments) == 0:
+				break
+			print(adjustments)
+			print("Re-verifying mesh...")
+
+		enable_Optimesh = True
+		if enable_Optimesh:
+			print("Optimising mesh...")
+			import optimesh
+			#nodes, elements = optimesh.cpt.fixed_point_uniform(nodes, elements, 1.0e-10, 100, verbose=True)
+			#nodes, elements = optimesh.odt.fixed_point_uniform(nodes, elements, 1.0e-10, 100, verbose=True)
+			#nodes, elements = optimesh.cvt.quasi_newton_uniform_full(nodes, elements, 1.0e-10, 100, verbose=True)
+			nodes, elements = optimesh.cpt.linear_solve_density_preserving(nodes, elements, 1.0e-10, 100, verbose=True)
+
+		plotter = Q2D_Plotter([-0.13,0.13], [-0.07,0.19])
+		Q2D_path_color = 'blue'
+		plotter.draw(path)
+		plotter.draw(hole) # circle outlining the top hole of the hook
+
+		Q2D_path_color = 'grey'
+		plotter.draw_elements(nodes, elements)
+
 if Q2D_SpaceClaim:
 	# Finally, switch to solid-modelling mode
 	ViewHelper.SetViewMode(InteractionMode.Solid)
+else:
+	Q2D_Plotter.show()
