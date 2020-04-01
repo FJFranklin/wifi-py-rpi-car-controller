@@ -2098,6 +2098,7 @@ elif arc_test == 4:
 		Conduit_Middle_Right.hide()
 
 		Conduit_Middle_Middle = Conduit_Middle_Helix.split(DEG(185.0), 'Conduit-Middle-Middle', Conduit_Middle_Right)
+		Conduit_Middle_Middle.paint(black, white, green, blue)
 
 		Conduit_Middle.rename('Conduit-Middle-Left')
 		Conduit_Middle.lock()
