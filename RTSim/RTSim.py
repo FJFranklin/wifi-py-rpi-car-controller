@@ -46,12 +46,12 @@ class RTSim(object):
         if self.__trial_type == 'default':
             # Default barriers
             self.__barriers = (
-                ( -5.05, -5.00,  0.05, 10    ),
-                ( -5.00,  5.00, 10,     0.05 ),
-                ( -5.00, -5.05, 10,     0.05 ),
-                (  5.00, -5.00,  0.05, 10    ),
-                ( -3.00, -3.00,  0.05,  8    ),
-                (  2.95, -5.00,  0.05,  8    ),
+                ( -5.05, -5.00,  0.05, 10.0  ),
+                ( -5.00,  5.00, 10.0,   0.05 ),
+                ( -5.00, -5.05, 10.0,   0.05 ),
+                (  5.00, -5.00,  0.05, 10.0  ),
+                ( -3.00, -3.00,  0.05,  8.0  ),
+                (  2.95, -5.00,  0.05,  8.0  ),
                 ( -1.00, -0.10,  2.00,  0.2  )
             )
             # Default start (top-left), looking North
@@ -207,8 +207,8 @@ class RTSim(object):
             ( b1x,      -5.00,    0.05,      b1y1-(-5.00)),
             ( b2x,       b2y2,    0.05,      5.00-b2y2),
             ( b2x,      -5.00,    0.05,      b2y1-(-5.00)),
-            ( b3x2-0.05, b3y-2,   0.05,      2),
-            ( b3x1,      b3y+0.2, 0.05,      2),
+            ( b3x2-0.05, b3y-2,   0.05,      2.0),
+            ( b3x1,      b3y+0.2, 0.05,      2.0),
             ( b3x1,      b3y,     b3x2-b3x1, 0.2)
         )
 
@@ -255,9 +255,6 @@ class RTSim(object):
 
     def get_GPS(self):
         return self.__position[1,0:2]
-
-    def get_compass(self):
-        return self.__position[1,2]
 
     def get_compass(self):
         return self.__position[1,2]
@@ -487,7 +484,7 @@ class RTSim(object):
                 self.__pingPoints = np.resize(self.__pingPoints, (self.__pingMax, 2))
             self.__pingPoints[self.__pingCount,:] = closest_point
             self.__pingCount = self.__pingCount + 1
-            closest_distance = int(closest_distance * 100 + 0.5) / 100
+            closest_distance = int(int(closest_distance * 100 + 0.5) / 100)
 
         self.ping_receive(closest_distance)
 
@@ -553,7 +550,7 @@ class RTSim(object):
                 dirvec[0:2] = [0,1]
             else:
                 dirvec[0:2] = [0,-1]
-            distance, point = self.__intersection(pos, dirvec, line)
+            distance, _point = self.__intersection(pos, dirvec, line)
             if (distance >= 0) and (distance < 0.2): # we have an intersection
                 bValidity = False
                 break
@@ -563,7 +560,7 @@ class RTSim(object):
                 dirvec[0:2] = [1,0]
             else:
                 dirvec[0:2] = [-1,0]
-            distance, point = self.__intersection(pos, dirvec, line)
+            distance, _point = self.__intersection(pos, dirvec, line)
             if (distance >= 0) and (distance < 0.2): # we have an intersection
                 bValidity = False
                 break
@@ -573,7 +570,7 @@ class RTSim(object):
                 dirvec[0:2] = [0,1]
             else:
                 dirvec[0:2] = [0,-1]
-            distance, point = self.__intersection(pos, dirvec, line)
+            distance, _point = self.__intersection(pos, dirvec, line)
             if (distance >= 0) and (distance < 0.2): # we have an intersection
                 bValidity = False
                 break
@@ -583,7 +580,7 @@ class RTSim(object):
                 dirvec[0:2] = [1,0]
             else:
                 dirvec[0:2] = [-1,0]
-            distance, point = self.__intersection(pos, dirvec, line)
+            distance, _point = self.__intersection(pos, dirvec, line)
             if (distance >= 0) and (distance < 0.2): # we have an intersection
                 bValidity = False
                 break

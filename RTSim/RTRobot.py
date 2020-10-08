@@ -62,8 +62,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="RTRobot Coursework - Guide a two-wheeled robot round the map.")
 
-    parser.add_argument('--duration', help='How many iterations to do [100].', default=180, type=int)
-    parser.add_argument('--trial',    help='Specify map type [default].',      default='default', choices=['default', 'random', 'TNT', 'CWC', 'BSB'])
+    parser.add_argument('--duration', help='How many seconds to run [40].', default=40, type=int)
+    parser.add_argument('--trial',    help='Specify map type [default].',   default='default', choices=['default', 'random', 'TNT', 'CWC', 'BSB'])
 
     args = parser.parse_args()
 
