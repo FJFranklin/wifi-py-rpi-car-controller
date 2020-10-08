@@ -15,18 +15,34 @@ HIGH = 1
 
 LED_BUILTIN = 13
 
+A0 = 14
+A1 = 15
+A2 = 16
+A3 = 17
+A4 = 18
+A5 = 19
+
+class Stream(object):
+    def __init__(self):
+        self.baud = None
+
+    def begin(self, baud: int):
+        self.baud = baud
+
+    def print(self, *args): # This won't work in Python 2
+        print(*args, end='')
+
+    def println(self, *args):
+        print(*args)
+
+Serial = Stream()
+
 __timeStart = datetime.datetime.now()
 
 __pin_mode = [OUTPUT] * 14
 __pin_state = [LOW] * 14
 
 __ax = None
-
-# oddly different scaling on Mac OS X 
-if platform.system() == 'Darwin':
-    __ax_scale = 1
-else:
-    __ax_scale = 2
 
 __servo_patch = None
 
@@ -101,8 +117,8 @@ class Servo(object):
 
         Servo.__servos.append(self)
 
-    def attach(self, pin):
-        if isinstance(pin, int) and pin >= 0 and pin < 14:
+    def attach(self, pin: int):
+        if pin >= 0 and pin < 14:
             self.pin = pin
 
     def attached(self):
@@ -404,21 +420,29 @@ def micros():
 def millis():
     return int(micros() / 1000)
 
-def pinMode(pin, mode):
-    if isinstance(pin, int) and pin >= 0 and pin < 14:
+def pinMode(pin: int, mode):
+    if pin >= 0 and pin < 14:
         if mode:
             __pin_mode[pin] = INPUT
         else:
             __pin_mode[pin] = OUTPUT
 
-def digitalRead(pin):
+def map(x, from_lo, from_hi, to_lo, to_hi):
+    return int(to_lo + ((to_hi - to_lo) * (x - from_lo)) / (from_hi - from_lo))
+
+def analogRead(pin: int):
+    if pin < A0 or pin > A5:
+        return 0
+    return micros() & 1023
+
+def digitalRead(pin: int):
     state = LOW
-    if isinstance(pin, int) and pin >= 0 and pin < 14:
+    if pin >= 0 and pin < 14:
         state = __pin_state[pin]
     return state
 
-def digitalWrite(pin, state):
-    if isinstance(pin, int) and pin >= 0 and pin < 14:
+def digitalWrite(pin: int, state):
+    if pin >= 0 and pin < 14:
         if __pin_mode[pin] == OUTPUT:
             old_state = __pin_state[pin]
             if state:
