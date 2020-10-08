@@ -2,6 +2,8 @@ import math
 import platform
 import datetime
 
+from typing import List
+
 import numpy as np
 import matplotlib.pyplot as __plt
 
@@ -13,7 +15,7 @@ HIGH = 1
 
 LED_BUILTIN = 13
 
-__timeStart = 0
+__timeStart = datetime.datetime.now()
 
 __pin_mode = [OUTPUT] * 14
 __pin_state = [LOW] * 14
@@ -29,6 +31,9 @@ else:
 __servo_patch = None
 
 def servo_redraw(angle=0):
+    if __ax is None: # The window has been closed
+        return
+
     ro =   14
     ra =   70
     ox = 1485
@@ -49,7 +54,7 @@ def servo_redraw(angle=0):
         __servo_patch.set_xy(xy)
 
 class Servo(object):
-    __servos = []
+    __servos: List['Servo'] = []
 
     __servo_target = 0
     __servo_actual = 0
@@ -135,6 +140,9 @@ __led8_patch = None
 __led9_patch = None
 
 def __ledB(state):
+    if __ax is None: # The window has been closed
+        return
+
     if state:
         rgb = (1.0, 1.0, 0)
     else:
@@ -148,6 +156,9 @@ def __ledB(state):
         __ledB_patch.set_facecolor(rgb)
 
 def __led8(state):
+    if __ax is None: # The window has been closed
+        return
+
     if state:
         rgb = (0,   0, 1.0)
     else:
@@ -161,6 +172,9 @@ def __led8(state):
         __led8_patch.set_facecolor(rgb)
 
 def __led9(state):
+    if __ax is None: # The window has been closed
+        return
+
     if state:
         rgb = (0, 1.0,   0)
     else:
@@ -184,10 +198,14 @@ __button1_active = False
 __button2_active = False
 
 def __button_check(event):
-    x = __ax_scale * event.x
-    y = 1199 - __ax_scale * event.y
-    #print('({x},{y})'.format(x=x,y=y))
     b = None
+
+    if __ax is None: # The window has been closed
+        return b
+
+    inv = __ax.transData.inverted()
+    x, y = inv.transform((event.x, event.y))
+    #print('({ex} -> {x}, {ey} -> {y})'.format(x=x, y=y, ex=event.x, ey=event.y))
 
     global __button1_highlight
     __button1_highlight = False
@@ -204,6 +222,9 @@ def __button_check(event):
     return b
 
 def __button1():
+    if __ax is None: # The window has been closed
+        return
+
     global __button1_highlight
     if __button1_highlight:
         edge_rgb = 'k'
@@ -226,6 +247,9 @@ def __button1():
         __button1_patch.set_facecolor(face_rgb)
 
 def __button2():
+    if __ax is None: # The window has been closed
+        return
+
     global __button2_highlight
     if __button2_highlight:
         edge_rgb = 'k'
@@ -289,11 +313,11 @@ def __mouse_press(event):
     __button2()
 
 def __mouse_move(event):
-    b = __button_check(event)
+    __button_check(event)
     __button1()
     __button2()
 
-def __mouse_leave(event):
+def __mouse_leave(_event):
     global __button1_highlight
     __button1_highlight = False
     __button1()
@@ -302,7 +326,7 @@ def __mouse_leave(event):
     __button2_highlight = False
     __button2()
 
-def __close(event):
+def __close(_event):
     #print('close event received')
     global __ax
     __ax = None
@@ -340,11 +364,7 @@ def delay(ms):
             break
 
 def ArduinoSim(setup, loop):
-    dpi=72
-    scale=2
-    xsize = 1600
-    ysize = 1200
-    fig = __plt.figure(figsize=(xsize / dpi, ysize / dpi), dpi=(dpi/scale))
+    fig = __plt.figure()
     fig.canvas.mpl_connect('close_event', __close)
 
     fig.canvas.mpl_connect('button_press_event',   __mouse_press)
