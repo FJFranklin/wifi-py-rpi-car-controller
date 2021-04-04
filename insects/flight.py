@@ -114,7 +114,7 @@ class Environment(object):
         self.__update_polar()
 
         # update insect directions
-        self.data[:,4:7] = nudge(self.data[:,4:7], 0.1)
+        self.data[:,4:7] = nudge(self.data[:,4:7], dt)
 
         # update camera orientation (maximum speed is ten degrees per second)
         limit = 10 * dt

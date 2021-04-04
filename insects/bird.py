@@ -110,7 +110,7 @@ class Environment(object):
         self.data[:,1:4] = newpos
 
         # update insect directions
-        self.data[:,4:7] = nudge(self.data[:,4:7], 0.1)
+        self.data[:,4:7] = nudge(self.data[:,4:7], dt)
 
         # update 3D plot, if it was requested & created
         if self.ax is not None:
