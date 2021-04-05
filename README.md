@@ -3,37 +3,44 @@ wifi-py-rpi-car-controller
 
 **Overview**
 
-In this project, the focus is on communication over WiFi,
-with the aim of being able to control a car or other vehicle
-using a web interface. The method requires two Raspberry Pi
-(or other Linux) computers.
+This repository is really just a collection of works-in-progress
+with a variety of purposes.
 
-One RPi, the "controller", is set up as a WiFi hub
-(e.g., with hostapd) and DHCP server (e.g., using dnsmasq).
-This creates a private network which anyone may connect to -
-the security of the network can of course be configured -
-over WiFi. The "controller" also runs a web server and MQTT
-broker with websockets support; I am using mosquitto, which
-provites a default MQTT broker as well as a web server /
-websockets interface. The webserver serves the
-HTML/Javascript/CSS files that create the web interface.
+- ArduinoSim is a Python version of a specific introductory
+Arduino lab; TinkerCad is a better solution
 
-The other RPi, the "car", connects via WiFi to the MQTT
-broker, and the MQTT broker then acts as a middle man,
-relaying data between the browser(s) and the "car". The
-"car", of course, is responsible for the remote device,
-i.e., it must check the sensors for obstacles, update the
-current drive settings, adjust the steering, etc.
+- NetIP has its own repository, but is an unfinished work.
+There's a critical problem of buffering that needs to be
+resolved.
 
-Given all these requirements, I have created this project
-that implements the basic logic:
+- RTSim is a simple robot model implemented in Python and in
+Matlab, as an exercise to think about navigation and steering.
 
-- Written in Python and using threading and Queue for event
-management, and Paho.MQTT (Python).
+- arduino/hello is a simple serial console tool for Arduinos.
 
-- The web interface is written as a client-side scripted
-interface based on HTML and SVG, and again Paho.MQTT
-(Javascript).
+- insects is a Python simulation of a bird in an insect space.
+
+- microstick was written for a dsPIC33 Microstick.
+
+- mqtt evolved into a separate repository - see cariot.
+
+- noise models pathways of sound with a simple diffractive model.
+
+- pistick is a unix tool for serial communication with devices.
+
+- pyccar is an attempt at a touchscreen UI for Raspberry Pi.
+
+- scene is an earlier version of noise.
+
+- sketch is a Python CAD-sketching tool compatible with SpaceClaim.
+
+- static is a simple CSS/SVG/Javascript UI to go with a Mosquitto
+websockets broker.
+
+- web-py-server is a car controller implemented as a Python web
+server.
+
+- wifi-py-rpi is an awful way to implement remote shutdown.
 
 --------
 
