@@ -38,16 +38,21 @@ int main (int argc, char ** argv) {
   unsigned char buffer[16];
 
   const char * device = "/dev/serial0";
+  const char * logname = 0;
+
+  FILE * log = 0;
 
   int count;
   int fd;
 
   bool bArduino = false;
+  bool bEcho = false;
 
   for (int arg = 1; arg < argc; arg++) {
     if (strcmp (argv[arg], "--help") == 0) {
-      fprintf (stderr, "\nstick [--help] [--list] [--usb] [--arduino] [/dev/<ID>]\n\n");
+      fprintf (stderr, "\nstick [--help] [--echo] [--log=<file>] [--list] [--usb] [--arduino] [/dev/<ID>]\n\n");
       fprintf (stderr, "  --help     Display this help.\n");
+      fprintf (stderr, "  --echo     Echo typed characters to the terminal window.\n");
       fprintf (stderr, "  --list     List available PIC commands.\n");
       fprintf (stderr, "  --usb      Connect to /dev/ttyUSB0 by default.\n");
       fprintf (stderr, "  --arduino  Connect to /dev/ttyACM0 by default, and omit PIC-specific behaviour.\n");
@@ -58,15 +63,27 @@ int main (int argc, char ** argv) {
       list_pic_help ();
       return 0;
     }
-    if (strcmp (argv[arg], "--usb") == 0) {
+    if (strcmp (argv[arg], "--echo") == 0) {
+      bEcho = true;
+    } else if (strcmp (argv[arg], "--usb") == 0) {
       device = "/dev/ttyUSB0"; // first serial-over-usb on linux
     } else if (strcmp (argv[arg], "--arduino") == 0) {
       device = "/dev/ttyACM0"; // first serial-over-usb on pi
       bArduino = true;
+    } else if (strncmp (argv[arg], "--log=", 6) == 0) {
+      logname = argv[arg] + 6;
     } else if (strncmp (argv[arg], "/dev/", 5) == 0) {
       device = argv[arg];
     } else {
-      fprintf (stderr, "stick [--help] [--list] [--usb] [--arduino] [/dev/ID]\n");
+      fprintf (stderr, "stick [--help] [--echo] [--log=<file>] [--list] [--usb] [--arduino] [/dev/ID]\n");
+      return -1;
+    }
+  }
+
+  if (logname) {
+    log = fopen (logname, "w");
+    if (!log) {
+      fprintf (stderr, "Failed to open \"%s\" - exiting.\n", logname);
       return -1;
     }
   }
@@ -119,6 +136,10 @@ int main (int argc, char ** argv) {
       buffer[count] = 0;
       fprintf (stdout, "%s", (const char *) buffer);
       fflush (stdout);
+      if (log) {
+        fprintf (log, "%s", (const char *) buffer);
+        fflush (log);
+      }
     }
 
     tv.tv_sec = 0;
@@ -150,11 +171,19 @@ int main (int argc, char ** argv) {
 	list_pic_help ();
 	continue;
       }
+      if (bEcho) {
+        fputc (c, stdout);
+        fflush (stdout);
+      }
+      if (log) {
+        fputc (c, log);
+        fflush (log);
+      }
       if (write (fd, &c, 1) < 0) {
 	fprintf (stderr, "error: unable to write to serial\n");
 	break;
       }
-      usleep (100000);
+      usleep (1000);
     }
   }
 
@@ -162,6 +191,9 @@ int main (int argc, char ** argv) {
    */
   tcsetattr (STDIN_FILENO, TCSANOW, &ttysave);
 
+  if (log) {
+    fclose (log);
+  }
   close (fd); // close serial
 
   return 0;
