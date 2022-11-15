@@ -1,5 +1,3 @@
-
-
 # -*- indent-tabs-mode: t; tab-width: 4 -*-
 
 # target API Version 22
@@ -15,10 +13,11 @@
 #  7:  SpaceClaim: foil [Parameters needed]
 #  8: !SpaceClaim: hook - offset
 #  9: !SpaceClaim: hook - mesh w/ dmsh
-# 10: SpaceClaim: foil (G. Snee)
-# 11: SpaceClaim: bonded flexible pipe
-# 12: SpaceClaim: bonded flexible pipe - convert wires to beams
-arc_test = 12
+# 10:  SpaceClaim: foil (G. Snee)
+# 11:  SpaceClaim: bonded flexible pipe
+# 12:  SpaceClaim: bonded flexible pipe - convert wires to beams
+# 13:  SpaceClaim: loading pins
+arc_test = 13
 
 print_path_info = False
 print_plot_info = False
@@ -2842,9 +2841,102 @@ elif arc_test == 11 or arc_test == 12:
             s = Selection.Create(cb[0])
             Beam.SetProfile(s, cs)
 
+elif arc_test == 13:
+    def xy_sketch_reset(orientation='up', origin=(0,0,0)):
+        O = Point.Create(*origin)
+
+        if orientation == 'down':
+            B1 = Direction.Create(-1,  0, 0)
+            B2 = Direction.Create( 0, -1, 0)
+            B3 = Direction.Create( 0,  0, 1)
+        else: #if orientation == 'up':
+            B1 = Direction.Create( 1, 0, 0)
+            B2 = Direction.Create( 0, 1, 0)
+            B3 = Direction.Create( 0, 0, 1)
+
+        plane = Plane.Create(Frame.Create(O, B1, B2))
+        ViewHelper.SetSketchPlane(plane)
+        return plane, B3
+
+    plane, normal = xy_sketch_reset('down', (0, 0.0, -0.008))
+    plotter = Q2D_Extrusion(plane)
+    ear = Q2D_Path.polygon([(-0.003, -0.01), (0.003, -0.01), (0.003, 0.01), (-0.003, 0.01)])
+    plotter.draw(ear)
+    plotter.extrude_and_clear('pin lower flange rear ear', normal, 0.004)
+
+    plane, normal = xy_sketch_reset('down', (0, 0.0, -0.004))
+    plotter = Q2D_Extrusion(plane)
+    center  = Q2D_Point((0.0, 0.0))
+    plotter.draw(Q2D_Circle(center, 0.02))
+    plotter.extrude_and_clear('pin lower flange rear', normal, 0.004)
+
+    plane, normal = xy_sketch_reset('down', (0, 0.0, 0.008))
+    plotter = Q2D_Extrusion(plane)
+    center  = Q2D_Point((0.0, 0.0))
+    plotter.draw(Q2D_Circle(center, 0.02))
+    plotter.extrude_and_clear('pin lower flange front', normal, 0.004)
+
+    plane, normal = xy_sketch_reset('down', (0, 0.0, 0.012))
+    plotter = Q2D_Extrusion(plane)
+    ear = Q2D_Path.polygon([(-0.003, -0.01), (0.003, -0.01), (0.003, 0.01), (-0.003, 0.01)])
+    plotter.draw(ear)
+    plotter.extrude_and_clear('pin lower flange front ear', normal, 0.004)
+
+    plane, normal = xy_sketch_reset('down', (0, 0.0, 0.0))
+    plotter = Q2D_Extrusion(plane)
+    pflat = Q2D_Point((0.0, -0.002))
+    pcirc = Q2D_Point((0.0,  0.0))
+    l = Q2D_Line(pflat, Q2D_Vector(0.0))
+    c = Q2D_Circle(pcirc, 0.015)
+    a = Q2D_Arc(None, c, False)
+    path = Q2D_Path(l)
+    path.append(a, farside=True, transition=0.002)
+    path.append(l, farside=True, transition=0.002)
+    path.end_point(pflat)
+    plotter.draw(path)
+    plotter.extrude_and_clear('pin lower', normal, 0.008)
+
+    plane, normal = xy_sketch_reset('up', (0, 0.16, -0.008))
+    plotter = Q2D_Extrusion(plane)
+    ear = Q2D_Path.polygon([(-0.003, -0.01), (0.003, -0.01), (0.003, 0.01), (-0.003, 0.01)])
+    plotter.draw(ear)
+    plotter.extrude_and_clear('pin upper flange rear ear', normal, 0.004)
+
+    plane, normal = xy_sketch_reset('up', (0, 0.16, -0.004))
+    plotter = Q2D_Extrusion(plane)
+    center  = Q2D_Point((0.0, 0.0))
+    plotter.draw(Q2D_Circle(center, 0.015))
+    plotter.extrude_and_clear('pin upper flange rear', normal, 0.004)
+
+    plane, normal = xy_sketch_reset('up', (0, 0.16, 0.008))
+    plotter = Q2D_Extrusion(plane)
+    center  = Q2D_Point((0.0, 0.0))
+    plotter.draw(Q2D_Circle(center, 0.015))
+    plotter.extrude_and_clear('pin upper flange front', normal, 0.004)
+
+    plane, normal = xy_sketch_reset('up', (0, 0.16, 0.012))
+    plotter = Q2D_Extrusion(plane)
+    ear = Q2D_Path.polygon([(-0.003, -0.01), (0.003, -0.01), (0.003, 0.01), (-0.003, 0.01)])
+    plotter.draw(ear)
+    plotter.extrude_and_clear('pin upper flange front ear', normal, 0.004)
+
+    plane, normal = xy_sketch_reset('up', (0, 0.16, 0.0))
+    plotter = Q2D_Extrusion(plane)
+    pflat = Q2D_Point((0.0, -0.002))
+    pcirc = Q2D_Point((0.0,  0.0))
+    l = Q2D_Line(pflat, Q2D_Vector(0.0))
+    c = Q2D_Circle(pcirc, 0.008)
+    a = Q2D_Arc(None, c, False)
+    path = Q2D_Path(l)
+    path.append(a, farside=True, transition=0.002)
+    path.append(l, farside=True, transition=0.002)
+    path.end_point(pflat)
+    plotter.draw(path)
+    plotter.extrude_and_clear('pin upper', normal, 0.008)
+
 if Q2D_SpaceClaim:
     # Finally, switch to solid-modelling mode
-    # remove_all_datum_planes()
+    remove_all_datum_planes()
     ViewHelper.SetViewMode(InteractionMode.Solid)
 else:
     Q2D_Plotter.show()
