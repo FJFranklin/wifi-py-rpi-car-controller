@@ -18,7 +18,23 @@ although if you are using Spyder (for example) it will complain about using func
 The functions defined in `baltam.py` are:
 
 ### `answer(number)`
-A simple way to print a number to three significant figures.
+A simple way to print a number to three significant figures, with options for the number of significant figures, to layout as a matrix, and a tolerance for zero (defaulting to 1E-15).
+```In [52]: answer(1/3)
+answer (3 s.f.): 0.333
+
+In [53]: answer(1j/3, sigfigs=5)
+answer (5 s.f.): 0 + 0.33333i
+
+In [54]: answer(np.asarray([[1,1j],[2,2j]]), style='matrix')
+answer (3 s.f.):  (          1 +          0i) (          0 +          1i)
+                  (          2 +          0i) (          0 +          2i)
+
+In [55]: answer(0.001**5)
+answer (3 s.f.): 0
+
+In [55]: answer(0.001**5, zero=1E-16)
+answer (3 s.f.): 1e-15
+```
 
 --------
 
