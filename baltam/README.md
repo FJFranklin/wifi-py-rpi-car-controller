@@ -49,6 +49,51 @@ def dzdn(n, z):
 
 N, Z = ode(dzdn, [0.5,1.5], [0.5,-0.5])
 ```
+### Plotting Functions
+`baltam.py` is designed to mimic Matlab's plotting functions closely, so `figure()` opens a new plot window and, e.g., `figure(3)` creates or returns to the window titled Figure 3. By default, each new plot overwrites any existing plot, but specifying `hold(True)` changes this behaviour. (Changing between 2D and 3D plots always overwrites any existing plot.) Specifying `hold(False)` returns to the default behaviour.
+
+Titles and axis labels can be set with, e.g., `title('This is the title')` and `xlabel('This is the x axis')` and so on. For 2D line plots, a legend can be added using a list of descriptions, e.g., `legend(['Line 1','Line 2'])`. Axis ranges can be set with `xlim([from,to])`, etc., and `gca()` returns the MatPlotLib axes object (if needed).
+
+Various plots can be created with functions matching their Matlab equivalents: `fplot()`, `fsurf()`, `surface()`, `contour()`, `plot()`, `plot3()`. A MatPlotLib colormap can be given as an option to `fsurf()`, `surface()`, `contour()`, and `fsurf()` can be used to create several types of 3D plot (by specifying the option plot_type as 'surf', 'surfc', 'cont2d' or 'cont3d').
+
+```Python
+import numpy as np
+from matplotlib import cm
+
+from baltam import figure, xlabel, ylabel, zlabel, ylim, hold
+from baltam import title, legend, fplot, fsurf, plot
+
+figure(1)
+x = np.linspace(-2,2,21)
+y = x**3
+plot(x, y, 'ro')
+xlabel('x-axis')
+ylabel('y-axis')
+title('Fit to Data')
+hold(True)
+
+def cube(x):
+    return x**3
+fplot(cube, [-2.5,2.5], 'k--')
+legend(['data','curve fit'])
+ylim([-10,10])
+hold(False)
+
+def dimple(x, y):
+    radius_squared = x**2 + y**2
+    return np.cos(x**2) * radius_squared * np.exp(-radius_squared)
+
+figure(2)
+fsurf(dimple, [-2.5,2.5,0,2.5], resolution=(141,71), cmap=cm.jet)
+title('Function plot of surface')
+zlabel('z')
+
+figure(3)
+fsurf(dimple, [-2.5,2.5,-2.5,2.5], resolution=(141,71), cmap=cm.jet, plot_type='cont3d')
+title('Function plot of contours')
+```
+
+<img style="align:center;width:50%;" src="BaltamPlotsExample.png" width="50%" height="50%" />
 
 --------
 
