@@ -10,8 +10,11 @@ Requires: numpy, scipy and matplotlib
 
 # If using Spyder or some interactive Python, the figures behave in a very
 # different way, so this forces the figures to appear in separate windows
-from IPython import get_ipython
-get_ipython().run_line_magic('matplotlib', 'qt')
+try:
+    from IPython import get_ipython
+    get_ipython().run_line_magic('matplotlib', 'qt')
+except:
+    pass
 
 # A useful library for reading data from text files
 import csv
@@ -284,8 +287,6 @@ def _baltam_new_figure(fig_no: int, threeD: bool = False) -> BaltamFigure:
     global _baltam_figure_current
     global _baltam_figures
     
-    plt.ion()
-
     if fig_no is None:
         fig_next = 1
         while fig_next in _baltam_figures:
