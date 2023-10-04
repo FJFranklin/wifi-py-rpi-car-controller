@@ -19,7 +19,8 @@ The functions defined in `baltam.py` are:
 
 ### `answer(number)`
 A simple way to print a number to three significant figures, with options for the number of significant figures, to layout as a matrix, and a tolerance for zero (defaulting to 1E-15).
-```In [52]: answer(1/3)
+```
+In [52]: answer(1/3)
 answer (3 s.f.): 0.333
 
 In [53]: answer(1j/3, sigfigs=5)
@@ -32,8 +33,21 @@ answer (3 s.f.):  (          1 +          0i) (          0 +          1i)
 In [55]: answer(0.001**5)
 answer (3 s.f.): 0
 
-In [55]: answer(0.001**5, zero=1E-16)
+In [56]: answer(0.001**5, zero=1E-16)
 answer (3 s.f.): 1e-15
+```
+### `csvread(filename, skip_rows=0, skip_cols=0)`
+Reads the named comma-separated variable (CSV) file, starting at row zero and column zero unless specified otherwise, e.g.:
+```Python
+data = csvread('accel_Dec0910_153854.csv', 1, 0)
+```
+### `ode(fn, from_to, y0)`
+An ordinary differential equation solver, where `fn` is a function f(t,y) returning dy/dt; `from_to` is a list ([t1, t2] or [t1, ..., t2]) specifying the time-span of integration; and `y0` is the initial value to match `fn`, e.g.:
+```Python
+def dzdn(n, z):
+    return np.asarray([z[0] - z[1], z[0] + z[1]])
+
+N, Z = ode(dzdn, [0.5,1.5], [0.5,-0.5])
 ```
 
 --------
