@@ -285,20 +285,49 @@ def Q2D_Arc_Test(arc_test):
 
         l_neck = Q2D_Line(p_hole, Q2D_Vector(DEG(neck_a)))  # neck center-line
 
-        a_seat.mesh = 0.001
-        a_top.mesh  = 0.002
-        a_main.mesh = 0.010
+        path = Q2D_Path()
 
-        path = Q2D_Path(a_seat)
-        path.append(l_neck.parallel(-neck_t / 2, True), transition=r1, farside=False, co_sense=True, mesh=0.003)
-        path.append(a_top, transition=r2, farside=False, co_sense=False)
-        path.append(l_neck.parallel( neck_t / 2, False), transition=r2, farside=False, co_sense=False, mesh=0.003)
-        path.append(a_main, transition=r2, farside=False, co_sense=False)
-        path.append(a_seat, transition=rb, farside=False, co_sense=True)
+        _, c = path.append(a_seat)
+        c.name = "seat-inner"
+
+        t, c = path.append(l_neck.parallel(-neck_t / 2, True), transition=r1, farside=False, co_sense=True)
+        t.name = "seat-neck-tr"
+        c.name = "neck-left"
+
+        t, c = path.append(a_top, transition=r2, farside=False, co_sense=False)
+        t.name = "neck-head-tr-left"
+        c.name = "head-outer"
+
+        t, c = path.append(l_neck.parallel( neck_t / 2, False), transition=r2, farside=False, co_sense=False)
+        t.name = "neck-head-tr-right"
+        c.name = "neck-right"
+
+        t, c = path.append(a_main, transition=r2, farside=False, co_sense=False)
+        t.name = "neck-main-tr"
+        c.name = "main"
+
+        t, c = path.append(a_seat, transition=rb, farside=False, co_sense=True)
+        t.name = "tip"
+        c.name = "seat-outer"
+
         path.end_point(p_start)
+        path.name = "hook-outline"
+
+        path.mesh = 0.01
+        path["seat-inner"  ].mesh = 0.001
+        path["seat-outer"  ].mesh = 0.001
+        path["seat-neck-tr"].mesh = 0.002
+        path["neck-left"   ].mesh = 0.003
+        path["neck-right"  ].mesh = 0.003
+        path["head-outer"  ].mesh = 0.002
+
+        # circle outlining the top hole of the hook
+        hole = Q2D_Path.circle(Q2D_Circle(p_hole, r_hole))
+        hole.name = "hook-hole"
+        hole.mesh = 0.001
 
         paths.append(path)
-        paths.append(Q2D_Circle(p_hole, r_hole)) # circle outlining the top hole of the hook
+        paths.append(hole)
 
     elif arc_test == 3:
         oy = 0.0136
@@ -386,28 +415,44 @@ def Q2D_Arc_Test(arc_test):
     elif arc_test == 5:
         path = Q2D_Path.polygon([(0.1, 0.051/2), (0.1, 0.049/2), (0.1-0.07, 0.049/2),
                                  (0.1-0.07, 0.059/2), (0.1-0.02, 0.059/2)])
+        path.name = "sleeve"
+        path.mesh = 0.002
         paths.append(path)
 
         path = Q2D_Path.polygon([(0, 0.052/2), (0.025, 0.052/2), (0.025, 0.0595/2),
                                  (0.035, 0.0595/2), (0.035, 0.085/2), (0.090, 0.085/2),
                                  (0.090, 0.154/2), (0, 0.154/2)])
+        path.name = "coupling"
+        path.mesh = 0.01
+        path.edges[1].mesh = 0.002
+        path.edges[2].mesh = 0.002
+        path.edges[3].mesh = 0.001
+        path.edges[4].mesh = 0.001
         paths.append(path)
 
         path = Q2D_Path.polygon([(0.075, 0.059/2), (0.100, 0.059/2), (0.1014, 0.0646/2),
                                  (0.120, 0.0646/2), (0.1352, 0.059/2), (0.1377, 0.084/2),
                                  (0.075, 0.084/2)])
+        path.name = "rubber"
+        path.mesh = 0.001
         paths.append(path)
 
         path = Q2D_Path.polygon([(0.1, 0.051/2), (0.165, 0.051/2), (0.165, 0.057/2),
                                  (0.1, 0.057/2)])
+        path.name = "liner"
+        path.mesh = 0.001
         paths.append(path)
 
         path = Q2D_Path.polygon([(0.135, 0.057/2), (0.165, 0.057/2), (0.165, 0.075/2),
                                  (0.1368, 0.075/2)])
+        path.name = "fabric"
+        path.mesh = 0.002
         paths.append(path)
 
         path = Q2D_Path.polygon([(0.1368, 0.075/2), (0.165, 0.075/2), (0.165, 0.085/2),
                                  (0.1378, 0.085/2)])
+        path.name = "spiral"
+        path.mesh = 0.002
         paths.append(path)
 
     elif arc_test == 6:

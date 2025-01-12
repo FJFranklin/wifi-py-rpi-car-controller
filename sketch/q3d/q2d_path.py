@@ -97,126 +97,86 @@ class Q2D_Vector(object):
 
 class Q2D_Object(object):
 
-    def __init__(self, name, **kwargs):
-        self.name = name
-        self.props = kwargs
-        self.start = None # starting point of curve
-        self.chain = None # next Q2D_Object in chain
+    __counter = 0
+
+    def __init__(self, geom, **kwargs):
+        self._geom = geom
+        self.name  = kwargs.get("name", None)
+
+        Q2D_Object.__counter += 1
+        self.__id = "_2D_" + str(Q2D_Object.__counter)
 
     @property
-    def mesh(self):
-        return self.props.get("mesh")
+    def unique_id(self):
+        return self.__id
 
-    @mesh.deleter
-    def mesh(self):
-        self.props.pop("mesh", None)
+    @property
+    def geom(self):
+        return self._geom
 
-    @mesh.setter
-    def mesh(self, value):
-        if value is not None:
-            bUpdate = True
-            if "mesh" in self.props:
-                min_mesh = self.props["mesh"]
-                if value >= min_mesh:
-                    bUpdate = False
-            if bUpdate:
-                self.props["mesh"] = value
+    def desc(self):
+        d = self.geom + "(id=" + self.__id
+        if self.name is not None:
+            d += ",name='" + self.name + "'"
+        d += ")"
+        return d
 
 class Q2D_Point(Q2D_Object):
 
     def __init__(self, xy, **kwargs):
         Q2D_Object.__init__(self, "Point", **kwargs)
-        self.start = xy
-        self.__point = None
+        x, y = xy
+        self.__x = x
+        self.__y = y
+        self.__mesh = kwargs.get("mesh", None)
 
+    @property
+    def mesh(self):
+        return self.__mesh
+
+    @mesh.deleter
+    def mesh(self):
+        self.__mesh = None
+
+    @mesh.setter
+    def mesh(self, value):
+        if value is not None:
+            bUpdate = True
+            if self.__mesh is not None:
+                min_mesh = self.__mesh
+                if value >= min_mesh:
+                    bUpdate = False
+            if bUpdate:
+                self.__mesh = value
+
+    @property
     def x(self):
-        return self.start[0]
+        return self.__x
 
+    @property
     def y(self):
-        return self.start[1]
-
-    def point(self):
-        if self.__point is None:
-            self.__point = Point2D.Create(self.start[0], self.start[1])
-        return self.__point
+        return self.__y
 
     def cartesian_relative(self, dx, dy): # new point displaced from self; cartesian components
-        return Q2D_Point((self.start[0] + dx, self.start[1] + dy))
+        return Q2D_Point((self.x + dx, self.y + dy))
 
     def polar_relative(self, r, theta): # new point displaced from self; polar components
-        x = self.x() + r * math.cos(theta)
-        y = self.y() + r * math.sin(theta)
+        x = self.x + r * math.cos(theta)
+        y = self.y + r * math.sin(theta)
         return Q2D_Point((x, y))
 
     def vector_relative(self, v): # new point displaced from self by vector v
-        return Q2D_Point((self.start[0] + v.x(), self.start[1] + v.y()))
+        return Q2D_Point((self.x + v.x(), self.y + v.y()))
 
     def distance(self, p): # distance between points
-        return ((self.start[0] - p.x())**2 + (self.start[1] - p.y())**2)**0.5
+        return ((self.x - p.x)**2 + (self.y - p.y)**2)**0.5
+
+    def coincident(self, p): # true if both points are in exactly the same place
+        return (self.x == p.x) and (self.y == p.y)
 
     @staticmethod
     def from_to(from_point, to_point): # define vector between two points
-        return Q2D_Vector.from_to(to_point.x() - from_point.x(), to_point.y() - from_point.y())
-
-class Q2D_Line(Q2D_Object):
-
-    def __init__(self, start, direction, **kwargs):
-        Q2D_Object.__init__(self, "Line", **kwargs)
-        self.start = start
-        self.direction = direction
-
-    def parallel(self, offset, reverse=False):
-        if reverse:
-            d = self.direction.copy().reverse()
-        else:
-            d = self.direction
-        return Q2D_Line(self.start.cartesian_relative(-offset * self.direction.y(), offset * self.direction.x()), d)
-
-    def intersection(self, rhs, offset=0.0, interior=True):
-        # First check the lines aren't parallel
-        d1 = self.direction
-        d2 =  rhs.direction
-        det = d2.cross(d1)
-        if det == 0: # oops, they are
-            return None
-
-        if interior and det > 0:
-            p1 = self.parallel(-offset).start
-            p2 =  rhs.parallel(-offset).start
-        else:
-            p1 = self.parallel( offset).start
-            p2 =  rhs.parallel( offset).start
-
-        c1 = p1.y() * d1.x() - p1.x() * d1.y()
-        c2 = p2.y() * d2.x() - p2.x() * d2.y()
-        y = (d1.y() * c2 - d2.y() * c1) / det
-        x = (d1.x() * c2 - d2.x() * c1) / det
-
-        return Q2D_Point((x, y))
-
-    def project(self, point):
-        rhs = Q2D_Line(point, self.direction.copy().rotate())
-        return self.intersection(rhs)
-
-    def poly_points(self, interval):
-        points = []
-        if self.chain is not None:
-            p1 = self.start
-            p2 = self.chain
-            if p2.name != "Point":
-                p2 = p2.start
-
-            dx = p2.x() - p1.x()
-            dy = p2.y() - p1.y()
-            length = math.sqrt(dx**2 + dy**2)
-
-            count = int(math.ceil(length / interval))
-            for c in range(0, count):
-                x = p1.x() + (dx * c) / count
-                y = p1.y() + (dy * c) / count
-                points += [[x, y]]
-
-        return points
+        return Q2D_Vector.from_to(to_point.x - from_point.x, to_point.y - from_point.y)
 
 class Q2D_Ellipse(Q2D_Object):
 
@@ -258,7 +218,7 @@ class Q2D_Ellipse(Q2D_Object):
         theta = 0.0
         while theta < 2 * math.pi:
             point = self.point_on_circumference(theta)
-            points += [[point.x(), point.y()]]
+            points += [[point.x, point.y]]
             radius = self.center.distance(point)
             theta = theta + interval / radius
 
@@ -268,28 +228,298 @@ class Q2D_Circle(Q2D_Ellipse):
 
     def __init__(self, center, radius, **kwargs):
         Q2D_Ellipse.__init__(self, center, radius, radius, **kwargs)
-        self.name = "Circle"
+        self._geom = "Circle"
         self.radius = radius
 
     def convert_to_ellipse(self):
-        self.name = "Ellipse"
+        self._geom = "Ellipse"
 
-class Q2D_Arc(Q2D_Object):
+class Q2D_Curve(Q2D_Object):
+
+    def __init__(self, geom, **kwargs):
+        Q2D_Object.__init__(self, geom, **kwargs)
+        self.__vertex = [] # list of vertices, not including any arc centres or control points
+        self.__edge   = [] # list of edges
+        self.__mesh   = kwargs.get("mesh", None)
+
+        # Only the *first* vertex of a curve can be [None]-type, but no edges or vertices can then be added to it
+        # A *defined* curve has no [None]-type vertices, at least one edge, and No. vertices = No. edges + 1
+        # A *component* curve has all [None]-type edges; otherwise, edges must not be [None]-type
+
+    def __getitem__(self, key): # find first instance of edge or vertex by name
+        value = None
+        if key is not None:
+            for e in self.__edge:
+                if e.name == key:
+                    value = e
+                    break
+            if value is None:
+                for v in self.__vertex:
+                    if v.name == key:
+                        value = v
+                        break
+        return value
+        
+    @property
+    def mesh(self):
+        return self.__mesh
+
+    @mesh.deleter
+    def mesh(self):
+        self.__mesh = None
+
+    @mesh.setter
+    def mesh(self, value):
+        if value is not None:
+            bUpdate = True
+            if self.__mesh is not None:
+                min_mesh = self.__mesh
+                if value >= min_mesh:
+                    bUpdate = False
+            if bUpdate:
+                self.__mesh = value
+
+            for e in self.__edge:
+                if e is not None:
+                    e.mesh = value
+            for v in self.__vertex:
+                if v is not None:
+                    v.mesh = value
+
+    def curve_print(self, indent=""):
+        Nv = len(self.__vertex)
+        Ne = len(self.__edge)
+
+        print(indent + self.desc() + "[mesh={m}] has {v} vertices and {e} edges".format(m=self.mesh, v=Nv, e=Ne))
+
+        indent += "    "
+        for iv in range(Nv):
+            v = self.__vertex[iv]
+            if v is None:
+                print(indent + "vertex {i} ({n})[mesh={m}] [None]".format(i=iv, n=v.desc(), m=v.mesh))
+            else:
+                print(indent + "vertex {i} ({n})[mesh={m}] @ ({x:.4f}, {y:.4f})".format(i=iv, n=v.desc(), m=v.mesh, x=v.x, y=v.y))
+
+            if iv >= Ne:
+                continue
+
+            e = self.__edge[iv]
+            if e is None:
+                print(indent + "edge {i} [None]".format(i=iv))
+            else:
+                e.curve_print(indent)
+
+    @property # first vertex, or None
+    def start(self):
+        v0 = None
+        if len(self.__vertex) > 0:
+            v0 = self.__vertex[0]
+        return v0
+
+    @property # last vertex (distinct from first), or None
+    def end(self):
+        vf = None
+        if len(self.__vertex) > 1:
+            vf = self.__vertex[-1]
+        return vf
+
+    @property # last edge, or None
+    def last(self):
+        ef = None
+        if len(self.__edge) > 0:
+            ef = self.__edge[-1]
+        return ef
+
+    @property # list of vertices
+    def vertices(self):
+        return self.__vertex
+
+    @property # list of edges
+    def edges(self):
+        return self.__edge
+
+    def _curve_begin(self, vertex): # start the curve by adding the initial vertex
+        bAdded = True
+
+        if len(self.__vertex) > 0:
+            print("* * * Q2D_Curve::curve_begin(): error: attempt to begin existing curve")
+            bAdded = False
+        else:
+            self.__vertex.append(vertex)
+
+        return bAdded
+
+    def _curve_append_vertex(self, vertex): # add next vertex
+        bAdded = True
+
+        if len(self.__vertex) == 0:
+            bAdded = self._curve_begin(vertex)
+        elif vertex is None:
+            print("* * * Q2D_Curve::curve_append_vertex(): error: attempt to append [None]-vertex to curve")
+            bAdded = False
+        else:
+            if len(self.__vertex) == len(self.__edge): # set this new vertex as the end-point vertex of the last curve
+                last = self.last # last edge in list
+                if last is not None:
+                    lvx = last.vertices
+                    if not vertex.coincident(lvx[-1]):
+                        bAdded = last._curve_append_vertex(vertex)
+            else:
+                bAdded = self._curve_append_edge(None) # add (with checks) a [None]-edge between vertices
+
+            if bAdded:
+                v0 = self.__vertex[0]
+                if v0.coincident(vertex): # if we return to the start, add in the starting vertex as next point
+                    self.__vertex.append(v0)
+                else:
+                    self.__vertex.append(vertex)
+
+        return bAdded
+
+    def _curve_append_edge(self, edge): # add edge starting at existing curve end-point
+        bAdded = True
+
+        if len(self.__edge) > 0:
+            if edge is None and self.__edge[0] is not None:
+                print("* * * Q2D_Curve::curve_append_edge(): error: attempt to append [None]-edge to non-component curve")
+                return False
+            if edge is not None and self.__edge[0] is None:
+                print("* * * Q2D_Curve::curve_append_edge(): error: attempt to append defined edge to component curve")
+                return False
+
+        if len(self.__vertex) == len(self.__edge):
+            if edge is None:
+                print("* * * Q2D_Curve::curve_append_edge(): error: attempt to append [None]-edge out of sequence")
+                bAdded = False
+            else:
+                bAdded = self._curve_append_vertex(edge.start)
+                if bAdded:
+                    self.__edge.append(edge)
+        elif self.__vertex[0] is None:
+            print("* * * Q2D_Curve::curve_append_edge(): error: attempt to append edge to curve with undefined start")
+            bAdded = False
+        else:
+            self.__edge.append(edge)
+
+        return bAdded
+
+    def curve_defined(self): # return true if at least one edge and if both ends of the curve are specified
+        return len(self.__edge) > 0 and len(self.__vertex) == len(self.__edge) + 1
+
+    def component_curve(self): # return true if any (and thus all) edges are [None]-type
+        bCompC = False
+        if len(self.__edge) > 0:
+            if self.__edge[0] is None:
+                bCompC = True
+        return bCompC
+
+    def curve_closed(self): # return true if final vertex is the initial vertex
+        bClosed = False
+        if len(self.__vertex) > 1:
+            if self.__vertex[0] == self.__vertex[-1]:
+                bClosed = True
+        return bClosed
+
+class Q2D_Line(Q2D_Curve):
+    # Q2D_Line is a Q2D_Curve with a reference/starting vertex but no edge or end-point vertex
+
+    def __init__(self, start, direction, **kwargs):
+        Q2D_Curve.__init__(self, "Line", **kwargs)
+        self._curve_begin(start)
+        self.direction = direction
+
+    def parallel(self, offset, reverse=False):
+        if reverse:
+            d = self.direction.copy().reverse()
+        else:
+            d = self.direction
+        return Q2D_Line(self.start.cartesian_relative(-offset * self.direction.y(), offset * self.direction.x()), d)
+
+    def intersection(self, rhs, offset=0.0, interior=True):
+        # First check the lines aren't parallel
+        d1 = self.direction
+        d2 =  rhs.direction
+        det = d2.cross(d1)
+        if det == 0: # oops, they are
+            return None
+
+        if interior and det > 0:
+            p1 = self.parallel(-offset).start
+            p2 =  rhs.parallel(-offset).start
+        else:
+            p1 = self.parallel( offset).start
+            p2 =  rhs.parallel( offset).start
+
+        c1 = p1.y * d1.x() - p1.x * d1.y()
+        c2 = p2.y * d2.x() - p2.x * d2.y()
+        y = (d1.y() * c2 - d2.y() * c1) / det
+        x = (d1.x() * c2 - d2.x() * c1) / det
+
+        return Q2D_Point((x, y))
+
+    def project(self, point):
+        rhs = Q2D_Line(point, self.direction.copy().rotate())
+        return self.intersection(rhs)
+
+    def nurbs_cps_wts(self, degree):
+        # return list of control point coordinates as (x,y)
+
+        if degree != 2:
+            print("* * * Q2D_Line::nurbs_cps_wts: only degree=2 is supported currently.")
+            return None, None
+        if not self.curve_defined():
+            print("* * * Q2D_Line::nurbs_cps_wts: curve not defined.")
+            return None, None
+
+        p0 = self.vertices[0]
+        p1 = self.vertices[1]
+
+        sx, sy = p0.x, p0.y
+        ex, ey = p1.x, p1.y
+
+        mx = (sx + ex) / 2.0
+        my = (sy + ey) / 2.0
+
+        cps = [(sx, sy), (mx, my), (ex, ey)]
+        wts = [1.0, 1.0, 1.0]
+
+        return cps, wts
+
+    def poly_points(self, interval):
+        points = []
+        if self.curve_defined():
+            vertices = self.vertices
+            p1 = vertices[0]
+            p2 = vertices[1]
+
+            dx = p2.x - p1.x
+            dy = p2.y - p1.y
+            length = math.sqrt(dx**2 + dy**2)
+
+            count = int(math.ceil(length / interval))
+            for c in range(0, count):
+                x = p1.x + (dx * c) / count
+                y = p1.y + (dy * c) / count
+                points += [[x, y]]
+
+        return points
+
+class Q2D_Arc(Q2D_Curve):
+    # Q2D_Arc is a Q2D_Curve with a reference/starting vertex but no edge or end-point vertex
 
     def __init__(self, start, circle, clockwise=False, **kwargs):
-        Q2D_Object.__init__(self, "Arc", **kwargs)
-        self.start = start
+        Q2D_Curve.__init__(self, "Arc", **kwargs)
+        self._curve_begin(start)
         self.circle = circle
         self.clockwise = clockwise
 
-    def center(self):
-        return self.circle.center.start
-
+    @property
     def Ox(self):
-        return self.circle.center.x()
+        return self.circle.center.x
 
+    @property
     def Oy(self):
-        return self.circle.center.y()
+        return self.circle.center.y
 
     def concentric(self, offset):
         if self.clockwise:
@@ -302,15 +532,76 @@ class Q2D_Arc(Q2D_Object):
 
         return Q2D_Arc(cc_start, Q2D_Circle(self.circle.center, self.circle.radius - offset), self.clockwise)
 
+    @staticmethod
+    def nurbs_angles(theta, bPeriodic):
+        # split range into angles of 120 degrees or less, and half-angles
+        # also return: cha  the cosine of the half-angle
+        #              Ncp  number of control points for degree 2 curve
+        if theta is not None:
+            t1, t2 = theta
+        else:
+            t1 = 0.0
+            t2 = 2.0 * math.pi
+        Narc = int(math.ceil(math.fabs(t2 - t1) * 1.5 / math.pi))
+        cha = math.cos(math.fabs(t2 - t1) * 0.5 / Narc)
+        angles = []
+        Ncp = 2 * Narc
+        for a in range(Ncp):
+            angles.append(t1 + (t2 - t1) * a * 1.0 / Ncp)
+        if not bPeriodic:
+            Ncp += 1
+            angles.append(t2)
+        return angles, cha, Ncp
+
+    def nurbs_cps_wts(self):
+        # return list of control point coordinates as (x,y)
+
+        if not self.curve_defined():
+            print("* * * Q2D_Arc::nurbs_cps_wts: curve not defined.")
+            return None, None
+
+        p0 = self.vertices[0]
+        p1 = self.vertices[1]
+
+        sx, sy = p0.x, p0.y
+        ex, ey = p1.x, p1.y
+
+        ts = math.atan2(sy - self.Oy, sx - self.Ox)
+        te = math.atan2(ey - self.Oy, ex - self.Ox)
+        if ts > te and not self.clockwise:
+            ts -= 2.0 * math.pi
+        if te > ts and self.clockwise:
+            ts += 2.0 * math.pi
+
+        angles, cha, Ncp = Q2D_Arc.nurbs_angles((ts, te), False)
+        cps = []
+        wts = []
+
+        ha = False
+        for a in angles:
+            if ha:
+                rs = cha
+                ha = False
+            else:
+                rs = 1.0
+                ha = True
+
+            x = self.Ox + self.circle.radius * math.cos(a) / rs
+            y = self.Oy + self.circle.radius * math.sin(a) / rs
+
+            cps.append((x, y))
+            wts.append(rs)
+
+        return cps, wts
+
     def poly_points(self, interval):
         points = []
-        if self.chain is not None:
-            p1 = self.start
-            p2 = self.chain
-            if p2.name != "Point":
-                p2 = p2.start
-            t1 = math.atan2(p1.start[1] - self.circle.center.start[1], p1.start[0] - self.circle.center.start[0])
-            t2 = math.atan2(p2.start[1] - self.circle.center.start[1], p2.start[0] - self.circle.center.start[0])
+        if self.curve_defined():
+            vertices = self.vertices
+            p1 = vertices[0]
+            p2 = vertices[1]
+            t1 = math.atan2(p1.y - self.Oy, p1.x - self.Ox)
+            t2 = math.atan2(p2.y - self.Oy, p2.x - self.Ox)
             if self.clockwise:
                 if t1 <= t2:
                     if t2 > 0:
@@ -329,11 +620,11 @@ class Q2D_Arc(Q2D_Object):
             count = int(math.ceil(arc_length / interval))
             for c in range(0, count):
                 point = self.circle.point_on_circumference(t1 + ((t2 - t1) * c) / count)
-                points += [[point.x(), point.y()]]
+                points += [[point.x, point.y]]
 
         return points
 
-class Q2D_Path(object):
+class Q2D_Path(Q2D_Curve):
 
     @staticmethod
     def polygon(points): # where points = [(x1,y1) .. (xN,yN)], N > 2
@@ -357,17 +648,41 @@ class Q2D_Path(object):
 
         return path
 
-    def __init__(self, line_or_arc):
-        self.name = "Path"
-        self.chain = line_or_arc
-        self.current = line_or_arc
+    @staticmethod
+    def circle(circ):
+        Ox = circ.center.x
+        Oy = circ.center.y
+        r  = circ.radius
+        pe = Q2D_Point((Ox + r, Oy))
+        pn = Q2D_Point((Ox, Oy + r))
+        pw = Q2D_Point((Ox - r, Oy))
+        ps = Q2D_Point((Ox, Oy - r))
 
-    def __append(self, line_arc_point):
-        self.current.chain = line_arc_point
-        self.current = self.current.chain
+        path = Q2D_Path()
+        path.append(Q2D_Arc(pe, circ, False))
+        path.append(Q2D_Arc(pn, circ, False))
+        path.append(Q2D_Arc(pw, circ, False))
+        path.append(Q2D_Arc(ps, circ, False))
+        path.end_point(pe)
+
+        return path
+
+    def __init__(self, line_or_arc=None, **kwargs):
+        Q2D_Curve.__init__(self, "Path", **kwargs)
+
+        if line_or_arc is not None:
+            if line_or_arc.geom == "Arc" or line_or_arc.geom == "Line":
+                self._curve_append_edge(line_or_arc)
 
     def end_point(self, point):
-        self.__append(point)
+        if point.geom == "Point":
+            self._curve_append_vertex(point)
+
+    def __append(self, line_arc_point):
+        if line_arc_point.geom == "Point":
+            self._curve_append_vertex(line_arc_point)
+        else:
+            self._curve_append_edge(line_arc_point)
 
     def __append_line_to_line(self, line, transition, kwargs):
         lhs_arc  = None
@@ -378,7 +693,7 @@ class Q2D_Path(object):
             if transition > 0:
                 radius = transition
 
-        l1 = self.current
+        l1 = self.last
         l2 = line
 
         d1 = l1.direction
@@ -406,18 +721,14 @@ class Q2D_Path(object):
         return lhs_arc, rhs_line
 
     @staticmethod
-    def __intersect_circle(lhs, rhs, kwargs=None):
+    def __intersect_circle(lhs, rhs, kwargs):
         point = None
 
         cc = Q2D_Point.from_to(lhs.center, rhs.center)
         if cc.length < lhs.radius + rhs.radius:
             dtheta = math.acos(0.5 * (cc.length + (lhs.radius**2.0 - rhs.radius**2.0) / cc.length) / lhs.radius)
 
-            farside = False
-            if kwargs is not None:
-                if 'farside' in kwargs:
-                    farside = kwargs['farside']
-
+            farside = kwargs.get('farside', False)
             if farside:
                 point = lhs.center.polar_relative(lhs.radius, cc.theta + dtheta)
             else:
@@ -459,19 +770,10 @@ class Q2D_Path(object):
         lhs_arc  = None
         rhs_line = None
 
-        arc = self.current
+        arc = self.last
 
         farside  = kwargs.get('farside',  False)
         co_sense = kwargs.get('co_sense', True)
-
-        #if 'co_sense' in kwargs:
-        #    co_sense = kwargs['co_sense']
-        #else:
-        #    co_sense = True
-        #if 'farside' in kwargs:
-        #    farside = kwargs['farside']
-        #else:
-        #    farside = False
 
         if not arc.clockwise:
             sense = not co_sense
@@ -598,19 +900,10 @@ class Q2D_Path(object):
         lhs_arc = None
         rhs_arc = None
 
-        line = self.current
+        line = self.last
 
         farside  = kwargs.get('farside',  False)
         co_sense = kwargs.get('co_sense', True)
-
-        #if 'co_sense' in kwargs:
-        #    co_sense = kwargs['co_sense']
-        #else:
-        #    co_sense = True
-        #if 'farside' in kwargs:
-        #    farside = kwargs['farside']
-        #else:
-        #    farside = False
 
         if arc.clockwise:
             sense = not co_sense
@@ -734,25 +1027,27 @@ class Q2D_Path(object):
         lhs_arc = None
         rhs_arc = None
 
-        lhs = self.current
+        lhs = self.last
 
+        if lhs.circle.center.coincident(rhs.circle.center):
+            if lhs.circle.radius != rhs.circle.radius:
+                print("Q2D_Path.__append_arc_to_arc: error: unable to transition between concentric circles * * *")
+                return None, None
+            # we're continuing along the same circle
+            if rhs.start is None:
+                print("Q2D_Path.__append_arc_to_arc: error: transition vertex must be specified when continuing on same circle * * *")
+                return None, None
+            return None, rhs # success... ignoring transition curve settings and arc direction
         if transition is None:
             print("Q2D_Path.__append_arc_to_arc: error: transition radius must be positive * * *")
-        elif transition <= 0.0:
+            return None, None
+        if transition <= 0.0:
             print("Q2D_Path.__append_arc_to_arc: error: transition radius must be positive * * *")
+            return None, None
 
         # don't swap the sense of farside:
         farside     = kwargs.get('farside',  False)
         lhs_cosense = kwargs.get('co_sense', True)
-
-        #if 'farside' in kwargs:
-        #    farside = kwargs['farside']
-        #else:
-        #    farside = False
-        #if 'co_sense' in kwargs:
-        #    lhs_cosense = kwargs['co_sense']
-        #else:
-        #    lhs_cosense = True
 
         if lhs.clockwise == rhs.clockwise:
             rhs_cosense = lhs_cosense
@@ -800,74 +1095,77 @@ class Q2D_Path(object):
         tarc = None # transition curve
         pnew = None # new line or arc
 
-        if self.current.name == "Line":
-            if line_or_arc.name == "Line":
+        last = self.last
+        if last is None:
+            if line_or_arc.geom == "Line" or line_or_arc.geom == "Arc":
+                pnew = line_or_arc
+        elif last.geom == "Line":
+            if line_or_arc.geom == "Line":
                 tarc, pnew = self.__append_line_to_line(line_or_arc, transition, kwargs)
-            elif line_or_arc.name == "Arc":
+            elif line_or_arc.geom == "Arc":
                 tarc, pnew = self.__append_arc_to_line(line_or_arc, transition, kwargs)
-        elif self.current.name == "Arc":
-            if line_or_arc.name == "Line":
+        elif last.geom == "Arc":
+            if line_or_arc.geom == "Line":
                 tarc, pnew = self.__append_line_to_arc(line_or_arc, transition, kwargs)
-            elif line_or_arc.name == "Arc":
+            elif line_or_arc.geom == "Arc":
                 tarc, pnew = self.__append_arc_to_arc(line_or_arc, transition, kwargs)
 
         if tarc is not None:
-            tarc.mesh = kwargs.get('transition_mesh', None)
             self.__append(tarc)
-            print("append: transition curve with mesh {m}".format(m=tarc.mesh))
-
         if pnew is not None:
-            pnew.mesh = line_or_arc.props.get('mesh', None)
-            pnew.mesh = kwargs.get('mesh', None)
             self.__append(pnew)
-            print("append: curve with mesh {m}".format(m=pnew.mesh))
+
+        return tarc, pnew
 
     def offset_path(self, offset):
-        path = None
+        if not self.curve_defined():
+            print("* * * Q2D_Path::offset_path: path must be fully defined in order to create offset path!")
+            return None
+        if not self.curve_closed():
+            print("* * * Q2D_Path::offset_path: path must be closed in order to create offset path!")
+            return None
+            
+        path = Q2D_Path()
         endp = None
-        item = self.chain
-
-        while item is not None:
-            if item.name == "Line":
+        for item in self.edges:
+            if item is None:
+                print("* * * Q2D_Path::offset_path: error: unexpected [None]-edge!")
+                continue
+            if item.geom == "Line":
                 line = item.parallel(offset)
-                if path is None:
-                    path = Q2D_Path(line)
+                path.__append(line)
+                if endp is None:
                     endp = line.start
-                else:
-                    path.__append(line)
-            elif item.name == "Arc":
+            elif item.geom == "Arc":
                 arc = item.concentric(offset)
                 if arc is None:
-                    print("* * * Path segment skipped... behaviour undefined! * * *")
-                    item = item.chain
-                    continue
-                if path is None:
-                    path = Q2D_Path(arc)
+                    print("* * * Q2D_Path::offset_path: vanishing arc!")
+                    endp = None
+                    break
+                path.__append(arc)
+                if endp is None:
                     endp = arc.start
-                else:
-                    path.__append(arc)
-            else:
-                if path:
-                    path.end_point(endp)
 
-            item = item.chain
+        if endp is None:
+            path = None
+        else:
+            path.end_point(endp)
 
         return path
         
     def poly_points(self, arc_interval, line_interval=None):
         points = []
-        item = self.chain
-
-        while item is not None:
-            if item.name == "Line":
+        for item in self.edges:
+            if item is None:
+                continue
+            if item.geom == "Line":
                 if line_interval is not None:
                     points += item.poly_points(line_interval)
                 else:
-                    points += [[item.start.x(), item.start.y()]]
-            elif item.name == "Arc":
+                    v0 = item.start
+                    points += [[v0.x, v0.y]]
+            elif item.geom == "Arc":
                 points += item.poly_points(arc_interval)
-
-            item = item.chain
 
         return points
 
@@ -913,14 +1211,14 @@ class Q2D_Frame(object):
         return self
 
     def l2g(self, l): # translate from local to global space, where l is a Q2D_Point
-        gx = self.__Og.x() + l.x() * self.__e1.x() + l.y() * self.__e2.x()
-        gy = self.__Og.y() + l.x() * self.__e1.y() + l.y() * self.__e2.y()
+        gx = self.__Og.x + l.x() * self.__e1.x() + l.y() * self.__e2.x()
+        gy = self.__Og.y + l.x() * self.__e1.y() + l.y() * self.__e2.y()
         return Q2D_Point((gx, gy))
 
     def tuple_to_global(self, l12): # translate from local to global space, where l12 is an (x, y) tuple
         l1, l2 = l12
-        gx = self.__Og.x() + l1 * self.__e1.x() + l2 * self.__e2.x()
-        gy = self.__Og.y() + l1 * self.__e1.y() + l2 * self.__e2.y()
+        gx = self.__Og.x + l1 * self.__e1.x() + l2 * self.__e2.x()
+        gy = self.__Og.y + l1 * self.__e1.y() + l2 * self.__e2.y()
         return (gx, gy)
 
     def local_point_set_origin(self, l):
@@ -948,3 +1246,10 @@ class Q2D_Frame(object):
     def copy(self):
         frame = Q2D_Frame(self.__theta)
         return frame.global_point_set_origin(self.__Og)
+
+if __name__ == '__main__':
+    from q2d_tests import Q2D_Arc_Test
+    paths = Q2D_Arc_Test(2)
+    for p in paths:
+        p.curve_print()
+        print(" => No. poly points = {n}".format(n=len(p.poly_points(0.01, 0.02))))

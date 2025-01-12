@@ -6,7 +6,7 @@ class Q3D_Point(object):
         self.__x = xyz[0]
         self.__y = xyz[1]
         self.__z = xyz[2]
-        self.name  = "Point3D"
+        self.geom  = "Point3D"
         self.props = kwargs
 
     def x(self):
@@ -266,86 +266,69 @@ class Q3D_Frame(object):
         data = None
         item = None
 
-        if path.name == "Circle":
-            Ox, Oy = path.center.start
+        if path.geom == "Circle" or path.geom == "Ellipse":
+            Ox = path.center.x
+            Oy = path.center.y
             tx = offset_x + pscale_x * (cos_r * Ox - sin_r * Oy)
             ty = offset_y + pscale_y * (sin_r * Ox + cos_r * Oy)
             kwargs["offset"] = (offset_x + tx, offset_y + ty, offset_z)
-            kwargs["rotate"] = 0.0
-            data = self.nurbs_ellipse(path.radius, path.radius, **kwargs)
-        elif path.name == "Ellipse":
-            Ox, Oy = path.center.start
-            tx = offset_x + pscale_x * (cos_r * Ox - sin_r * Oy)
-            ty = offset_y + pscale_y * (sin_r * Ox + cos_r * Oy)
-            kwargs["offset"] = (offset_x + tx, offset_y + ty, offset_z)
-            kwargs["rotate"] = rotate + path.rotate
-            data = self.nurbs_ellipse(path.semi_major, path.semi_minor, **kwargs)
-        elif path.name == "Path":
-            print("info: Path")
-            item = path.chain
-        else:
-            print("* * * (oops: unsupported path type: '" + path.name + "') * * *")
-
-        if item is None:
+            if path.geom == "Circle":
+                kwargs["rotate"] = 0.0
+                data = self.nurbs_ellipse(path.radius, path.radius, **kwargs)
+            elif path.geom == "Ellipse":
+                kwargs["rotate"] = rotate + path.rotate
+                data = self.nurbs_ellipse(path.semi_major, path.semi_minor, **kwargs)
             return data
+
+        if path.geom != "Path":
+            print("* * * Q3D_Frame::nurbs_path: unsupported path type: '" + path.geom + "'")
+            return None
+        if not path.curve_defined():
+            print("* * * Q3D_Frame::nurbs_path: undefined path")
+            return None
+        if path.component_curve():
+            print("* * * Q3D_Frame::nurbs_path: cannot convert a component curve to a Nurbs path")
+            return None
 
         Nline = 0
         Narcs = 0
         bErr  = False
-        bPer  = False
-        p0    = item.start
+        bPer  = path.curve_closed()
 
-        while item is not None:
-            if item.name == "Line":
-                Nline += 1
-            elif item.name == "Arc":
-                Narcs += 1
-            elif item.name == "Point":
-                if p0 == item:
-                    bPer = True
-                else:
-                    print("Note: non-periodic end-point")
+        for item in path.edges:
+            if item is None:
+                print("* * * Q3D_Frame::nurbs_path: unexpected [None]-edge in path")
+                bErr = True
                 break
+            if item.geom == "Line":
+                Nline += 1
+            elif item.geom == "Arc":
+                Narcs += 1
             else:
-                print("* * * (oops: unsupported item type in path: '" + path.name + "') * * *")
+                print("* * * Q3D_Frame::nurbs_path: unsupported item type in path: '" + item.geom + "'")
                 bErr = True
                 break
 
-            item = item.chain
-
         if bErr:
-            return data
+            return None
         if Narcs + Nline == 0:
-            print("* * * (oops: no lines or arcs in path) * * *")
-            return data
+            print("* * * Q3D_Frame::nurbs_path: no lines or arcs in path")
+            return None
 
         cps  = []
         wts  = []
-        item = path.chain
         cp_e = None
 
-        while item is not None:
-            if item.name == "Point":
-                break
-
+        for item in path.edges:
             p1 = item.start
-            p2 = item.chain
-            if p2.name != "Point":
-                p2 = p2.start
+            p2 = item.end
 
-            if item.name == "Line":
-                seg_cps, seg_wts, seg_mmin = self.__cps_deg2_line((p1.x(), p1.y()), (p2.x(), p2.y()))
-            elif item.name == "Arc":
-                seg_cps, seg_wts, seg_mmin = self.__cps_deg2_arc((item.Ox(), item.Oy()),
-                                                                 (p1.x(), p1.y()), (p2.x(), p2.y()),
-                                                                 item.circle.radius, item.clockwise)
+            if item.geom == "Line":
+                seg_cps, seg_wts = item.nurbs_cps_wts(2)
+            elif item.geom == "Arc":
+                seg_cps, seg_wts = item.nurbs_cps_wts()
 
             Nscp = len(seg_cps)
-
-            # Note: minimum mesh size can be reduced by assignment, but not increased
-            item.mesh = seg_mmin
-            p1.mesh = item.mesh
-            p2.mesh = item.mesh
 
             for si in range(Nscp):
                 x, y = seg_cps[si]
@@ -354,16 +337,13 @@ class Q3D_Frame(object):
                 cp3  = self.g_pt(tx, ty, offset_z)
                 if si == 0:
                     cp3.mesh = p1.mesh
-                else:
-                    cp3.mesh = item.mesh
                 if si == Nscp - 1:
+                    cp3.mesh = p2.mesh
                     cp_e = cp3 # the end point is not automatically added to the list
                     wt_e = seg_wts[Nscp - 1]
                 else:
                     cps.append(cp3)
                     wts.append(seg_wts[si])
-
-            item = item.chain
 
         if not bPer:
             cps.append(cp_e)
@@ -372,52 +352,6 @@ class Q3D_Frame(object):
         kts, mps = self.__kts_mps(len(cps), bPer)
 
         return Q3D_NURBS_Data(2, cps, wts, kts, mps, bPer)
-
-    def __cps_deg2_line(self, p_start, p_end):
-        # return list of control point coordinates as (x,y), and a suggested minimum mesh size
-        sx, sy = p_start
-        ex, ey = p_end
-        mx = (sx + ex) / 2.0
-        my = (sy + ey) / 2.0
-
-        cps = [(sx, sy), (mx, my), (ex, ey)]
-        wts = [1.0, 1.0, 1.0]
-
-        mesh_min = math.sqrt((ex - sx)**2 + (ey - sy)**2) / 2.0
-        return cps, wts, mesh_min
-
-    def __cps_deg2_arc(self, p_center, p_start, p_end, radius, bClockwise):
-        # return list of control point coordinates as (x,y), and a suggested minimum mesh size
-        ox, oy = p_center
-        sx, sy = p_start
-        ex, ey = p_end
-        ts = math.atan2(sy - oy, sx - ox)
-        te = math.atan2(ey - oy, ex - ox)
-        if ts > te and not bClockwise:
-            ts -= 2.0 * math.pi
-        if te > ts and bClockwise:
-            ts += 2.0 * math.pi
-
-        angles, cha, Ncp = self.__angles((ts, te), False)
-        cps = []
-        wts = []
-
-        ha = False
-        for a in angles:
-            if ha:
-                rs = cha
-                ha = False
-            else:
-                rs = 1.0
-                ha = True
-
-            x = ox + radius * math.cos(a) / rs
-            y = oy + radius * math.sin(a) / rs
-            cps.append((x, y))
-            wts.append(rs)
-
-        mesh_min = radius / 2.0
-        return cps, wts, mesh_min
 
     def nurbs_torus(self, radius, semi_major, semi_minor, **kwargs):
         pitch = kwargs.get("pitch", 0.0)
@@ -471,3 +405,16 @@ class Q3D_Frame(object):
                 per1 = data.per
 
         return Q3D_NURBS_Data((deg1, deg2), cps, wts, (kts1, kts2), (mps1, mps2), (per1, per2))
+
+if __name__ == '__main__':
+    from q2d_tests import Q2D_Arc_Test
+    tests = [1,2,5]
+    frame = Q3D_Frame.sketch_reset()
+    for test in tests:
+        paths = Q2D_Arc_Test(test)
+        count = 0
+        for path in paths:
+            print("Converting path to single NURBS curve (test={t}, path={c}):".format(t=test, c=count))
+            data = frame.nurbs_path(path)
+            count += 1
+            print("done.")

@@ -2,7 +2,6 @@ import math
 
 from q3d_base import *
 from q2d_path import *
-from q2d_tests import Q2D_Arc_Test
 
 class Q3D_Draw(object):
 
@@ -223,27 +222,23 @@ class Q3D_Draw(object):
 
         c0 = arc.circle.center
 
-        c0.mesh = arc.circle.radius / 2.0
-        kw_min_mesh = kwargs.get("mesh")
-        if kw_min_mesh is not None:
-            c0.mesh = kw_min_mesh
+        kw_min_mesh = kwargs.get("mesh", arc.circle.radius / 2.0)
+        c0.mesh = kw_min_mesh
 
-        x0 = arc.circle.center.start[0]
-        y0 = arc.circle.center.start[1]
-        p0 = self.__draw_point(frame.g_pt(x0, y0, 0.0, mesh=c0.mesh), **kwargs)
+        x0 = arc.Ox
+        y0 = arc.Oy
+        p0 = self.__draw_point(frame.g_pt(x0, y0, 0.0, mesh=c0.mesh))
 
-        arc_final = True
+        v3i, v3f = arc_ends # 3D points at curve ends
+
         p1 = arc.start
-        p2 = arc.chain
-        if p2.name != "Point":
-            p2 = p2.start
-            arc_final = False
-        if kw_min_mesh is not None:
-            p1.mesh = kw_min_mesh
-            p2.mesh = kw_min_mesh
+        p2 = arc.end
 
-        t1 = math.atan2(p1.start[1] - y0, p1.start[0] - x0)
-        t2 = math.atan2(p2.start[1] - y0, p2.start[0] - x0)
+        p1.mesh = kw_min_mesh
+        p2.mesh = kw_min_mesh
+
+        t1 = math.atan2(p1.y - y0, p1.x - x0)
+        t2 = math.atan2(p2.y - y0, p2.x - x0)
         # Note: math.atan2 returns -pi..pi
         if arc.clockwise:
             if t1 <= t2:
@@ -252,22 +247,16 @@ class Q3D_Draw(object):
             if t2 <= t1:
                 t2 += 2.0 * math.pi
 
-        if arc_ends is None:
-            arc0 = self.__draw_point(frame.g_pt(p1.start[0], p1.start[1], 0.0, mesh=p1.mesh), **kwargs)
-            arc1 = arc0
-        else:
-            arc0, arc1 = arc_ends
-
         Narc, angles, meshes = self.__angles((t1, t2), (p1.mesh, p2.mesh))
-        pa = [arc1]
-        for n in range(Narc): # create points first
+        pa = [v3i]
+        for n in range(Narc-1): # create points first
             a = angles[n+1]
             m = meshes[n+1]
             x = x0 + arc.circle.radius * math.cos(a)
             y = y0 + arc.circle.radius * math.sin(a)
-            pa.append(self.__draw_point(frame.g_pt(x, y, 0.0, mesh=m), **kwargs))
+            pa.append(self.__draw_point(frame.g_pt(x, y, 0.0, mesh=m)))
 
-        arc2 = pa[Narc]
+        pa.append(v3f)
 
         for n in range(Narc): # cthen draw the curves
             if arc.clockwise:
@@ -282,68 +271,63 @@ class Q3D_Draw(object):
             else:
                 segs.append(s)
 
-        arc_ends = (arc0, arc2)
-        return segs, arc_ends
+        return segs
 
     def __draw_line(self, line, frame, arc_ends, **kwargs):
-        p1 = line.start
-        p2 = line.chain
-        if arc_ends is None:
-            if p2.name != "Point":
-                p2 = p2.start
-            gpt0 = frame.g_pt(p1.start[0], p1.start[1], 0.0, mesh=p1.mesh)
-            gpt1 = frame.g_pt(p2.start[0], p2.start[1], 0.0, mesh=p2.mesh)
-            path0 = self.__draw_point(gpt0, **kwargs)
-            path1 = self.__draw_point(gpt1, **kwargs)
-            arc_ends = (path0, path1)
-            line0 = path0
-            line1 = path1
-        else:
-            path0, path1 = arc_ends
-            line0 = path1
-            if p2.name != "Point":
-                p2 = p2.start
-                gpt1 = frame.g_pt(p2.start[0], p2.start[1], 0.0, mesh=p2.mesh)
-                line1 = self.__draw_point(gpt1, **kwargs)
-            else:
-                line1 = path0
-            arc_ends = (path0, line1)
+        v3i, v3f = arc_ends # 3D points at curve ends
 
         curve_id = self.__new_expr_id()
-        gmsh.model.occ.addLine(line0, line1, curve_id)
-        return curve_id, arc_ends
+        gmsh.model.occ.addLine(v3i, v3f, curve_id)
+        return curve_id
 
     def __draw_path(self, path, frame, **kwargs):
-        item = path.chain
-        p2_prev = None
-        while item is not None:
-            p1 = item
-            p2 = item.chain
-            if item.name != "Point":
-                p1 = p1.start
-                if p2.name != "Point":
-                    p2 = p2.start
-                p1.mesh = item.mesh
-                p2.mesh = item.mesh
-            if p2_prev is not None:
-                p2_prev.mesh = p1.mesh
-                p1.mesh = p2_prev.mesh
-            p2_prev = p2
-            item = item.chain
+        if not path.curve_defined():
+            print("* * * Q3D_Draw::__draw_path: path is not defined")
+            return None
+        if path.component_curve():
+            print("* * * Q3D_Draw::__draw_path: unable to draw component path")
+            return None
+        if not path.curve_closed():
+            print("* * * Q3D_Draw::__draw_path: path not a loop - unsupported") # FIXME
+            return None
 
-        item = path.chain
+        bErr = False
+
+        e2D = path.edges
+        v2D = path.vertices
+        v3D = []
+        for v2 in v2D:
+            if v2 is None:
+                print("* * * Q3D_Draw::__draw_path: unexpected [None]-vertex in path")
+                bErr = True
+                break
+            v3 = frame.g_pt(v2.x, v2.y, 0.0, mesh=v2.mesh)
+            v3D.append(self.__draw_point(v3))
+
         arc_segs = []
-        arc_ends = None
-        while item is not None:
-            if item.name == "Line":
-                print('item({n}).mesh={m}, p1.mesh={o}'.format(n=item.name, m=item.mesh, o=item.start.mesh))
-                s, arc_ends = self.__draw_line(item, frame, arc_ends, **kwargs)
+        for ei in range(len(e2D)):
+            item = e2D[ei]
+            v3i  = v3D[ei]
+            v3f  = v3D[ei+1]
+            ends = (v3i, v3f)
+
+            if item is None:
+                print("* * * Q3D_Draw::__draw_path: unexpected [None]-edge in path")
+                bErr = True
+                break
+            if item.geom == "Line":
+                s = self.__draw_line(item, frame, ends, **kwargs)
                 arc_segs.append(s)
-            elif item.name == "Arc":
-                print('item({n}).mesh={m}, p1.mesh={o}'.format(n=item.name, m=item.mesh, o=item.start.mesh))
-                segs, arc_ends = self.__draw_arc(item, frame, arc_ends, **kwargs)
+            elif item.geom == "Arc":
+                segs = self.__draw_arc(item, frame, ends, **kwargs)
                 arc_segs = arc_segs + segs
-            item = item.chain
+            else:
+                print("* * * Q3D_Draw::__draw_path: unsupported item type in path: '" + item.geom + "'")
+                bErr = True
+                break
+
+        if bErr:
+            return None
 
         return self.__draw_loop(arc_segs)
 
@@ -353,9 +337,9 @@ class Q3D_Draw(object):
 
         loop_id = None
 
-        if path.name == "Path":
+        if path.geom == "Path":
             loop_id = self.__draw_path(path, frame, **kwargs)
-        elif path.name == "Circle":
+        elif path.geom == "Circle":
             loop_id = self.__draw_circle(path, frame, **kwargs)
 
         return loop_id
@@ -363,82 +347,105 @@ class Q3D_Draw(object):
     def make_surface(self, name, loop_ids):
         return self.__pp_surface(name, loop_ids)
 
-bPlotEllipseTests = False
-bPlotTorusTests = False
-bPlotPathTests = True
-bPlotPathEllipseTests = False
-bPlotPathSimpleTests = False
-bBuildMesh = True
+if __name__ == '__main__':
+    from q2d_tests import Q2D_Arc_Test
 
-import gmsh
-import sys
+    bPlotEllipseTests = False
+    bPlotTorusTests = False
+    bPlotPathTests = False
+    bPlotPathEllipseTests = False
+    bPlotPathSimpleTests = True
+    bPlotPathCompoundTests = False
+    bBuildMesh = True
 
-gmsh.initialize(sys.argv)
+    from q2d_tests import Q2D_Arc_Test
 
-gmsh.model.add("torus")
+    import gmsh
+    import sys
 
-Geo = Q3D_Draw(0.5)
+    gmsh.initialize(sys.argv)
 
-def test_ellipse(orientation, origin, semi_major, semi_minor, **kwargs):
-    frame = Q3D_Frame.sketch_reset(orientation, origin)
-    data = frame.nurbs_ellipse(semi_major, semi_minor)
-    return Geo.draw_nurbs("ellipse-" + orientation, data, **kwargs)
+    gmsh.model.add("torus")
 
-def test_torus(orientation, origin, radius, semi_major, semi_minor, pitch=0.0, theta=None, **kwargs):
-    frame = Q3D_Frame.sketch_reset(orientation, origin)
-    data = frame.nurbs_torus(radius, semi_major, semi_minor, pitch, theta)
-    return Geo.draw_nurbs("torus-" + orientation, data, **kwargs)
+    Geo = Q3D_Draw(0.5)
 
-if bPlotEllipseTests:
-    C1 = test_ellipse('XY', (-1.0, 0.0, 0.0), 1.0, 1.0)
-    C2 = test_ellipse('YZ', ( 0.0,-1.0, 0.0), 0.8, 0.3, mesh=0.1)
-    C3 = test_ellipse('ZX', ( 0.0, 0.0,-1.0), 0.2, 0.9)
-if bPlotTorusTests:
-    S1 = test_torus('XY', ( 1.0, 0.0, 0.0),   1, 0.2, 0.2, mesh=0.05)
-    S2 = test_torus('YZ', ( 0.5, 0.0, 1.0),   1, 0.2, 0.2, 0.0, (-0.25*math.pi,1.25*math.pi))
-    S3 = test_torus('ZX', ( 0.0, 0.0, 0.5), 0.6, 0.1, 0.3, 0.5, ( 0.25*math.pi,4.25*math.pi))
-if bPlotPathTests:
-    test = 5
-    paths = Q2D_Arc_Test(test)
-    frame = Q3D_Frame.sketch_reset()
-    count = 0
-    for path in paths:
-        print("Converting path: test-" + str(test) + str(count))
-        data = frame.nurbs_path(path)
-        if data:
-            Geo.draw_nurbs("test-" + str(test) + str(count), data, surface=True)
-        count += 1
-        print("done.")
-if bPlotPathEllipseTests:
-    C = Q2D_Circle(Q2D_Point((0.9, 0.1)), 0.05)
-    E = Q2D_Ellipse(Q2D_Point((1.0, 0.0)), 0.2, 0.1, rotate=math.pi/4.0)
-    frame = Q3D_Frame.sketch_reset()
-    for angle in range(0, 360, 20):
-        data = frame.nurbs_path(E, rotate=math.radians(angle))
-        if data:
-            Geo.draw_nurbs("e-" + str(angle), data)
-        data = frame.nurbs_path(C, rotate=math.radians(angle))
-        if data:
-            Geo.draw_nurbs("c-" + str(angle), data)
-if bPlotPathSimpleTests:
-    test = 2
-    paths = Q2D_Arc_Test(test)
-    frame = Q3D_Frame.sketch_reset()
-    for p in range(6):
-        loops = []
+    def test_ellipse(orientation, origin, semi_major, semi_minor, **kwargs):
+        frame = Q3D_Frame.sketch_reset(orientation, origin)
+        data = frame.nurbs_ellipse(semi_major, semi_minor)
+        return Geo.draw_nurbs("ellipse-" + orientation, data, **kwargs)
+
+    def test_torus(orientation, origin, radius, semi_major, semi_minor, pitch=0.0, theta=None, **kwargs):
+        frame = Q3D_Frame.sketch_reset(orientation, origin)
+        data = frame.nurbs_torus(radius, semi_major, semi_minor, pitch, theta)
+        return Geo.draw_nurbs("torus-" + orientation, data, **kwargs)
+
+    if bPlotEllipseTests:
+        C1 = test_ellipse('XY', (-1.0, 0.0, 0.0), 1.0, 1.0)
+        C2 = test_ellipse('YZ', ( 0.0,-1.0, 0.0), 0.8, 0.3, mesh=0.1)
+        C3 = test_ellipse('ZX', ( 0.0, 0.0,-1.0), 0.2, 0.9)
+
+    if bPlotTorusTests:
+        S1 = test_torus('XY', ( 1.0, 0.0, 0.0),   1, 0.2, 0.2, mesh=0.05)
+        S2 = test_torus('YZ', ( 0.5, 0.0, 1.0),   1, 0.2, 0.2, 0.0, (-0.25*math.pi,1.25*math.pi))
+        S3 = test_torus('ZX', ( 0.0, 0.0, 0.5), 0.6, 0.1, 0.3, 0.5, ( 0.25*math.pi,4.25*math.pi))
+
+    if bPlotPathTests:
+        test = 5
+        paths = Q2D_Arc_Test(test)
+        frame = Q3D_Frame.sketch_reset()
+        count = 0
+        for path in paths:
+            print("Converting path: test-" + str(test) + str(count))
+            data = frame.nurbs_path(path)
+            if data:
+                Geo.draw_nurbs("test-" + str(test) + str(count), data, surface=True)
+            count += 1
+            print("done.")
+
+    if bPlotPathEllipseTests:
+        C = Q2D_Circle(Q2D_Point((0.9, 0.1)), 0.05)
+        E = Q2D_Ellipse(Q2D_Point((1.0, 0.0)), 0.2, 0.1, rotate=math.pi/4.0)
+        frame = Q3D_Frame.sketch_reset()
+        for angle in range(0, 360, 20):
+            data = frame.nurbs_path(E, rotate=math.radians(angle))
+            if data:
+                Geo.draw_nurbs("e-" + str(angle), data)
+            data = frame.nurbs_path(C, rotate=math.radians(angle))
+            if data:
+                Geo.draw_nurbs("c-" + str(angle), data)
+
+    if bPlotPathSimpleTests:
+        test = 5
+        paths = Q2D_Arc_Test(test)
+        frame = Q3D_Frame.sketch_reset()
         count = 0
         for path in paths:
             print("Drawing path: test-" + str(test) + str(count))
-            loops.append(Geo.draw_path(path, frame))
+            loop = Geo.draw_path(path, frame)
+            Geo.make_surface("test-" + str(test), [loop])
             count += 1
             print("done.")
-        Geo.make_surface("test-" + str(test), loops)
-        frame.e2_rotate(math.pi/3.0)
 
-if bBuildMesh:
-    gmsh.model.mesh.generate(2)
+    if bPlotPathCompoundTests:
+        test = 2
+        paths = Q2D_Arc_Test(test)
+        frame = Q3D_Frame.sketch_reset()
+        symmetry = 5
+        for p in range(symmetry):
+            loops = []
+            count = 0
+            for path in paths:
+                print("Drawing path: test-" + str(test) + str(count))
+                loops.append(Geo.draw_path(path, frame))
+                count += 1
+                print("done.")
+            Geo.make_surface("test-" + str(test), loops)
+            frame.e2_rotate(math.pi * 2.0 / symmetry)
 
-if "-nopopup" not in sys.argv:
-    gmsh.fltk.run()
+    if bBuildMesh:
+        gmsh.model.mesh.generate(2)
 
-gmsh.finalize()
+    if "-nopopup" not in sys.argv:
+        gmsh.fltk.run()
+
+    gmsh.finalize()
