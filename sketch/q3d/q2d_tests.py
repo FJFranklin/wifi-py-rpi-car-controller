@@ -7,6 +7,7 @@ def Q2D_Arc_Test(arc_test):
         return math.radians(a)
 
     paths = []
+    bCompound = False
 
     if arc_test == 0:
         offset = -0.1
@@ -251,6 +252,8 @@ def Q2D_Arc_Test(arc_test):
         paths.append(path)
 
     elif arc_test == 2: # let's draw a hook
+        bCompound = True
+
         # Fixed Parameters
         r_seat = 0.015 # loading pin has 30mm diameter
         r_hole = 0.008 # supporting pin has 16mm diameter
@@ -497,4 +500,4 @@ def Q2D_Arc_Test(arc_test):
 
         paths.append(path)
 
-    return paths
+    return paths, bCompound

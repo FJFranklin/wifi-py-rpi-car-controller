@@ -1297,11 +1297,3 @@ class Q2D_Frame(object):
     def copy(self):
         frame = Q2D_Frame(self.__theta)
         return frame.global_point_set_origin(self.__Og)
-
-if __name__ == '__main__':
-    from q2d_tests import Q2D_Arc_Test
-    paths = Q2D_Arc_Test(2)
-    for p in paths:
-        p.curve_print()
-        Q2D_NURBS_Path(p).curve_print()
-        print(" => No. poly points = {n}".format(n=len(p.poly_points(0.01, 0.02))))

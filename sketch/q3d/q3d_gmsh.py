@@ -1,5 +1,7 @@
 import math
 
+import gmsh
+
 from q3d_base import *
 from q2d_path import *
 
@@ -84,12 +86,13 @@ class Q3D_Draw(object):
         gmsh.model.occ.addBSpline(cps, tag=curve_id, degree=data.deg, weights=wts,
                                   knots=data.kts, multiplicities=data.mps)
         if data.per:
+            loop_id = self.__draw_loop([curve_id])
             if bSurface:
-                loop_id = self.__draw_loop([curve_id])
+                #loop_id = self.__draw_loop([curve_id])
                 pp = self.__pp_surface(name, [loop_id])
                 plane_id, phys_id = pp
             else:
-                loop_id = None
+                #loop_id = None
                 plane_id = None
                 phys_id = self.__pp_curve(name, [curve_id])
         else:
@@ -388,126 +391,3 @@ class Q3D_Draw(object):
 
     def make_surface(self, name, loop_ids):
         return self.__pp_surface(name, loop_ids)
-
-if __name__ == '__main__':
-    from q2d_tests import Q2D_Arc_Test
-
-    bPlotEllipseTests = False
-    bPlotTorusTests = False
-    bPlotPathTests = False
-    bPlotNurbsPathTests = True
-    bPlotPathEllipseTests = False
-    bPlotPathSimpleTests = False
-    bPlotPathCompoundTests = False
-    bBuildMesh = True
-
-    from q2d_tests import Q2D_Arc_Test
-
-    import gmsh
-    import sys
-
-    gmsh.initialize(sys.argv)
-
-    gmsh.model.add("torus")
-
-    Geo = Q3D_Draw(0.5)
-
-    def test_ellipse(orientation, origin, semi_major, semi_minor, **kwargs):
-        frame = Q3D_Frame.sketch_reset(orientation, origin)
-        data = frame.nurbs_ellipse(semi_major, semi_minor)
-        return Geo.draw_nurbs("ellipse-" + orientation, data, **kwargs)
-
-    def test_torus(orientation, origin, radius, semi_major, semi_minor, pitch=0.0, theta=None, **kwargs):
-        frame = Q3D_Frame.sketch_reset(orientation, origin)
-        data = frame.nurbs_torus(radius, semi_major, semi_minor, pitch, theta)
-        return Geo.draw_nurbs("torus-" + orientation, data, **kwargs)
-
-    if bPlotEllipseTests:
-        C1 = test_ellipse('XY', (-1.0, 0.0, 0.0), 1.0, 1.0)
-        C2 = test_ellipse('YZ', ( 0.0,-1.0, 0.0), 0.8, 0.3, mesh=0.1)
-        C3 = test_ellipse('ZX', ( 0.0, 0.0,-1.0), 0.2, 0.9)
-
-    if bPlotTorusTests:
-        S1 = test_torus('XY', ( 1.0, 0.0, 0.0),   1, 0.2, 0.2, mesh=0.05)
-        S2 = test_torus('YZ', ( 0.5, 0.0, 1.0),   1, 0.2, 0.2, 0.0, (-0.25*math.pi,1.25*math.pi))
-        S3 = test_torus('ZX', ( 0.0, 0.0, 0.5), 0.6, 0.1, 0.3, 0.5, ( 0.25*math.pi,4.25*math.pi))
-
-    if bPlotNurbsPathTests:
-        test = 5
-        paths = Q2D_Arc_Test(test)
-        frame = Q3D_Frame.sketch_reset()
-        count = 0
-        for path in paths:
-            if path.curve_closed():
-                text = " (closed)"
-            else:
-                text = " (open)"
-            print("Converting path: test-" + str(test) + str(count) + text)
-            N2D_path = Q2D_NURBS_Path(path)
-            N3D_path = Q3D_NURBS_Path(frame, N2D_path)
-            path_id, phys_id = Geo.draw_nurbs_path_3d(N3D_path)
-            if path.curve_closed():
-                Geo.make_surface("test-" + str(test), [path_id])
-            print("done.")
-            count += 1
-
-    if bPlotPathTests:
-        test = 5
-        paths = Q2D_Arc_Test(test)
-        frame = Q3D_Frame.sketch_reset()
-        count = 0
-        for path in paths:
-            print("Converting path: test-" + str(test) + str(count))
-            data = frame.nurbs_path(path)
-            if data:
-                Geo.draw_nurbs("test-" + str(test) + str(count), data, surface=True)
-            count += 1
-            print("done.")
-
-    if bPlotPathEllipseTests:
-        C = Q2D_Circle(Q2D_Point((0.9, 0.1)), 0.05)
-        E = Q2D_Ellipse(Q2D_Point((1.0, 0.0)), 0.2, 0.1, rotate=math.pi/4.0)
-        frame = Q3D_Frame.sketch_reset()
-        for angle in range(0, 360, 20):
-            data = frame.nurbs_path(E, rotate=math.radians(angle))
-            if data:
-                Geo.draw_nurbs("e-" + str(angle), data)
-            data = frame.nurbs_path(C, rotate=math.radians(angle))
-            if data:
-                Geo.draw_nurbs("c-" + str(angle), data)
-
-    if bPlotPathSimpleTests:
-        test = 5
-        paths = Q2D_Arc_Test(test)
-        frame = Q3D_Frame.sketch_reset()
-        count = 0
-        for path in paths:
-            print("Drawing path: test-" + str(test) + str(count))
-            loop = Geo.draw_path(path, frame)
-            Geo.make_surface("test-" + str(test), [loop])
-            count += 1
-            print("done.")
-
-    if bPlotPathCompoundTests:
-        test = 2
-        paths = Q2D_Arc_Test(test)
-        frame = Q3D_Frame.sketch_reset()
-        symmetry = 5
-        for p in range(symmetry):
-            loops = []
-            count = 0
-            for path in paths:
-                print("Drawing path: test-" + str(test) + str(count))
-                loops.append(Geo.draw_path(path, frame))
-                count += 1
-                print("done.")
-            Geo.make_surface("test-" + str(test), loops)
-            frame.e2_rotate(math.pi * 2.0 / symmetry)
-
-    if bBuildMesh:
-        gmsh.model.mesh.generate(2)
-
-    if "-nopopup" not in sys.argv:
-        gmsh.fltk.run()
-
-    gmsh.finalize()

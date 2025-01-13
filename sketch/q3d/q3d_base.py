@@ -510,20 +510,3 @@ class Q3D_NURBS_Path(Q2D_Curve): # path converted to multiple Nurbs curves
                 self._curve_append_edge(curve_3d)
                 self._curve_append_vertex(v3f)
                 v3i = v3f
-
-if __name__ == '__main__':
-    from q2d_tests import Q2D_Arc_Test
-    tests = [1,2,5]
-    frame = Q3D_Frame.sketch_reset()
-    for test in tests:
-        paths = Q2D_Arc_Test(test)
-        count = 0
-        for path in paths:
-            print("1. Converting path to single NURBS curve (test={t}, path={c}):".format(t=test, c=count))
-            data = frame.nurbs_path(path)
-            print("...done.")
-            print("2. Converting path to NURBS path (test={t}, path={c}):".format(t=test, c=count))
-            N2Dpath = Q2D_NURBS_Path(path)
-            N3Dpath = Q3D_NURBS_Path(frame, N2Dpath)
-            print("...done.")
-            count += 1
