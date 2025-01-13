@@ -24,17 +24,23 @@ class Q3D_Draw(object):
         mesh = self.mesh
         if "mesh" in kwargs:
             kw_mesh = kwargs["mesh"]
-            if kw_mesh < mesh:
-                mesh = kw_mesh
+            if kw_mesh is not None:
+                if mesh is None:
+                    mesh = kw_mesh
+                elif kw_mesh < mesh:
+                    mesh = kw_mesh
         if "mesh" in point.props:
             pp_mesh = point.props["mesh"]
-            if pp_mesh < mesh:
-                mesh = pp_mesh
+            if pp_mesh is not None:
+                if mesh is None:
+                    mesh = pp_mesh
+                elif pp_mesh < mesh:
+                    mesh = pp_mesh
         print("mesh: {s} / {k} / {p} => {f} ({x:.3f},{y:.3f})".format(s=self.mesh, k=kwargs.get("mesh"),
                                                                       p=point.props.get("mesh"), f=mesh,
-                                                                      x=point.x(), y=point.y()))
+                                                                      x=point.x, y=point.y))
         p_id = self.__new_expr_id()
-        gmsh.model.occ.addPoint(point.x(), point.y(), point.z(), mesh, p_id)
+        gmsh.model.occ.addPoint(point.x, point.y, point.z, mesh, p_id)
         point.props["id"] = p_id
         return p_id
 
@@ -344,6 +350,42 @@ class Q3D_Draw(object):
 
         return loop_id
 
+    def __draw_nurbs_curve_3d(self, curve, **kwargs):
+        cps = []
+        for cp in curve.cps:
+            cps.append(self.__draw_point(cp))
+
+        curve_id = self.__new_expr_id()
+        gmsh.model.occ.addBSpline(cps, tag=curve_id, degree=curve.deg, weights=curve.wts,
+                                  knots=curve.kts, multiplicities=curve.mps)
+        curve.props["gmsh:id"] = curve_id
+        return curve_id
+
+    def draw_nurbs_path_3d(self, path, **kwargs):
+        if path.geom != "NURBS-Path-3D":
+            return None
+
+        name = kwargs.get("name", path.name)
+        if name is None:
+            name = "untitled"
+
+        curve_ids = []
+        for curve in path.edges:
+            curve_ids.append(self.__draw_nurbs_curve_3d(curve))
+
+        if path.curve_closed():
+            path_id = self.__draw_loop(curve_ids)
+            phys_id = self.__pp_curve(name, curve_ids)
+        else:
+            path_id = self.__new_expr_id()
+            phys_id = self.__new_expr_id()
+            print("* * * Q3D_Draw::draw_nurbs_path_3d: Open paths are not yet implemented") # FIXME
+
+        path.props["gmsh:id"] = path_id
+        path.props["gmsh:pc"] = phys_id
+
+        return path_id, phys_id
+
     def make_surface(self, name, loop_ids):
         return self.__pp_surface(name, loop_ids)
 
@@ -353,8 +395,9 @@ if __name__ == '__main__':
     bPlotEllipseTests = False
     bPlotTorusTests = False
     bPlotPathTests = False
+    bPlotNurbsPathTests = True
     bPlotPathEllipseTests = False
-    bPlotPathSimpleTests = True
+    bPlotPathSimpleTests = False
     bPlotPathCompoundTests = False
     bBuildMesh = True
 
@@ -388,6 +431,25 @@ if __name__ == '__main__':
         S1 = test_torus('XY', ( 1.0, 0.0, 0.0),   1, 0.2, 0.2, mesh=0.05)
         S2 = test_torus('YZ', ( 0.5, 0.0, 1.0),   1, 0.2, 0.2, 0.0, (-0.25*math.pi,1.25*math.pi))
         S3 = test_torus('ZX', ( 0.0, 0.0, 0.5), 0.6, 0.1, 0.3, 0.5, ( 0.25*math.pi,4.25*math.pi))
+
+    if bPlotNurbsPathTests:
+        test = 5
+        paths = Q2D_Arc_Test(test)
+        frame = Q3D_Frame.sketch_reset()
+        count = 0
+        for path in paths:
+            if path.curve_closed():
+                text = " (closed)"
+            else:
+                text = " (open)"
+            print("Converting path: test-" + str(test) + str(count) + text)
+            N2D_path = Q2D_NURBS_Path(path)
+            N3D_path = Q3D_NURBS_Path(frame, N2D_path)
+            path_id, phys_id = Geo.draw_nurbs_path_3d(N3D_path)
+            if path.curve_closed():
+                Geo.make_surface("test-" + str(test), [path_id])
+            print("done.")
+            count += 1
 
     if bPlotPathTests:
         test = 5

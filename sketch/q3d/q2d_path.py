@@ -241,6 +241,7 @@ class Q2D_Curve(Q2D_Object):
         self.__vertex = [] # list of vertices, not including any arc centres or control points
         self.__edge   = [] # list of edges
         self.__mesh   = kwargs.get("mesh", None)
+        self.props = {}
 
         # Only the *first* vertex of a curve can be [None]-type, but no edges or vertices can then be added to it
         # A *defined* curve has no [None]-type vertices, at least one edge, and No. vertices = No. edges + 1
@@ -297,6 +298,8 @@ class Q2D_Curve(Q2D_Object):
             v = self.__vertex[iv]
             if v is None:
                 print(indent + "vertex {i} ({n})[mesh={m}] [None]".format(i=iv, n=v.desc(), m=v.mesh))
+            elif v.geom == "Point3D":
+                print(indent + "vertex {i} ({n}) @ ({x:.4f}, {y:.4f}, {z:.4f})".format(i=iv, n=v.desc(), x=v.x, y=v.y, z=v.z))
             else:
                 print(indent + "vertex {i} ({n})[mesh={m}] @ ({x:.4f}, {y:.4f})".format(i=iv, n=v.desc(), m=v.mesh, x=v.x, y=v.y))
 
@@ -1169,6 +1172,54 @@ class Q2D_Path(Q2D_Curve):
 
         return points
 
+class Q2D_NURBS_Curve(Q2D_Curve): # non-periodic component curve
+    def __init__(self, line_or_arc, **kwargs):
+        Q2D_Curve.__init__(self, "NURBS-Curve", **kwargs)
+        if not line_or_arc.curve_defined():
+            print("* * * Q2D_NURBS_Curve::__init__: source geometry must be a fully defined Line or Arc")
+        else:
+            self._curve_begin(line_or_arc.start)
+            if line_or_arc.geom == "Line":
+                self.deg = 1
+                self.kts = [0.0, 1.0]
+                self.mps = [2, 2]
+                self.cps = [line_or_arc.start, line_or_arc.end]
+                self.wts = [1.0, 1.0]
+            elif line_or_arc.geom == "Arc":
+                self.deg = 2
+                cps, wts = line_or_arc.nurbs_cps_wts()
+                Ncp = len(cps)
+                self.cps = [line_or_arc.start]
+                for cp in range(1,Ncp-1):
+                    pt = Q2D_Point(cps[cp])
+                    self.cps.append(pt)
+                    self._curve_append_vertex(pt)
+                self.cps.append(line_or_arc.end)
+                self.wts = wts
+                self.kts = []
+                self.mps = [3]
+                Narc = int(Ncp / 2)
+                for a in range(Narc):
+                    self.kts.append(a * 1.0 / Narc)
+                    if a:
+                        self.mps.append(2)
+                self.kts.append(1.0)
+                self.mps.append(self.mps[0])
+            else:
+                print("* * * Q2D_NURBS_Curve::__init__: source geometry must be a fully defined Line or Arc")
+            self._curve_append_vertex(line_or_arc.end)
+
+class Q2D_NURBS_Path(Q2D_Curve): # path converted to multiple Nurbs curves
+    def __init__(self, path, **kwargs):
+        Q2D_Curve.__init__(self, "NURBS-Path", **kwargs)
+        if path.geom != "Path" or not path.curve_defined():
+            print("* * * Q2D_NURBS_Path::__init__: source geometry must be a fully defined Path")
+
+        for e in path.edges:
+            self._curve_append_edge(Q2D_NURBS_Curve(e, **kwargs))
+
+        self._curve_append_vertex(path.end)
+
 class Q2D_Frame(object):
     @staticmethod
     def map_angle(angle):
@@ -1252,4 +1303,5 @@ if __name__ == '__main__':
     paths = Q2D_Arc_Test(2)
     for p in paths:
         p.curve_print()
+        Q2D_NURBS_Path(p).curve_print()
         print(" => No. poly points = {n}".format(n=len(p.poly_points(0.01, 0.02))))

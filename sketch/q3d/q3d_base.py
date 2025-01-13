@@ -1,5 +1,7 @@
 import math
 
+from q2d_path import Q2D_Curve, Q2D_NURBS_Curve, Q2D_NURBS_Path
+
 class Q3D_Point(object):
 
     def __init__(self, xyz, **kwargs):
@@ -9,12 +11,19 @@ class Q3D_Point(object):
         self.geom  = "Point3D"
         self.props = kwargs
 
+    def desc(self):
+        d = self.geom + " [{p}]".format(p=self.props)
+        return d
+
+    @property
     def x(self):
         return self.__x
 
+    @property
     def y(self):
         return self.__y
 
+    @property
     def z(self):
         return self.__z
 
@@ -36,6 +45,9 @@ class Q3D_Point(object):
                     bUpdate = False
             if bUpdate:
                 self.props["mesh"] = value
+
+    def coincident(self, p): # true if both points are in exactly the same place
+        return (self.x == p.x) and (self.y == p.y) and (self.z == p.z)
 
 class Q3D_Vector(object):
 
@@ -84,16 +96,16 @@ class Q3D_NURBS_Data(object):
 class Q3D_Frame(object):
     def local_to_global(self, l123):
         l1, l2, l3 = l123
-        gx = self.__Og.x() + l1 * self.__e1.x() + l2 * self.__e2.x() + l3 * self.__e3.x()
-        gy = self.__Og.y() + l1 * self.__e1.y() + l2 * self.__e2.y() + l3 * self.__e3.y()
-        gz = self.__Og.z() + l1 * self.__e1.z() + l2 * self.__e2.z() + l3 * self.__e3.z()
+        gx = self.__Og.x + l1 * self.__e1.x() + l2 * self.__e2.x() + l3 * self.__e3.x()
+        gy = self.__Og.y + l1 * self.__e1.y() + l2 * self.__e2.y() + l3 * self.__e3.y()
+        gz = self.__Og.z + l1 * self.__e1.z() + l2 * self.__e2.z() + l3 * self.__e3.z()
         return Q3D_Point((gx, gy, gz))
 
     def tuple_to_global(self, l123):
         l1, l2, l3 = l123
-        gx = self.__Og.x() + l1 * self.__e1.x() + l2 * self.__e2.x() + l3 * self.__e3.x()
-        gy = self.__Og.y() + l1 * self.__e1.y() + l2 * self.__e2.y() + l3 * self.__e3.y()
-        gz = self.__Og.z() + l1 * self.__e1.z() + l2 * self.__e2.z() + l3 * self.__e3.z()
+        gx = self.__Og.x + l1 * self.__e1.x() + l2 * self.__e2.x() + l3 * self.__e3.x()
+        gy = self.__Og.y + l1 * self.__e1.y() + l2 * self.__e2.y() + l3 * self.__e3.y()
+        gz = self.__Og.z + l1 * self.__e1.z() + l2 * self.__e2.z() + l3 * self.__e3.z()
         return (gx, gy, gz)
 
     def g_pt(self, local_x, local_y, local_z, **kwargs):
@@ -406,6 +418,99 @@ class Q3D_Frame(object):
 
         return Q3D_NURBS_Data((deg1, deg2), cps, wts, (kts1, kts2), (mps1, mps2), (per1, per2))
 
+class Q3D_NURBS_Curve(Q2D_Curve): # convert non-periodic component NURBS curve from 2D to 3D
+    def __init__(self, frame, nurbs_curve_2d, **kwargs):
+        Q2D_Curve.__init__(self, "NURBS-Curve-3D", **kwargs)
+        if nurbs_curve_2d.geom != "NURBS-Curve" or not nurbs_curve_2d.curve_defined():
+            print("* * * Q3D_NURBS_Curve::__init__: source geometry must be a fully defined 2D NURBS curve")
+        else:
+            base_weight = kwargs.get("base_weight", 1.0)
+            post_scale  = kwargs.get("post_scale",  (1.0, 1.0))
+            offset      = kwargs.get("offset",      (0.0, 0.0, 0.0))
+            rotate      = kwargs.get("rotate",      0.0)
+
+            self.wts = []
+            for wt in nurbs_curve_2d.wts:
+                self.wts.append(base_weight * wt)
+
+            self.deg = nurbs_curve_2d.deg
+            self.kts = nurbs_curve_2d.kts
+            self.mps = nurbs_curve_2d.mps
+
+            # order of transformations: rotate, post-scale, offset
+            if rotate:
+                cos_r = math.cos(rotate)
+                sin_r = math.sin(rotate)
+            else:
+                cos_r = 1.0
+                sin_r = 0.0
+            pscale_x, pscale_y = post_scale
+            offset_x, offset_y, offset_z = offset
+
+            Ncp = len(nurbs_curve_2d.cps)
+
+            arc_ends = kwargs.get("arc_ends")
+            if arc_ends is not None:
+                v3i, v3f = arc_ends
+            else:
+                v3i = None
+                v3f = None
+
+            self.cps = []
+            for cpi in range(Ncp):
+                if cpi == 0 and v3i is not None:
+                    self.cps.append(v3i)
+                    continue
+                if cpi == Ncp - 1 and v3f is not None:
+                    self.cps.append(v3f)
+                    continue
+                cp2 = nurbs_curve_2d.cps[cpi]
+                tx  = offset_x + pscale_x * (cos_r * cp2.x - sin_r * cp2.y)
+                ty  = offset_y + pscale_y * (sin_r * cp2.x + cos_r * cp2.y)
+                cp3 = frame.g_pt(tx, ty, offset_z, mesh=cp2.mesh)
+                self.cps.append(cp3)
+            for cp3 in self.cps:
+                self._curve_append_vertex(cp3)
+
+class Q3D_NURBS_Path(Q2D_Curve): # path converted to multiple Nurbs curves
+    def __init__(self, frame, path, **kwargs):
+        Q2D_Curve.__init__(self, "NURBS-Path-3D", **kwargs)
+        if path.geom != "NURBS-Path" or not path.curve_defined():
+            print("* * * Q3D_NURBS_Path::__init__: source geometry must be a fully defined NURBS Path")
+        else:
+            base_weight = kwargs.get("base_weight", 1.0)
+            post_scale  = kwargs.get("post_scale",  (1.0, 1.0))
+            offset      = kwargs.get("offset",      (0.0, 0.0, 0.0))
+            rotate      = kwargs.get("rotate",      0.0)
+
+            # order of transformations: rotate, post-scale, offset
+            if rotate:
+                cos_r = math.cos(rotate)
+                sin_r = math.sin(rotate)
+            else:
+                cos_r = 1.0
+                sin_r = 0.0
+            pscale_x, pscale_y = post_scale
+            offset_x, offset_y, offset_z = offset
+
+            cps = []
+            for cp2 in path.vertices:
+                tx  = offset_x + pscale_x * (cos_r * cp2.x - sin_r * cp2.y)
+                ty  = offset_y + pscale_y * (sin_r * cp2.x + cos_r * cp2.y)
+                cp3 = frame.g_pt(tx, ty, offset_z, mesh=cp2.mesh)
+                cps.append(cp3)
+
+            v3i = cps[0]
+            self._curve_append_vertex(v3i)
+            for cpi in range(1,len(cps)):
+                v3f = cps[cpi]
+                ends = (v3i, v3f)
+                curve_2d = path.edges[cpi-1]
+                curve_3d = Q3D_NURBS_Curve(frame, curve_2d, arc_ends=ends, **kwargs)
+                self._curve_append_edge(curve_3d)
+                self._curve_append_vertex(v3f)
+                v3i = v3f
+
 if __name__ == '__main__':
     from q2d_tests import Q2D_Arc_Test
     tests = [1,2,5]
@@ -414,7 +519,11 @@ if __name__ == '__main__':
         paths = Q2D_Arc_Test(test)
         count = 0
         for path in paths:
-            print("Converting path to single NURBS curve (test={t}, path={c}):".format(t=test, c=count))
+            print("1. Converting path to single NURBS curve (test={t}, path={c}):".format(t=test, c=count))
             data = frame.nurbs_path(path)
+            print("...done.")
+            print("2. Converting path to NURBS path (test={t}, path={c}):".format(t=test, c=count))
+            N2Dpath = Q2D_NURBS_Path(path)
+            N3Dpath = Q3D_NURBS_Path(frame, N2Dpath)
+            print("...done.")
             count += 1
-            print("done.")
