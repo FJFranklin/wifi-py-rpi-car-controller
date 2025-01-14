@@ -405,7 +405,7 @@ class Q3D_Frame(object):
             frame.local_translate((pitch * a * 0.5 / math.pi, radius / rs, 0))
 
             kwargs["base_weight"] = rs
-            kwargs["post_scale"]  = (1.0 / rs, 1.0)
+            kwargs["post_scale"]  = (1.0, 1.0 / rs)
             data = frame.nurbs_ellipse(semi_major, semi_minor, **kwargs)
             cps.append(data.cps)
             wts.append(data.wts)

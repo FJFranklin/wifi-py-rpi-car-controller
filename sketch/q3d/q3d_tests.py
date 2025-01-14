@@ -14,8 +14,8 @@ tests_descs = [
     ['simple',  'Simple line-arc construction (Gmsh)'],
     ['frame-p', '3D frame rotation with path selection (Gmsh)'],
     ['frame-e', '3D frame rotation with ellipse pattern (Gmsh)'],
-    ['ellipse', 'Simple ellipse test (Gmsh)'],
-    ['torus-e', 'Simple elliptical torus test (Gmsh)'],
+    ['ellipse', 'Periodic NURBS ellipse test (Gmsh)'],
+    ['torus-e', 'Doubly periodic NURBS torus test (Gmsh)'],
     ['nurbs3D', 'Piecewise NURBS curves (Q3D Base)'],
     ['nurbs2D', 'Piecewise NURBS curves (Q2D Base)']
 ]
@@ -168,7 +168,7 @@ if args.test == 'frame-e':
             Geo.draw_nurbs("c-" + str(angle), data)
 
 if args.test == 'ellipse':
-    print("Test: Simple ellipse test (Gmsh)")
+    print("Test: Periodic NURBS ellipse test (Gmsh)")
 
     def test_ellipse(orientation, origin, semi_major, semi_minor, **kwargs):
         frame = Q3D_Frame.sketch_reset(orientation, origin)
@@ -180,7 +180,7 @@ if args.test == 'ellipse':
     C3 = test_ellipse('ZX', ( 0.0, 0.0,-1.0), 0.2, 0.9)
 
 if args.test == 'torus-e':
-    print("Test: Simple elliptical torus test (Gmsh)")
+    print("Test: Doubly periodic NURBS torus test (Gmsh)")
 
     def test_torus(orientation, origin, radius, semi_major, semi_minor, pitch=0.0, theta=None, **kwargs):
         frame = Q3D_Frame.sketch_reset(orientation, origin)
