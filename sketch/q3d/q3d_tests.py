@@ -12,6 +12,7 @@ tests_descs = [
     ['p-nurbs', 'Piecewise NURBS curves (Gmsh)'],
     ['w-nurbs', 'Single whole NURBS curves (Gmsh)'],
     ['simple',  'Simple line-arc construction (Gmsh)'],
+    ['mpl',     'Simple line-arc construction (Matplotlib)'],
     ['frame-p', '3D frame rotation with path selection (Gmsh)'],
     ['frame-e', '3D frame rotation with ellipse pattern (Gmsh)'],
     ['ellipse', 'Periodic NURBS ellipse test (Gmsh)'],
@@ -124,6 +125,62 @@ if args.test == 'simple':
         print("Making physical surface with compound path")
         Geo.make_surface("test-" + str(test), p_ids)
         print("done.")
+
+if args.test == 'mpl':
+    print("Test: Simple line-arc construction (Matplotlib)")
+    test = args.path
+    paths, bCompound = Q2D_Arc_Test(test)
+    xmin = -0.5
+    xmax = -0.5
+    ymin =  0.5
+    ymax =  0.5
+    bFirst = True
+    for path in paths:
+        np = Q2D_NURBS_Path(path)
+        for e in np.edges:
+            for v in e.vertices:
+                if bFirst:
+                    bFirst = False
+                    xmin = v.x
+                    xmax = v.x
+                    ymin = v.y
+                    ymax = v.y
+                    continue
+                if v.x > xmax:
+                    xmax = v.x
+                if v.x < xmin:
+                    xmin = v.x
+                if v.y > ymax:
+                    ymax = v.y
+                if v.y < ymin:
+                    ymin = v.y
+    x_range = xmax - xmin
+    y_range = ymax - ymin
+    x_middle = (xmax + xmin) / 2.0
+    y_middle = (ymax + ymin) / 2.0
+    if x_range > y_range:
+        xmin = x_middle - x_range * 0.55
+        xmax = x_middle + x_range * 0.55
+        ymin = y_middle - x_range * 0.55
+        ymax = y_middle + x_range * 0.55
+    else:
+        xmin = x_middle - y_range * 0.55
+        xmax = x_middle + y_range * 0.55
+        ymin = y_middle - y_range * 0.55
+        ymax = y_middle + y_range * 0.55
+    from q2d_plotter import Q2D_Plotter
+    plotter = Q2D_Plotter([xmin,xmax],[ymin,ymax])
+    count = 0
+    for path in paths:
+        if path.curve_closed():
+            text = " (closed)"
+        else:
+            text = " (open)"
+        print("Plotting path: test-" + str(test) + str(count) + text)
+        plotter.draw(path)
+        print("done.")
+        count += 1
+    plotter.show()
 
 if args.test == 'frame-p':
     print("Test: 3D frame rotation with path selection (Gmsh)")

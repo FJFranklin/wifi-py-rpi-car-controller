@@ -500,4 +500,71 @@ def Q2D_Arc_Test(arc_test):
 
         paths.append(path)
 
+    if arc_test == 8:
+        ID = 0.076
+        OD = 0.088
+        dh = 0.001
+        fl = 0.012
+
+        ri = ID/2
+        rl = OD/2
+        rh = rl + dh
+        rf = ri + fl
+
+        p_sw = Q2D_Point((ri,0.000))
+        p_nw = Q2D_Point((ri,0.203))
+        p_ne = Q2D_Point((rl,0.178))
+        p_eh = Q2D_Point((rh,0.005))
+        p_se = Q2D_Point((rf,0.005))
+
+        N = Q2D_Vector(DEG( 90))
+        E = Q2D_Vector(DEG(  0))
+        S = Q2D_Vector(DEG(270))
+        W = Q2D_Vector(DEG(180))
+
+        ll = Q2D_Line(p_ne, S)
+        lh = Q2D_Line(p_eh, S)
+
+        # bump of width 4mm and radius 3mm:
+        br = 0.003
+        bx = rl - 0.001 * math.sqrt(5)
+        def bump(by):
+            p0 = Q2D_Point((bx,by))
+            ba = Q2D_Arc(None, Q2D_Circle(p0, br), clockwise=True)
+            path.append(ba)
+            path.append(ll)
+
+        # hump with 45deg edges, 3mm transition radii
+        ha = 45.0
+        hr = 0.003
+        def hump_start(by):
+            ps = Q2D_Point((rl,by))
+            ls = Q2D_Line(ps,Q2D_Vector(DEG(270+ha)))
+            path.append(ls)
+            path.append(lh, transition=hr)
+        def hump_end(by):
+            pe = Q2D_Point((rl,by))
+            le = Q2D_Line(pe,Q2D_Vector(DEG(270-ha)))
+            path.append(le, transition=hr)
+            path.append(ll)
+
+        path = Q2D_Path(Q2D_Line(p_sw, N))
+        path.append(Q2D_Line(p_nw, E))
+        path.append(Q2D_Line(p_ne, Q2D_Vector(DEG(272))), transition=0.004)
+        path.append(ll)
+        for iy in range(5):
+            by = 0.121 - 0.008 * iy
+            bump(by)
+        for se in [(0.082,0.077),(0.071,0.065),(0.058,0.051),(0.043,0.035)]:
+            ys, ye = se
+            hump_start(ys)
+            hump_end(ye)
+        hump_start(0.025)
+        path.append(Q2D_Line(p_se, E))
+        path.append(Q2D_Line(p_se, S))
+        path.append(Q2D_Line(p_sw, W))
+        path.end_point(p_sw)
+
+        paths.append(path)
+
     return paths, bCompound
