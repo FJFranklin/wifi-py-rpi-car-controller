@@ -122,3 +122,10 @@ class Q2D_Plotter(object):
 
         elif path.geom == "Circle" or path.geom == "Ellipse":
             self.__draw_ellipse(path, False)
+
+def Q2D_Plot(paths):
+    xmin, xmax, ymin, ymax = Q2D_BBox(paths)
+    plotter = Q2D_Plotter([xmin,xmax],[ymin,ymax])
+    for path in paths:
+        plotter.draw(path)
+    plotter.show()

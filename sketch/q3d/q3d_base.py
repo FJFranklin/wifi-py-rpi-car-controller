@@ -2,18 +2,55 @@ import math
 
 from q2d_path import Q2D_Curve, Q2D_NURBS_Curve, Q2D_NURBS_Path
 
-class Q3D_Point(object):
+class Q3D_Object(object):
+    __counter = 0
+
+    def __init__(self, geom, **kwargs):
+        self._geom  = geom
+        self.__name = kwargs.get("name", None)
+        self.props  = {}
+
+        Q3D_Object.__counter += 1
+        self.__id = "_3D_" + str(Q3D_Object.__counter)
+
+    @property
+    def unique_id(self):
+        return self.__id
+
+    @property
+    def geom(self):
+        return self._geom
+
+    @property
+    def name(self):
+        if self.__name is None:
+            n = self.__id
+        else:
+            n = self.__name
+        return n
+
+    @name.setter
+    def name(self, value):
+        self.__name = value
+
+    def desc(self):
+        d = self.geom + "(id=" + self.__id
+        if self.__name is not None:
+            d += ",name='" + self.__name + "'"
+        d += ") [{p}]".format(p=self.props)
+        return d
+
+class Q3D_Point(Q3D_Object):
 
     def __init__(self, xyz, **kwargs):
+        Q3D_Object.__init__(self, "Point3D", **kwargs)
         self.__x = xyz[0]
         self.__y = xyz[1]
         self.__z = xyz[2]
-        self.geom  = "Point3D"
-        self.props = kwargs
 
-    def desc(self):
-        d = self.geom + " [{p}]".format(p=self.props)
-        return d
+        mesh = kwargs.get("mesh", None)
+        if mesh is not None:
+            self.props["mesh"] = mesh
 
     @property
     def x(self):

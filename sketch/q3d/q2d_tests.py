@@ -415,49 +415,6 @@ def Q2D_Arc_Test(arc_test):
 
         paths.append(path)
 
-    elif arc_test == 5:
-        path = Q2D_Path.polygon([(0.1, 0.051/2), (0.1, 0.049/2), (0.1-0.07, 0.049/2),
-                                 (0.1-0.07, 0.059/2), (0.1-0.02, 0.059/2)])
-        path.name = "sleeve"
-        path.mesh = 0.002
-        paths.append(path)
-
-        path = Q2D_Path.polygon([(0, 0.052/2), (0.025, 0.052/2), (0.025, 0.0595/2),
-                                 (0.035, 0.0595/2), (0.035, 0.085/2), (0.090, 0.085/2),
-                                 (0.090, 0.154/2), (0, 0.154/2)])
-        path.name = "coupling"
-        path.mesh = 0.01
-        path.edges[1].mesh = 0.002
-        path.edges[2].mesh = 0.002
-        path.edges[3].mesh = 0.001
-        path.edges[4].mesh = 0.001
-        paths.append(path)
-
-        path = Q2D_Path.polygon([(0.075, 0.059/2), (0.100, 0.059/2), (0.1014, 0.0646/2),
-                                 (0.120, 0.0646/2), (0.1352, 0.059/2), (0.1377, 0.084/2),
-                                 (0.075, 0.084/2)])
-        path.name = "rubber"
-        path.mesh = 0.001
-        paths.append(path)
-
-        path = Q2D_Path.polygon([(0.1, 0.051/2), (0.165, 0.051/2), (0.165, 0.057/2),
-                                 (0.1, 0.057/2)])
-        path.name = "liner"
-        path.mesh = 0.001
-        paths.append(path)
-
-        path = Q2D_Path.polygon([(0.135, 0.057/2), (0.165, 0.057/2), (0.165, 0.075/2),
-                                 (0.1368, 0.075/2)])
-        path.name = "fabric"
-        path.mesh = 0.002
-        paths.append(path)
-
-        path = Q2D_Path.polygon([(0.1368, 0.075/2), (0.165, 0.075/2), (0.165, 0.085/2),
-                                 (0.1378, 0.085/2)])
-        path.name = "spiral"
-        path.mesh = 0.002
-        paths.append(path)
-
     elif arc_test == 6:
         XY = Q2D_Frame(DEG( 30.0))
 
@@ -497,73 +454,6 @@ def Q2D_Arc_Test(arc_test):
         path.append(l_b,  )
         path.append(l_r,  transition=0.75)
         path.end_point(p_tr)
-
-        paths.append(path)
-
-    if arc_test == 8:
-        ID = 0.076
-        OD = 0.088
-        dh = 0.001
-        fl = 0.012
-
-        ri = ID/2
-        rl = OD/2
-        rh = rl + dh
-        rf = ri + fl
-
-        p_sw = Q2D_Point((ri,0.000))
-        p_nw = Q2D_Point((ri,0.203))
-        p_ne = Q2D_Point((rl,0.178))
-        p_eh = Q2D_Point((rh,0.005))
-        p_se = Q2D_Point((rf,0.005))
-
-        N = Q2D_Vector(DEG( 90))
-        E = Q2D_Vector(DEG(  0))
-        S = Q2D_Vector(DEG(270))
-        W = Q2D_Vector(DEG(180))
-
-        ll = Q2D_Line(p_ne, S)
-        lh = Q2D_Line(p_eh, S)
-
-        # bump of width 4mm and radius 3mm:
-        br = 0.003
-        bx = rl - 0.001 * math.sqrt(5)
-        def bump(by):
-            p0 = Q2D_Point((bx,by))
-            ba = Q2D_Arc(None, Q2D_Circle(p0, br), clockwise=True)
-            path.append(ba)
-            path.append(ll)
-
-        # hump with 45deg edges, 3mm transition radii
-        ha = 45.0
-        hr = 0.003
-        def hump_start(by):
-            ps = Q2D_Point((rl,by))
-            ls = Q2D_Line(ps,Q2D_Vector(DEG(270+ha)))
-            path.append(ls)
-            path.append(lh, transition=hr)
-        def hump_end(by):
-            pe = Q2D_Point((rl,by))
-            le = Q2D_Line(pe,Q2D_Vector(DEG(270-ha)))
-            path.append(le, transition=hr)
-            path.append(ll)
-
-        path = Q2D_Path(Q2D_Line(p_sw, N))
-        path.append(Q2D_Line(p_nw, E))
-        path.append(Q2D_Line(p_ne, Q2D_Vector(DEG(272))), transition=0.004)
-        path.append(ll)
-        for iy in range(5):
-            by = 0.121 - 0.008 * iy
-            bump(by)
-        for se in [(0.082,0.077),(0.071,0.065),(0.058,0.051),(0.043,0.035)]:
-            ys, ye = se
-            hump_start(ys)
-            hump_end(ye)
-        hump_start(0.025)
-        path.append(Q2D_Line(p_se, E))
-        path.append(Q2D_Line(p_se, S))
-        path.append(Q2D_Line(p_sw, W))
-        path.end_point(p_sw)
 
         paths.append(path)
 

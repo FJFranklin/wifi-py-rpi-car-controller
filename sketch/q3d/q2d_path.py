@@ -100,8 +100,8 @@ class Q2D_Object(object):
     __counter = 0
 
     def __init__(self, geom, **kwargs):
-        self._geom = geom
-        self.name  = kwargs.get("name", None)
+        self._geom  = geom
+        self.__name = kwargs.get("name", None)
 
         Q2D_Object.__counter += 1
         self.__id = "_2D_" + str(Q2D_Object.__counter)
@@ -114,10 +114,22 @@ class Q2D_Object(object):
     def geom(self):
         return self._geom
 
+    @property
+    def name(self):
+        if self.__name is None:
+            n = self.__id
+        else:
+            n = self.__name
+        return n
+
+    @name.setter
+    def name(self, value):
+        self.__name = value
+
     def desc(self):
         d = self.geom + "(id=" + self.__id
-        if self.name is not None:
-            d += ",name='" + self.name + "'"
+        if self.__name is not None:
+            d += ",name='" + self.__name + "'"
         d += ")"
         return d
 
@@ -1297,3 +1309,45 @@ class Q2D_Frame(object):
     def copy(self):
         frame = Q2D_Frame(self.__theta)
         return frame.global_point_set_origin(self.__Og)
+
+def Q2D_BBox(paths):
+    xmin = -0.5 # FIXME: Q2D_Curve should have function for bounding box estimate
+    xmax = -0.5
+    ymin =  0.5
+    ymax =  0.5
+    bFirst = True
+    for path in paths:
+        np = Q2D_NURBS_Path(path)
+        for e in np.edges:
+            for v in e.vertices:
+                if bFirst:
+                    bFirst = False
+                    xmin = v.x
+                    xmax = v.x
+                    ymin = v.y
+                    ymax = v.y
+                    continue
+                if v.x > xmax:
+                    xmax = v.x
+                if v.x < xmin:
+                    xmin = v.x
+                if v.y > ymax:
+                    ymax = v.y
+                if v.y < ymin:
+                    ymin = v.y
+    x_range = xmax - xmin
+    y_range = ymax - ymin
+    x_middle = (xmax + xmin) / 2.0
+    y_middle = (ymax + ymin) / 2.0
+    if x_range > y_range:
+        xmin = x_middle - x_range * 0.55
+        xmax = x_middle + x_range * 0.55
+        ymin = y_middle - x_range * 0.55
+        ymax = y_middle + x_range * 0.55
+    else:
+        xmin = x_middle - y_range * 0.55
+        xmax = x_middle + y_range * 0.55
+        ymin = y_middle - y_range * 0.55
+        ymax = y_middle + y_range * 0.55
+
+    return xmin, xmax, ymin, ymax
