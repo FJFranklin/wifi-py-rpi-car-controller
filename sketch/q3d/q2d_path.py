@@ -956,22 +956,19 @@ class Q2D_Path(Q2D_Curve):
 
         pi = l1.intersection(l2, radius)
         if pi is None:
-            if Q2D_Print_Info:
-                print('Unable to add line to line - no intersection')
-        else:
-            if radius > 0:
-                if Q2D_Print_Info:
-                    print('Adding line to line with transition')
-                p1 = l1.project(pi)
-                p2 = l2.project(pi)
+            Q2D_Error('Unable to add line to line - no intersection')
 
-                clockwise = d2.cross(d1) > 0
-                lhs_arc  = Q2D_Arc(p1, Q2D_Circle(pi, radius), clockwise)
-                rhs_line = Q2D_Line(p2, d2)
-            else:
-                if Q2D_Print_Info:
-                    print('Adding line to line without transition')
-                rhs_line = Q2D_Line(pi, d2)
+        if radius > 0:
+            Q2D_Info('Adding line to line with transition')
+            p1 = l1.project(pi)
+            p2 = l2.project(pi)
+
+            clockwise = d2.cross(d1) > 0
+            lhs_arc  = Q2D_Arc(p1, Q2D_Circle(pi, radius), clockwise)
+            rhs_line = Q2D_Line(p2, d2)
+        else:
+            Q2D_Info('Adding line to line without transition')
+            rhs_line = Q2D_Line(pi, d2)
 
         return lhs_arc, rhs_line
 
@@ -1012,16 +1009,13 @@ class Q2D_Path(Q2D_Curve):
             cross = cp.cross(line.direction)
 
             if abs(cp.length - circle.radius) < Q2D_Design_Tolerance:
-                if Q2D_Print_Info:
-                    print("tangent: error = {e}".format(e=(cp.length - circle.radius)))
+                Q2D_Info("tangent: error = {e}".format(e=(cp.length - circle.radius)))
                 point = midpoint
                 tangent = True # check sense
             elif cp.length > circle.radius:
-                if Q2D_Print_Info:
-                    print("line does not intersect circle; missed by {d}".format(d=(cp.length - circle.radius)))
+                Q2D_Error("line does not intersect circle; missed by {d}".format(d=(cp.length - circle.radius)))
             else: # cp.length < circle.radius:
-                if Q2D_Print_Info:
-                    print("line intersects circle")
+                Q2D_Info("line intersects circle")
                 dv = line.direction.copy()
                 dv.length = (circle.radius**2.0 - cp.length**2.0)**0.5
 
@@ -1050,11 +1044,10 @@ class Q2D_Path(Q2D_Curve):
         point, cross, tangent = Q2D_Path.__intersect_line(line, arc.circle, sense)
         if transition == 0.0:
             if point is None:
-                if Q2D_Print_Info:
-                    print('Unable to add line without transition')
-            else:
-                Q2D_Info('Adding line without transition')
-                rhs_line = Q2D_Line(point, line.direction)
+                Q2D_Error('Unable to add line without transition')
+
+            Q2D_Info('Adding line without transition')
+            rhs_line = Q2D_Line(point, line.direction)
         else:
             if not arc.clockwise:
                 offset = -transition
@@ -1102,11 +1095,9 @@ class Q2D_Path(Q2D_Curve):
                             lhs_arc  = Q2D_Arc(arc.circle.project(p, True), Q2D_Circle(p, transition), clockwise=arc.clockwise)
                             rhs_line = Q2D_Line(line.project(p), line.direction)
                         else:
-                            if Q2D_Print_Info:
-                                print('Unable to add line with specified (co-sense) transition; try increasing the transition radius')
+                            Q2D_Error('Unable to add line with specified (co-sense) transition; try increasing the transition radius')
                     else:
-                        if Q2D_Print_Info:
-                            print('Unable to add line with specified (co-sense) transition; require transition radius > arc radius')
+                        Q2D_Error('Unable to add line with specified (co-sense) transition; require transition radius > arc radius')
                 else:
                     o = Q2D_Circle(arc.circle.center, arc.circle.radius + transition)
                     if arc.clockwise:
@@ -1120,8 +1111,7 @@ class Q2D_Path(Q2D_Curve):
                         lhs_arc  = Q2D_Arc(arc.circle.project(p), Q2D_Circle(p, transition), clockwise=(not arc.clockwise))
                         rhs_line = Q2D_Line(line.project(p), line.direction)
                     else:
-                        if Q2D_Print_Info:
-                            print('Unable to add line with specified (counter-sense) transition')
+                        Q2D_Error('Unable to add line with specified (counter-sense) transition')
             else: # line intersects circle
                 if co_sense:
                     if transition < arc.circle.radius:
@@ -1134,11 +1124,9 @@ class Q2D_Path(Q2D_Curve):
                             lhs_arc  = Q2D_Arc(arc.circle.project(p), Q2D_Circle(p, transition), clockwise=arc.clockwise)
                             rhs_line = Q2D_Line(line.project(p), line.direction)
                         else:
-                            if Q2D_Print_Info:
-                                print('Unable to add line with specified (co-sense) transition; try increasing the transition radius')
+                            Q2D_Error('Unable to add line with specified (co-sense) transition; try increasing the transition radius')
                     else:
-                        if Q2D_Print_Info:
-                            print('Unable to add line with specified (co-sense) transition; require transition radius > arc radius')
+                        Q2D_Error('Unable to add line with specified (co-sense) transition; require transition radius > arc radius')
                 else:
                     o = Q2D_Circle(arc.circle.center, arc.circle.radius + transition)
                     l = line.parallel(offset)
@@ -1353,10 +1341,8 @@ class Q2D_Path(Q2D_Curve):
                 tarc, pnew = self.__append_arc_to_arc(line_or_arc, transition, kwargs)
 
         if tarc is not None:
-            print("Adding transition arc.")
             self.__append(tarc)
         if pnew is not None:
-            print("Adding curve, geom=" + pnew.geom)
             self.__append(pnew)
 
         return tarc, pnew
