@@ -131,7 +131,7 @@ if args.test == 'mpl':
     print("Test: Simple line-arc construction (Matplotlib)")
     test = args.path
     paths, bCompound = Q2D_Arc_Test(test)
-    xmin, xmax, ymin, ymax = Q2D_BBox(paths)
+    xmin, xmax, ymin, ymax = Q2D_BBox_Multi(paths, 0.1)
     plotter = Q2D_Plotter([xmin,xmax],[ymin,ymax])
     count = 0
     for path in paths:

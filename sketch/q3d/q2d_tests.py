@@ -433,7 +433,7 @@ def Q2D_Arc_Test(arc_test):
 
         paths.append(path)
 
-    if arc_test == 7:
+    elif arc_test == 7:
         XY = Q2D_Frame(DEG(45.0))
         XY.global_tuple_set_origin((-2.5, 0.0))
 
@@ -456,5 +456,8 @@ def Q2D_Arc_Test(arc_test):
         path.end_point(p_tr)
 
         paths.append(path)
+
+    else:
+        raise RuntimeError("No definition for test path " + str(arc_test))
 
     return paths, bCompound

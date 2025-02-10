@@ -156,7 +156,7 @@ class Q2D_Vector(object):
         antillel = abs(math.pi - dt) < Q2D_Design_Tolerance
         return parallel or (antillel and allow_antiparallel)
 
-class Q2D_Object(object):
+class Q2D_Object(abc.ABC):
     """Q2D_Object is the base class for all 2D path objects.
     """
 
@@ -199,7 +199,7 @@ class Q2D_Object(object):
                 Q2D_Error("Keyword 'name' must be a str.")
             self.__name = value
 
-    @abc.abstractmethod
+    #@abc.abstractmethod
     def desc(self) -> str:
         """Brief description of object as a string."""
         d = self._geom + "(id=" + self.__id
@@ -209,7 +209,6 @@ class Q2D_Object(object):
         return d
 
 class Q2D_Point(Q2D_Object):
-
     """2D geometry class 'Point'.
     """
 
@@ -289,7 +288,6 @@ class Q2D_Point(Q2D_Object):
         return Q2D_Vector.from_to(to_point.x - from_point.x, to_point.y - from_point.y)
 
 class Q2D_Ellipse(Q2D_Object):
-
     """2D geometry class 'Ellipse' as a generalisation of 'Circle' (see Q2D_Circle).
     """
 
@@ -345,7 +343,6 @@ class Q2D_Ellipse(Q2D_Object):
         return points
 
 class Q2D_Circle(Q2D_Ellipse):
-
     """2D geometry class 'Circle'.
     """
 
@@ -366,8 +363,71 @@ class Q2D_Circle(Q2D_Ellipse):
         """Convert circle into an ellipse."""
         self._geom = "Ellipse"
 
-class Q2D_Curve(Q2D_Object):
+class Q2D_BBox(object):
+    """2D bounding box record.
+    """
 
+    def __init__(self) -> None:
+        """New instance of Q2D_BBox with no limits."""
+        self.x_min = None
+        self.x_max = None
+        self.y_min = None
+        self.y_max = None
+
+    def ranges(self) -> tuple:
+        """The x- and y-ranges of the bounding box."""
+        x_range = 0.0
+        y_range = 0.0
+        if self.x_min is not None:
+            x_range = self.x_max - self.x_min
+            y_range = self.y_max - self.y_min
+        return x_range, y_range
+
+    def center(self) -> tuple:
+        """The x- and y-coordinates of the bounding box center."""
+        if self.x_min is not None:
+            x_center = (self.x_max + self.x_min) / 2.0
+            y_center = (self.y_max + self.y_min) / 2.0
+        else:
+            x_center = 0.0
+            y_center = 0.0
+        return x_center, y_center
+
+    def include(self, p: Q2D_Point) -> None:
+        """Set or adjust the 2D bounding box to include the specified 2D point."""
+        if self.x_min is None:
+            self.x_min = p.x
+            self.x_max = p.x
+            self.y_min = p.y
+            self.y_max = p.y
+        else:
+            if self.x_min > p.x:
+                self.x_min = p.x
+            if self.x_max < p.x:
+                self.x_max = p.x
+            if self.y_min > p.y:
+                self.y_min = p.y
+            if self.y_max < p.y:
+                self.y_max = p.y
+
+    def merge(self, p: Self) -> None:
+        """Set or enlarge the 2D bounding box by merging with the specified 2D bounding box."""
+        if self.x_min is None:
+            self.x_min = p.x_min
+            self.x_max = p.x_max
+            self.y_min = p.y_min
+            self.y_max = p.y_max
+        else:
+            if self.x_min > p.x_min:
+                self.x_min = p.x_min
+            if self.x_max < p.x_max:
+                self.x_max = p.x_max
+            if self.y_min > p.y_min:
+                self.y_min = p.y_min
+            if self.y_max < p.y_max:
+                self.y_max = p.y_max
+
+class Q2D_Curve(Q2D_Object):
     """2D geometry virtual class for path component curves.
 
     Only the *first* vertex of a curve can be [None]-type, but no edges or vertices can then be added to it
@@ -384,6 +444,17 @@ class Q2D_Curve(Q2D_Object):
         self.__edge   = [] # list of edges
         self.__mesh   = kwargs.get("mesh", None)
         self.props = {}
+
+    #@abc.abstractmethod
+    def boundingbox(self) -> Q2D_BBox:
+        bbox = Q2D_BBox()
+        for v in self.__vertex:
+            if v is not None:
+                bbox.include(v)
+        for e in self.__edge:
+            if e is not None:
+                bbox.merge(e.boundingbox())
+        return bbox
 
     def __getitem__(self, key: str) -> Q2D_Object: # find first instance of edge or vertex by name
         """Search for component edge or vertex with specified name."""
@@ -560,7 +631,6 @@ class Q2D_Curve(Q2D_Object):
         return bClosed
 
 class Q2D_Line(Q2D_Curve):
-
     """2D geometry class 'Line'. A Q2D_Curve with a reference/starting vertex and a defined direction.
     """
 
@@ -569,6 +639,7 @@ class Q2D_Line(Q2D_Curve):
         Q2D_Curve.__init__(self, "Line", **kwargs)
         self._curve_begin(start)
         self.direction = direction
+        self.direction.length = 1.0
 
     def parallel(self, offset: float, reverse: bool = False) -> 'Q2D_Line':
         """Create new Q2D_Line parallel to this with specified offset (+ve to left); optionally reverse the direction."""
@@ -598,10 +669,10 @@ class Q2D_Line(Q2D_Curve):
             p1 = self.parallel( offset).start
             p2 =  rhs.parallel( offset).start
 
-        c1 = p1.y * d1.x(True) - p1.x * d1.y(True)
-        c2 = p2.y * d2.x(True) - p2.x * d2.y(True)
-        y = (d1.y(True) * c2 - d2.y(True) * c1) / det
-        x = (d1.x(True) * c2 - d2.x(True) * c1) / det
+        c1 = p1.y * d1.x() - p1.x * d1.y()
+        c2 = p2.y * d2.x() - p2.x * d2.y()
+        y = (d1.y() * c2 - d2.y() * c1) / det
+        x = (d1.x() * c2 - d2.x() * c1) / det
 
         return Q2D_Point((x, y))
 
@@ -657,7 +728,6 @@ class Q2D_Line(Q2D_Curve):
         return points
 
 class Q2D_Arc(Q2D_Curve):
-
     """2D geometry class 'Arc'. A Q2D_Curve with a reference circle and a defined direction.
     """
 
@@ -677,6 +747,12 @@ class Q2D_Arc(Q2D_Curve):
     def Oy(self) -> float:
         """y-coordinate of circle center."""
         return self.circle.center.y
+
+    def boundingbox(self) -> Q2D_BBox:
+        bbox = super(Q2D_Arc,self).boundingbox()
+        bbox.include(Q2D_Point((self.circle.center.x+self.circle.radius,self.circle.center.y+self.circle.radius)))
+        bbox.include(Q2D_Point((self.circle.center.x-self.circle.radius,self.circle.center.y-self.circle.radius)))
+        return bbox
 
     def check_offset(self, offset: float) -> tuple[bool,float]:
         """Check if an offset-arc is possible; if so return the same offset, otherwise return the limit."""
@@ -797,7 +873,6 @@ class Q2D_Arc(Q2D_Curve):
         return points
 
 class Q2D_Path(Q2D_Curve):
-
     """2D geometry class 'Path'. A composite Q2D_Curve built out of lines and arcs.
     """
 
@@ -806,18 +881,14 @@ class Q2D_Path(Q2D_Curve):
         """Build a new polygonal Q2D_Path with vertices listed as [(x1,y1) .. (xN,yN)], N > 2."""
         path = None
         if len(points) > 2:
+            path = Q2D_Path()
             p0 = Q2D_Point(points[0])
             p1 = p0
-
             for i in range(1, len(points)):
                 p2 = Q2D_Point(points[i])
                 line_12 = Q2D_Line(p1, Q2D_Point.from_to(p1, p2))
-                if i == 1:
-                    path = Q2D_Path(line_12)
-                else:
-                    path.append(line_12)
+                path.append(line_12)
                 p1 = p2
-
             line_12 = Q2D_Line(p1, Q2D_Point.from_to(p1, p0))
             path.append(line_12)
             path.end_point(p0)
@@ -874,9 +945,8 @@ class Q2D_Path(Q2D_Curve):
         rhs_line = None
 
         radius = 0
-        if transition is not None:
-            if transition > 0:
-                radius = transition
+        if transition > 0:
+            radius = transition
 
         l1 = self.last
         l2 = line
@@ -926,30 +996,39 @@ class Q2D_Path(Q2D_Curve):
     def __intersect_line(line: Q2D_Line, circle: Q2D_Circle, sense: bool) -> tuple[Q2D_Point,float,bool]:
         """Create new 2D point (or None if none) at intersection of line and circle with choice of sense."""
         point = None
+        cross = 0.0
         tangent = False
 
         midpoint = line.project(circle.center)
-        cp = Q2D_Point.from_to(circle.center, midpoint)
-        cross = cp.cross(line.direction)
-
-        if abs(cp.length - circle.radius) < Q2D_Design_Tolerance:
-            if Q2D_Print_Info:
-                print("tangent: error = {e}".format(e=(cp.length - circle.radius)))
-            point = midpoint
-            tangent = True # check sense
-        elif cp.length > circle.radius:
-            if Q2D_Print_Info:
-                print("line does not intersect circle; missed by {d}".format(d=(cp.length - circle.radius)))
-        else: # cp.length < circle.radius:
-            if Q2D_Print_Info:
-                print("line intersects circle")
+        if midpoint.coincident(circle.center):
             dv = line.direction.copy()
-            dv.length = (circle.radius**2.0 - cp.length**2.0)**0.5
-
+            dv.length = circle.radius
             if sense:
                 point = midpoint.vector_relative(dv)
             else:
                 point = midpoint.vector_relative(dv.reverse())
+        else:
+            cp = Q2D_Point.from_to(circle.center, midpoint)
+            cross = cp.cross(line.direction)
+
+            if abs(cp.length - circle.radius) < Q2D_Design_Tolerance:
+                if Q2D_Print_Info:
+                    print("tangent: error = {e}".format(e=(cp.length - circle.radius)))
+                point = midpoint
+                tangent = True # check sense
+            elif cp.length > circle.radius:
+                if Q2D_Print_Info:
+                    print("line does not intersect circle; missed by {d}".format(d=(cp.length - circle.radius)))
+            else: # cp.length < circle.radius:
+                if Q2D_Print_Info:
+                    print("line intersects circle")
+                dv = line.direction.copy()
+                dv.length = (circle.radius**2.0 - cp.length**2.0)**0.5
+
+                if sense:
+                    point = midpoint.vector_relative(dv)
+                else:
+                    point = midpoint.vector_relative(dv.reverse())
 
         return point, cross, tangent
 
@@ -969,7 +1048,7 @@ class Q2D_Path(Q2D_Curve):
             sense = co_sense
 
         point, cross, tangent = Q2D_Path.__intersect_line(line, arc.circle, sense)
-        if transition is None:
+        if transition == 0.0:
             if point is None:
                 if Q2D_Print_Info:
                     print('Unable to add line without transition')
@@ -1089,7 +1168,7 @@ class Q2D_Path(Q2D_Curve):
             sense = co_sense
 
         point, cross, tangent = Q2D_Path.__intersect_line(line, arc.circle, sense)
-        if transition is None:
+        if transition == 0.0:
             if point is None:
                 Q2D_Error("Unable to add arc without transition")
             Q2D_Info('Adding arc without transition')
@@ -1154,8 +1233,7 @@ class Q2D_Path(Q2D_Curve):
                         lhs_arc = Q2D_Arc(line.project(p), Q2D_Circle(p, transition), clockwise=(not arc.clockwise))
                         rhs_arc = Q2D_Arc(arc.circle.project(p), arc.circle, clockwise=arc.clockwise)
                     else:
-                        if Q2D_Print_Info:
-                            print('Unable to add (counter-sense) arc with specified transition')
+                        Q2D_Error('Unable to add (counter-sense) arc with specified transition')
             else: # line intersects circle
                 if co_sense:
                     if transition < arc.circle.radius:
@@ -1168,11 +1246,9 @@ class Q2D_Path(Q2D_Curve):
                             lhs_arc = Q2D_Arc(line.project(p), Q2D_Circle(p, transition), clockwise=arc.clockwise)
                             rhs_arc = Q2D_Arc(arc.circle.project(p), arc.circle, clockwise=arc.clockwise)
                         else:
-                            if Q2D_Print_Info:
-                                print('Unable to add (co-sense) arc with specified transition; try increasing the transition radius')
+                            Q2D_Error('Unable to add (co-sense) arc with specified transition; try increasing the transition radius')
                     else:
-                        if Q2D_Print_Info:
-                            print('Unable to add (co-sense) arc with specified transition; require transition radius > arc radius')
+                        Q2D_Error('Unable to add (co-sense) arc with specified transition; require transition radius > arc radius')
                 else:
                     o = Q2D_Circle(arc.circle.center, arc.circle.radius + transition)
                     l = line.parallel(-offset)
@@ -1194,10 +1270,10 @@ class Q2D_Path(Q2D_Curve):
 
         if lhs.circle.center.coincident(rhs.circle.center):
             if lhs.circle.radius != rhs.circle.radius:
-                Q2D_Error("Q2D_Path.__append_arc_to_arc: Unable to transition between concentric circles.")
+                Q2D_Error("Unable to transition between concentric circles.")
             # we're continuing along the same circle
             if rhs.start is None:
-                Q2D_Error("Q2D_Path.__append_arc_to_arc: Transition vertex must be specified when continuing on same circle.")
+                Q2D_Error("Transition vertex must be specified when continuing on same circle.")
             if lhs.clockwise != rhs.clockwise:
                 print("Q2D_Path.__append_arc_to_arc: warning: Path reverses along itself.")
             if transition > 0.0:
@@ -1205,7 +1281,7 @@ class Q2D_Path(Q2D_Curve):
             return None, rhs # success... ignoring transition curve settings and arc direction
 
         if transition <= 0.0: # [FIXME: Why not implement 0 also?]
-            Q2D_Error("Q2D_Path.__append_arc_to_arc: Transition radius must be positive.")
+            Q2D_Error("Transition radius must be positive.")
 
         # don't swap the sense of farside:
         farside     = kwargs.get('farside',  False)
@@ -1241,7 +1317,7 @@ class Q2D_Path(Q2D_Curve):
         point = Q2D_Path.__intersect_circle(lhs_o, rhs_o, kwargs)
 
         if point is None:
-            Q2D_Error("Q2D_Path.__append_arc_to_arc: Unable to intersect arcs.")
+            Q2D_Error("Unable to intersect arcs.")
 
         Q2D_Info("Adding arc with transition")
         lhs_point = lhs.circle.project(point, lhs_invert)
@@ -1277,8 +1353,10 @@ class Q2D_Path(Q2D_Curve):
                 tarc, pnew = self.__append_arc_to_arc(line_or_arc, transition, kwargs)
 
         if tarc is not None:
+            print("Adding transition arc.")
             self.__append(tarc)
         if pnew is not None:
+            print("Adding curve, geom=" + pnew.geom)
             self.__append(pnew)
 
         return tarc, pnew
@@ -1483,45 +1561,21 @@ class Q2D_Frame(object):
         frame = Q2D_Frame(self.__theta)
         return frame.global_point_set_origin(self.__Og)
 
-def Q2D_BBox(paths: list[Q2D_Path]) -> tuple: # FIXME
+def Q2D_BBox_Multi(paths: list[Q2D_Path], margin: float = 0.0) -> tuple:
     """Determine the bounding box for a list of paths."""
-    xmin = -0.5 # FIXME: Q2D_Curve should have function for bounding box estimate
-    xmax = -0.5
-    ymin =  0.5
-    ymax =  0.5
-    bFirst = True
+    bbox = Q2D_BBox()
     for path in paths:
-        np = Q2D_NURBS_Path(path)
-        for e in np.edges:
-            for v in e.vertices:
-                if bFirst:
-                    bFirst = False
-                    xmin = v.x
-                    xmax = v.x
-                    ymin = v.y
-                    ymax = v.y
-                    continue
-                if v.x > xmax:
-                    xmax = v.x
-                if v.x < xmin:
-                    xmin = v.x
-                if v.y > ymax:
-                    ymax = v.y
-                if v.y < ymin:
-                    ymin = v.y
-    x_range = xmax - xmin
-    y_range = ymax - ymin
-    x_middle = (xmax + xmin) / 2.0
-    y_middle = (ymax + ymin) / 2.0
+        bbox.merge(path.boundingbox())
+    x_range,  y_range  = bbox.ranges()
+    x_middle, y_middle = bbox.center()
     if x_range > y_range:
-        xmin = x_middle - x_range * 0.55
-        xmax = x_middle + x_range * 0.55
-        ymin = y_middle - x_range * 0.55
-        ymax = y_middle + x_range * 0.55
+        xmin = x_middle - x_range * 0.5 * (1.0 + margin)
+        xmax = x_middle + x_range * 0.5 * (1.0 + margin)
+        ymin = y_middle - x_range * 0.5 * (1.0 + margin)
+        ymax = y_middle + x_range * 0.5 * (1.0 + margin)
     else:
-        xmin = x_middle - y_range * 0.55
-        xmax = x_middle + y_range * 0.55
-        ymin = y_middle - y_range * 0.55
-        ymax = y_middle + y_range * 0.55
-
+        xmin = x_middle - y_range * 0.5 * (1.0 + margin)
+        xmax = x_middle + y_range * 0.5 * (1.0 + margin)
+        ymin = y_middle - y_range * 0.5 * (1.0 + margin)
+        ymax = y_middle + y_range * 0.5 * (1.0 + margin)
     return xmin, xmax, ymin, ymax
