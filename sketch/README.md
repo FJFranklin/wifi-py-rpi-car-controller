@@ -1,5 +1,8 @@
 # sketch
-Python code for drawing tangent paths in SpaceClaim or MatPlotLib
+Python code for drawing tangent paths in Discovery (previously SpaceClaim) or MatPlotLib
+
+A number of things changed subtly between SpaceClaim v22 and Discovery v252, but I'm gradually getting the code working again. Here's a carcass (based on schematic and measures in Tang et al.) modelled in Discovery 2025 R2.
+<img style="align:center;" src="images/Carcass-Tang.png"/>
 
 Left: Straight lines intersecting with optional transition radius. Right: Curved transitions between arcs.
 <img style="align:center;" src="images/arc-test-0.png"/>
